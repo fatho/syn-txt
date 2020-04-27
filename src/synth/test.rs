@@ -3,6 +3,8 @@
 use crate::note::*;
 use crate::synth::*;
 use crate::wave::*;
+use super::oscillator::*;
+use super::envelope::*;
 
 pub struct TestSynth {
     current_time: usize,
@@ -14,38 +16,13 @@ pub struct TestSynth {
 
 struct TestSynthVoice {
     note: Note,
-    volume: f64,
-    frequency: f64,
-    duration: usize,
-    released: Option<usize>,
-    previous: f64,
-}
-
-struct Envelope {
-    attack: f64,
-    decay: f64,
-    sustain: f64,
-    release: f64,
-}
-
-impl Envelope {
-    pub fn volume_held(&self, t: f64) -> f64 {
-        if t < self.attack {
-            t / self.attack
-        } else if t < self.attack + self.decay {
-            self.sustain + (1.0 - self.sustain) * (1.0 - (t - self.attack) / self.decay)
-        } else {
-            self.sustain
-        }
-    }
-
-    pub fn volume_released(&self, t: f64) -> Option<f64> {
-        if t < self.release {
-            Some(self.sustain * (1.0 - t/ self.release))
-        } else {
-            None
-        }
-    }
+    amplitude: f64,
+    sine: Oscillator,
+    saw1: Oscillator,
+    saw2: Oscillator,
+    envelope: ADSR,
+    time: EnvelopeTime,
+    time_increment: f64,
 }
 
 
@@ -68,20 +45,13 @@ impl TestSynth {
                 if event.time <= t {
                     match event.action {
                         NoteAction::Play { note, velocity } => {
-                            let new_voice = TestSynthVoice {
-                                note,
-                                volume: velocity.0 as f64 / std::u8::MAX as f64,
-                                frequency: self.note_frequency(note),
-                                duration: 0,
-                                released: None,
-                                previous: 0.0,
-                            };
+                            let new_voice = TestSynthVoice::new(note, velocity.amplitude(), self.tuning.frequency(note), self.sampler.sample_rate as f64);
                             self.active_voices.push(new_voice);
                         }
                         NoteAction::Release { note } => {
                             if let Some(note_voice) = self.active_voices.iter().position(|voice| voice.note == note) {
                                 let mut voice = self.active_voices.swap_remove(note_voice);
-                                voice.released = Some(voice.duration);
+                                voice.time = EnvelopeTime::release();
                                 self.fading_voices.push(voice);
                             }
                         }
@@ -95,14 +65,13 @@ impl TestSynth {
             let mut wave = 0.0;
 
             for voice in self.active_voices.iter_mut() {
-                wave += voice.sample(&self.sampler).unwrap_or(0.0);
+                wave += voice.sample()
             }
             let fading_voice_count = self.fading_voices.len();
             for voice_index in 0..fading_voice_count {
                 let reverse_index = fading_voice_count - 1 - voice_index;
-                if let Some(sample) = self.fading_voices[reverse_index].sample(&self.sampler) {
-                    wave += sample;
-                } else {
+                wave += self.fading_voices[reverse_index].sample();
+                if self.fading_voices[reverse_index].faded() {
                     self.fading_voices.swap_remove(reverse_index);
                 }
             }
@@ -112,47 +81,45 @@ impl TestSynth {
         }
         self.current_time += output.len()
     }
-
-    fn note_frequency(&self, note: Note) -> f64 {
-        let note_delta = note.0 as f64 - self.tuning.note.0 as f64;
-        self.tuning.frequency * 2.0f64.powf(note_delta / 12.0)
-    }
 }
 
 impl TestSynthVoice {
-    fn sample(&mut self, sampler: &SamplerInfo) -> Option<f64> {
-        let env = Envelope {
-            attack: 0.05,
-            decay: 1.0,
-            sustain: 0.5,
-            release: 0.25
-        };
-
-        let time = self.duration as f64 / sampler.sample_rate as f64;
-
-        let sine = (time * self.frequency * 2.0 * std::f64::consts::PI).sin();
+    fn new(note: Note, amplitude: f64, frequency: f64, sample_rate: f64) -> Self {
         let detune = 2.0f64.powf(5.0 / 1200.0);
-        let saw1 = 2.0 * (time * self.frequency * detune * 0.5).fract() - 1.0;
-        let saw2 = 2.0 * (time * self.frequency / detune * 0.5).fract() - 1.0;
+        Self {
+            note,
+            amplitude,
+            sine: Oscillator::new(WaveShape::Sine, sample_rate, frequency),
+            saw1: Oscillator::new(WaveShape::Saw, sample_rate, frequency * 0.5 * detune),
+            saw2: Oscillator::new(WaveShape::Saw, sample_rate, frequency * 0.5 / detune),
+            envelope: ADSR {
+                attack: 0.05,
+                decay: 1.0,
+                sustain: 0.5,
+                release: 0.25
+            },
+            time: EnvelopeTime::press(),
+            time_increment: 1.0 / sample_rate,
+        }
+    }
+
+    fn sample(&mut self) -> f64 {
+        self.time.advance(self.time_increment);
+        let sine = self.sine.next();
+        let saw1 = self.saw1.next();
+        let saw2 = self.saw2.next();
 
         let shape = sine * 0.5 + saw1 * 0.25 + saw2 * 0.25;
+        let envelope = self.envelope.eval(self.time);
 
-        let amplitude = if let Some(released) = self.released {
-            let t = (self.duration - released) as f64 / sampler.sample_rate as f64;
-            env.volume_released(t)
+        shape * envelope * self.amplitude
+    }
+
+    fn faded(&self) -> bool {
+        if let EnvelopeTime::SinceRelease(t) = self.time {
+            t >= self.envelope.release
         } else {
-            let t = self.duration as f64 / sampler.sample_rate as f64;
-            Some(env.volume_held(t))
-        };
-
-        self.duration += 1;
-
-        amplitude.map(|a| {
-            let current = a * shape * self.volume;
-            let previous = self.previous;
-            let alpha = (-2.0 * std::f64::consts::PI * 440.0).exp();
-            self.previous = (1.0 - alpha) * current + alpha * previous;
-            self.previous
-        })
+            false
+        }
     }
 }

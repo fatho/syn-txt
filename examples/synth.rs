@@ -52,22 +52,14 @@ fn main() -> io::Result<()> {
         sample_rate: 44100,
     };
 
-    comp.play_after(0.25, Note::named(NoteName::C, NoteOffset::Base, 4).unwrap());
-    comp.play_after(0.25, Note::named(NoteName::D, NoteOffset::Base, 4).unwrap());
-    comp.play_after(0.25, Note::named(NoteName::E, NoteOffset::Base, 4).unwrap());
-    comp.play_after(0.25, Note::named(NoteName::F, NoteOffset::Base, 4).unwrap());
-    comp.play_after(0.5, Note::named(NoteName::G, NoteOffset::Base, 4).unwrap());
-    comp.play_after(0.5, Note::named(NoteName::G, NoteOffset::Base, 4).unwrap());
-    comp.play_after(0.25, Note::named(NoteName::A, NoteOffset::Base, 4).unwrap());
-    comp.play_after(0.25, Note::named(NoteName::A, NoteOffset::Base, 4).unwrap());
-    comp.play_after(0.25, Note::named(NoteName::A, NoteOffset::Base, 4).unwrap());
-    comp.play_after(0.25, Note::named(NoteName::A, NoteOffset::Base, 4).unwrap());
-    comp.play_after(0.5, Note::named(NoteName::G, NoteOffset::Base, 4).unwrap());
-    comp.play_after(0.25, Note::named(NoteName::A, NoteOffset::Base, 4).unwrap());
-    comp.play_after(0.25, Note::named(NoteName::A, NoteOffset::Base, 4).unwrap());
-    comp.play_after(0.25, Note::named(NoteName::A, NoteOffset::Base, 4).unwrap());
-    comp.play_after(0.25, Note::named(NoteName::A, NoteOffset::Base, 4).unwrap());
-    comp.play_after(0.5, Note::named(NoteName::G, NoteOffset::Base, 4).unwrap());
+    for _ in 0..8 {
+        comp.play_after(0.125, Note::named(NoteName::E, NoteOffset::Base, 4).unwrap());
+        comp.play_after(0.125, Note::named(NoteName::A, NoteOffset::Base, 3).unwrap());
+    }
+    for _ in 0..8 {
+        comp.play_after(0.125, Note::named(NoteName::F, NoteOffset::Base, 4).unwrap());
+        comp.play_after(0.125, Note::named(NoteName::A, NoteOffset::Base, 3).unwrap());
+    }
 
     comp.events.sort_by_key(|evt| evt.time);
 

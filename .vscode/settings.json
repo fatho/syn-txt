@@ -1,0 +1,6 @@
+{
+    "rust-analyzer.cargo.loadOutDirsFromCheck": true,
+    "rust-analyzer.procMacro.enable": true,
+    "rust-analyzer.trace.server": "verbose",
+    "rust-analyzer.serverPath": "rust-analyzer",
+}

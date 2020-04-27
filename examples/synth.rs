@@ -60,6 +60,10 @@ fn main() -> io::Result<()> {
         comp.play_after(0.125, Note::named(NoteName::F, NoteOffset::Base, 4).unwrap());
         comp.play_after(0.125, Note::named(NoteName::A, NoteOffset::Base, 3).unwrap());
     }
+    for _ in 0..8 {
+        comp.play_after(0.125, Note::named(NoteName::E, NoteOffset::Base, 4).unwrap());
+        comp.play_after(0.125, Note::named(NoteName::A, NoteOffset::Base, 3).unwrap());
+    }
 
     comp.events.sort_by_key(|evt| evt.time);
 
@@ -69,10 +73,7 @@ fn main() -> io::Result<()> {
 
     let max_samples = comp.at(comp.last_note_end) + comp.sample_rate as usize;
 
-    let mut synth = synth::test::TestSynth::new(0, wave::SamplerInfo {
-        sample_rate: comp.sample_rate,
-        buffer_size: 44100,
-    });
+    let mut synth = synth::test::TestSynth::new(0, comp.sample_rate as f64);
 
     syn_txt::output::sox::with_sox_player(comp.sample_rate, |audio_stream| {
         let mut audio: Vec<wave::Stereo<f64>> = vec![wave::Stereo { left: 0.0, right: 0.0 }; max_samples];

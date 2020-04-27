@@ -8,7 +8,7 @@ use super::envelope::*;
 
 pub struct TestSynth {
     current_time: usize,
-    sampler: SamplerInfo,
+    sample_rate: f64,
     tuning: Tuning,
     active_voices: Vec<TestSynthVoice>,
     fading_voices: Vec<TestSynthVoice>,
@@ -27,13 +27,13 @@ struct TestSynthVoice {
 
 
 impl TestSynth {
-    pub fn new(epoch: usize, sampler: SamplerInfo) -> Self {
+    pub fn new(epoch: usize, sample_rate: f64) -> Self {
         TestSynth {
             current_time: epoch,
             active_voices: vec![],
             fading_voices: vec![],
             tuning: Tuning::default(),
-            sampler,
+            sample_rate,
         }
     }
 
@@ -45,7 +45,7 @@ impl TestSynth {
                 if event.time <= t {
                     match event.action {
                         NoteAction::Play { note, velocity } => {
-                            let new_voice = TestSynthVoice::new(note, velocity.amplitude(), self.tuning.frequency(note), self.sampler.sample_rate as f64);
+                            let new_voice = TestSynthVoice::new(note, velocity.amplitude(), self.tuning.frequency(note), self.sample_rate);
                             self.active_voices.push(new_voice);
                         }
                         NoteAction::Release { note } => {

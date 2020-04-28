@@ -2,6 +2,11 @@
 
 /// A "note" is just an index on the synthesizers keyboard.
 /// This definition follows the MIDI standard where C4 corresponds to index 60.
+///
+/// Note indices range from 0 to 127. At 12 semitones per octave,
+/// this corresponds to a dynamic range of more then 10 octaves,
+/// or a frequency ratio of about 1625 between the lowest and the
+/// highest frequency.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct Note(u8);
 
@@ -59,7 +64,7 @@ impl Note {
         // C4 is MIDI note number 60
         let normalize_index = 60 - 4 * 12;
         let note_index = octave * 12 + name_index + offset_index + normalize_index;
-        if name_index >= std::u8::MIN as i32 && name_index < std::u8::MAX as i32 {
+        if name_index >= 0 && name_index <= 127 {
             Some(Note(note_index as u8))
         } else {
             None
@@ -88,6 +93,7 @@ impl Note {
     }
 
     pub fn from_midi(midi_note: u8) -> Note {
+        assert!(midi_note < 128, "MIDI only has notes 0 - 127");
         Note(midi_note)
     }
 

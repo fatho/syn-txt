@@ -8,6 +8,7 @@ use syn_txt::note::*;
 use syn_txt::pianoroll::{PianoRoll, Time};
 use syn_txt::synth::{self, Synthesizer};
 use syn_txt::wave;
+use syn_txt::render;
 
 fn main() -> io::Result<()> {
     let eigth = Time::nth(8);
@@ -34,7 +35,7 @@ fn main() -> io::Result<()> {
     roll.append(&roll2);
     roll.append(&roll1);
 
-    let bpm = 128;
+    let bpm = 120;
     let measure = 4;
     let sample_rate = 44100;
     let time_to_sample = |time: Time| {
@@ -67,29 +68,40 @@ fn main() -> io::Result<()> {
 
     let max_samples = time_to_sample(roll.length()) + sample_rate as usize;
 
-    let mut synth = synth::test::TestSynth::new(0, sample_rate as f64);
+    let buffer_size = 441;
+
+    let synth = synth::test::TestSynth::new(0, sample_rate as f64);
+    let mut player = render::SynthPlayer::new(synth, &events);
+
 
     syn_txt::output::sox::with_sox_player(sample_rate, |audio_stream| {
-        let mut audio: Vec<wave::Stereo<f64>> = vec![
+        let mut audio_buffer: Vec<wave::Stereo<f64>> = vec![
             wave::Stereo {
                 left: 0.0,
                 right: 0.0
             };
-            max_samples
+            buffer_size
         ];
+        let mut byte_buffer = vec![0u8; buffer_size * 2 * 8];
 
-        synth.play(&events, &mut audio);
-
-        let bytes: Vec<u8> = audio
-            .iter()
-            .flat_map(|frame| iter::once(frame.left).chain(iter::once(frame.right)))
-            .flat_map(|sample| {
-                let bytes: Vec<u8> = sample.to_le_bytes()[..].into();
-                bytes.into_iter()
-            })
-            .collect();
-
-        audio_stream.write(&bytes)?;
+        let mut samples_total = 0;
+        while samples_total < max_samples {
+            audio_buffer.iter_mut().for_each(|s| *s = wave::Stereo::new(0.0, 0.0));
+            player.generate(&mut audio_buffer);
+            copy_audio_bytes(&audio_buffer, &mut byte_buffer);
+            audio_stream.write(&byte_buffer)?;
+            samples_total += audio_buffer.len();
+        }
         Ok(())
     })
+}
+
+fn copy_audio_bytes(audio: &[wave::Stereo<f64>], bytes: &mut [u8]) {
+    assert!(audio.len() * 2 * 8 <= bytes.len());
+    let mut offset = 0;
+    for sample in audio {
+        bytes[offset..offset + 8].copy_from_slice(&sample.left.to_le_bytes());
+        bytes[offset + 8..offset + 16].copy_from_slice(&sample.left.to_le_bytes());
+        offset += 16;
+    }
 }

@@ -1,10 +1,10 @@
 //! Exemplary implementation of a synthesizer.
 
+use super::envelope::*;
+use super::oscillator::*;
 use crate::note::*;
 use crate::synth::*;
 use crate::wave::*;
-use super::oscillator::*;
-use super::envelope::*;
 
 pub struct TestSynth {
     current_time: usize,
@@ -25,7 +25,6 @@ struct TestSynthVoice {
     time_increment: f64,
 }
 
-
 impl TestSynth {
     pub fn new(epoch: usize, sample_rate: f64) -> Self {
         TestSynth {
@@ -38,18 +37,27 @@ impl TestSynth {
     }
 
     pub fn play(&mut self, mut events: &[Event], output: &mut [Stereo<f64>]) {
-        for i in 0..output.len() {
+        for (i, out_sample) in output.into_iter().enumerate() {
             let t = self.current_time + i;
             // Process starting and stopping notes before or at this sample
             while let Some(event) = events.first() {
                 if event.time <= t {
                     match event.action {
                         NoteAction::Play { note, velocity } => {
-                            let new_voice = TestSynthVoice::new(note, velocity.amplitude(), self.tuning.frequency(note), self.sample_rate);
+                            let new_voice = TestSynthVoice::new(
+                                note,
+                                velocity.amplitude(),
+                                self.tuning.frequency(note),
+                                self.sample_rate,
+                            );
                             self.active_voices.push(new_voice);
                         }
                         NoteAction::Release { note } => {
-                            if let Some(note_voice) = self.active_voices.iter().position(|voice| voice.note == note) {
+                            if let Some(note_voice) = self
+                                .active_voices
+                                .iter()
+                                .position(|voice| voice.note == note)
+                            {
                                 let mut voice = self.active_voices.swap_remove(note_voice);
                                 voice.time = EnvelopeTime::release();
                                 self.fading_voices.push(voice);
@@ -76,8 +84,8 @@ impl TestSynth {
                 }
             }
 
-            output[i].left += wave;
-            output[i].right += wave;
+            out_sample.left += wave;
+            out_sample.right += wave;
         }
         self.current_time += output.len()
     }
@@ -96,7 +104,7 @@ impl TestSynthVoice {
                 attack: 0.05,
                 decay: 1.0,
                 sustain: 0.5,
-                release: 0.25
+                release: 0.25,
             },
             time: EnvelopeTime::press(),
             time_increment: 1.0 / sample_rate,
@@ -105,9 +113,9 @@ impl TestSynthVoice {
 
     fn sample(&mut self) -> f64 {
         self.time.advance(self.time_increment);
-        let sine = self.sine.next();
-        let saw1 = self.saw1.next();
-        let saw2 = self.saw2.next();
+        let sine = self.sine.next_sample();
+        let saw1 = self.saw1.next_sample();
+        let saw2 = self.saw2.next_sample();
 
         let shape = sine * 0.5 + saw1 * 0.25 + saw2 * 0.25;
         let envelope = self.envelope.eval(self.time);

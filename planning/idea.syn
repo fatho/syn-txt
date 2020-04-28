@@ -1,8 +1,28 @@
-(define leftHand '(
-    (play (A 1) 128)
-    (play (A 1) 128)
-    (play (A 1) 128)
-    (play (A 1) 128)
-))
 
-(overlay partA partB)
+Pan = automation {
+    ...
+}
+
+Lead = instrument {
+    pan = Pan;
+    ...
+}
+
+Drums = instrument {
+    ...
+}
+
+
+mix {
+    master = channel {
+        source = [ drumChannel musicChannel ];
+    };
+    musicChannel = channel {
+        source = [ Lead ];
+        ...
+    };
+    drumChannel = channel {
+        source = [ Drums ];
+        ...
+    }
+}

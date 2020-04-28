@@ -20,6 +20,8 @@ nixpkgs.mkShell {
     rustc
     cargo
     rust-analyzer
+    clippy
+    rustfmt
     # For running the examples
     sox
     # Allows running the update script right from this shell

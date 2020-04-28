@@ -19,9 +19,7 @@ pub struct Stereo<T> {
 
 impl<T> Stereo<T> {
     pub fn new(left: T, right: T) -> Self {
-        Self {
-            left, right,
-        }
+        Self { left, right }
     }
 }
 

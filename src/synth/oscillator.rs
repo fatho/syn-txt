@@ -12,7 +12,6 @@ pub struct Oscillator {
     phase_offset: f64,
 }
 
-
 impl Oscillator {
     pub fn new(shape: WaveShape, sample_rate: f64, frequency: f64) -> Self {
         Self {
@@ -23,7 +22,7 @@ impl Oscillator {
         }
     }
 
-    pub fn next(&mut self) -> f64 {
+    pub fn next_sample(&mut self) -> f64 {
         let phase = self.phase_offset;
         // Increment phase
         let phase_increment = self.frequency / self.sample_rate;

@@ -1,8 +1,11 @@
 //! Easy interface for getting sound to play using a sox subprocess.
-use std::process::{Stdio, Command};
 use std::io;
+use std::process::{Command, Stdio};
 
-pub fn with_sox_player<R, F: FnOnce(&mut dyn io::Write) -> io::Result<R>>(sample_rate: i32, callback: F) -> io::Result<R> {
+pub fn with_sox_player<R, F: FnOnce(&mut dyn io::Write) -> io::Result<R>>(
+    sample_rate: i32,
+    callback: F,
+) -> io::Result<R> {
     let mut player = Command::new("play")
         .arg("--channels")
         .arg("2")
@@ -28,7 +31,10 @@ pub fn with_sox_player<R, F: FnOnce(&mut dyn io::Write) -> io::Result<R>>(sample
     result
 }
 
-pub fn with_sox_wav<R, F: FnOnce(&mut dyn io::Write) -> io::Result<R>>(sample_rate: i32, callback: F) -> io::Result<R> {
+pub fn with_sox_wav<R, F: FnOnce(&mut dyn io::Write) -> io::Result<R>>(
+    sample_rate: i32,
+    callback: F,
+) -> io::Result<R> {
     let mut player = Command::new("sox")
         .arg("--channels")
         .arg("2")

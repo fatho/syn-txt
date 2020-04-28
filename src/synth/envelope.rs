@@ -36,13 +36,12 @@ pub struct ADSR {
     pub release: f64,
 }
 
-
 #[derive(Debug, Clone, Copy)]
 pub enum EnvelopeTime {
     /// Time elapsed since the key was pressed but not yet released.
     SincePress(f64),
     /// Time elapsed since the key was released.
-    SinceRelease(f64)
+    SinceRelease(f64),
 }
 
 impl EnvelopeTime {
@@ -62,12 +61,11 @@ impl EnvelopeTime {
     }
 }
 
-
 impl ADSR {
     /// Evaluate the envelope curve at this point in time.
     pub fn eval(&self, time: EnvelopeTime) -> f64 {
         match time {
-            EnvelopeTime::SincePress(t) =>
+            EnvelopeTime::SincePress(t) => {
                 if t < self.attack {
                     t / self.attack
                 } else if t < self.attack + self.decay {
@@ -75,12 +73,14 @@ impl ADSR {
                 } else {
                     self.sustain
                 }
-            EnvelopeTime::SinceRelease(t) =>
+            }
+            EnvelopeTime::SinceRelease(t) => {
                 if t < self.release {
-                    self.sustain * (1.0 - t/ self.release)
+                    self.sustain * (1.0 - t / self.release)
                 } else {
                     0.0
                 }
+            }
         }
     }
 }

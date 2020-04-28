@@ -1,9 +1,3 @@
-//! This namespace contains all the parts converting from note data to wave data.
-
-pub mod envelope;
-pub mod oscillator;
-pub mod test;
-
 use crate::note::*;
 
 /// Defines the tuning of an instrument by assinging a frequency to a certain note.
@@ -39,12 +33,4 @@ impl Default for Tuning {
             reference_frequency: 440.0,
         }
     }
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Event {
-    /// Time of the event in samples since playback started.
-    pub time: usize,
-    /// What kind of event happened at this time.
-    pub action: NoteAction,
 }

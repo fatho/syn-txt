@@ -6,7 +6,7 @@ use std::iter;
 use syn_txt;
 use syn_txt::note::*;
 use syn_txt::pianoroll::{PianoRoll, Time};
-use syn_txt::synth;
+use syn_txt::synth::{self, Synthesizer};
 use syn_txt::wave;
 
 fn main() -> io::Result<()> {

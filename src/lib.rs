@@ -1,7 +1,8 @@
 pub mod note;
-pub mod wave;
-pub mod synth;
 pub mod output;
+pub mod pianoroll;
+pub mod synth;
+pub mod wave;
 
 // Utility modules
 pub mod rational;

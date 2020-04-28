@@ -1,8 +1,8 @@
 //! This namespace contains all the parts converting from note data to wave data.
 
-pub mod test;
-pub mod oscillator;
 pub mod envelope;
+pub mod oscillator;
+pub mod test;
 
 use crate::note::*;
 
@@ -35,7 +35,7 @@ impl Tuning {
 impl Default for Tuning {
     fn default() -> Self {
         Tuning {
-            reference_note: Note::named(NoteName::A, NoteOffset::Base, 4).unwrap(),
+            reference_note: Note::named(NoteName::A, NoteOffset::Base, 4),
             reference_frequency: 440.0,
         }
     }

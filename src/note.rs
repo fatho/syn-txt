@@ -13,7 +13,7 @@ pub enum NoteName {
     D,
     E,
     F,
-    G
+    G,
 }
 
 /// Any offset applied to a note in standard notation.
@@ -29,18 +29,19 @@ pub enum NoteOffset {
 impl Note {
     /// Convert a note from standard notation to a MIDI note index.
     /// Note that different names may refer to the same note, e.g. a G♯ is the same as a A♭.
+    /// Returns `None` if the note is not representable in the MIDI note system.
     ///
     /// # Examples
     ///
     /// ```
     /// use syn_txt::note::*;
     ///
-    /// assert_eq!(Note::named(NoteName::A, NoteOffset::Base, 4), Some(Note::from_midi(69)));
-    /// assert_eq!(Note::named(NoteName::A, NoteOffset::Base, 4), Some(Note::from_midi(69)));
-    /// assert_eq!(Note::named(NoteName::C, NoteOffset::Sharp, 6), Some(Note::from_midi(85)));
-    /// assert_eq!(Note::named(NoteName::G, NoteOffset::Flat, 2), Some(Note::from_midi(42)));
+    /// assert_eq!(Note::named_checked(NoteName::A, NoteOffset::Base, 4), Some(Note::from_midi(69)));
+    /// assert_eq!(Note::named_checked(NoteName::A, NoteOffset::Base, 4), Some(Note::from_midi(69)));
+    /// assert_eq!(Note::named_checked(NoteName::C, NoteOffset::Sharp, 6), Some(Note::from_midi(85)));
+    /// assert_eq!(Note::named_checked(NoteName::G, NoteOffset::Flat, 2), Some(Note::from_midi(42)));
     /// ```
-    pub fn named(name: NoteName, offset: NoteOffset, octave: i32) -> Option<Note> {
+    pub fn named_checked(name: NoteName, offset: NoteOffset, octave: i32) -> Option<Note> {
         let name_index = match name {
             NoteName::C => 0,
             NoteName::D => 2,
@@ -65,6 +66,27 @@ impl Note {
         }
     }
 
+    /// Convert a note from standard notation to a MIDI note index.
+    /// Note that different names may refer to the same note, e.g. a G♯ is the same as a A♭.
+    ///
+    /// # Panics
+    ///
+    /// - If the note is not representable in the MIDI note system.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use syn_txt::note::*;
+    ///
+    /// assert_eq!(Note::named(NoteName::A, NoteOffset::Base, 4), Note::from_midi(69));
+    /// assert_eq!(Note::named(NoteName::A, NoteOffset::Base, 4), Note::from_midi(69));
+    /// assert_eq!(Note::named(NoteName::C, NoteOffset::Sharp, 6), Note::from_midi(85));
+    /// assert_eq!(Note::named(NoteName::G, NoteOffset::Flat, 2), Note::from_midi(42));
+    /// ```
+    pub fn named(name: NoteName, offset: NoteOffset, octave: i32) -> Note {
+        Note::named_checked(name, offset, octave).expect("Note not representable in MIDI system.")
+    }
+
     pub fn from_midi(midi_note: u8) -> Note {
         Note(midi_note)
     }
@@ -80,12 +102,35 @@ impl Note {
 }
 
 /// The velocity of a voice indicates how hard/fast the key was pressed down.
+///
+/// Uses an integral type internally for non-NaN convenience.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
-pub struct Velocity(pub u8);
+pub struct Velocity(u16);
 
 impl Velocity {
     pub fn amplitude(self) -> f64 {
-        self.0 as f64 / std::u8::MAX as f64
+        self.0 as f64 / std::u16::MAX as f64
+    }
+
+    pub fn full() -> Velocity {
+        Velocity(std::u16::MAX)
+    }
+
+    /// Convert a floating point value in the interval [0, 1] to a velocity.
+    /// # Panics
+    /// - if not 0 <= velocity <= 1.
+    /// # Examples
+    ///
+    /// ```
+    /// use syn_txt::note::*;
+    ///
+    /// assert_eq!(Velocity::from_f64(1.0), Velocity::full());
+    /// ```
+    pub fn from_f64(velocity: f64) -> Velocity {
+        if velocity.is_nan() || velocity < 0.0 || velocity > 1.0 {
+            panic!("{} out of range", velocity);
+        }
+        Velocity((velocity * std::u16::MAX as f64).round() as u16)
     }
 }
 

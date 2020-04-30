@@ -1,14 +1,14 @@
 //! Example demonstrating how to use the low-level synth interface.
 
 use std::io;
-use std::iter;
 
 use syn_txt;
 use syn_txt::note::*;
 use syn_txt::pianoroll::{PianoRoll, Time};
-use syn_txt::synth::{self, Synthesizer};
+use syn_txt::synth;
 use syn_txt::wave;
 use syn_txt::render;
+use syn_txt::output;
 
 fn main() -> io::Result<()> {
     let eigth = Time::nth(8);
@@ -88,20 +88,11 @@ fn main() -> io::Result<()> {
         while samples_total < max_samples {
             audio_buffer.iter_mut().for_each(|s| *s = wave::Stereo::new(0.0, 0.0));
             player.generate(&mut audio_buffer);
-            copy_audio_bytes(&audio_buffer, &mut byte_buffer);
+            let n = output::copy_f64_bytes(&audio_buffer, &mut byte_buffer);
+            assert_eq!(n, audio_buffer.len());
             audio_stream.write(&byte_buffer)?;
             samples_total += audio_buffer.len();
         }
         Ok(())
     })
-}
-
-fn copy_audio_bytes(audio: &[wave::Stereo<f64>], bytes: &mut [u8]) {
-    assert!(audio.len() * 2 * 8 <= bytes.len());
-    let mut offset = 0;
-    for sample in audio {
-        bytes[offset..offset + 8].copy_from_slice(&sample.left.to_le_bytes());
-        bytes[offset + 8..offset + 16].copy_from_slice(&sample.left.to_le_bytes());
-        offset += 16;
-    }
 }

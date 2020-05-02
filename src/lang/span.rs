@@ -121,7 +121,7 @@ impl<'a> LineMap<'a> {
     pub fn highlight(&self, start: Pos, end: Pos, colored: bool) -> String {
         let mut out = String::new();
         let display_start = 1.max(start.line - 1);
-        let display_end = self.line_offsets.len().min(start.line + 1);
+        let display_end = self.line_offsets.len().min(end.line + 1);
         for line in display_start..=display_end {
             let line_span = self.line_span(line);
             let line_str = &self.source[line_span.begin..line_span.end];
@@ -129,17 +129,18 @@ impl<'a> LineMap<'a> {
             let red = "\x1b[31;1m";
             let reset = "\x1b[0m";
 
-            if colored && (line == start.line) {
+            let color_line_number = colored && (line >= start.line && line <= end.line);
+            if color_line_number {
                 out.push_str(red);
             }
             write!(&mut out, "{:4}|", line).unwrap();
-            if colored && (line == start.line) {
+            if color_line_number {
                 out.push_str(reset);
             }
 
             if colored {
                 for (i, ch) in line_str.chars().enumerate() {
-                    if i + 1 == start.column && line == start.line {
+                    if (i + 1 == start.column && line == start.line) || (i == 0 && line > start.line && line <= end.line) {
                         out.push_str(red);
                     }
                     if i + 1 == end.column && line == end.line {
@@ -147,6 +148,7 @@ impl<'a> LineMap<'a> {
                     }
                     out.push(ch);
                 }
+                out.push_str(reset);
             } else {
                 out.push_str(line_str);
             }

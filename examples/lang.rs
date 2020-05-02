@@ -1,5 +1,6 @@
 use syn_txt::lang::lexer::Lexer;
 use syn_txt::lang::parser::Parser;
+use syn_txt::lang::interp::Interpreter;
 
 fn main() {
     let input = r#"
@@ -50,6 +51,13 @@ fn main() {
         )
     "#;
 
+    let input = r#"
+        (define x 1/4)
+        (define y x)
+        (define z y)
+        z
+    "#;
+
     let mut lex = Lexer::new(input);
     let mut tokens = Vec::new();
 
@@ -57,11 +65,19 @@ fn main() {
         if tok.1.is_error() {
             println!("ERROR {:?}: {:?}", tok.1, &input[tok.0.begin..tok.0.end]);
         } else {
-            println!("{:?}: {:?} ({:?})", tok.1, &input[tok.0.begin..tok.0.end], tok.0);
             tokens.push(tok);
         }
     }
 
     let mut parser = Parser::new(input, &tokens);
-    println!("{:?}", parser.parse());
+    // println!("{:?}", parser.parse());
+
+    let mut int = Interpreter::new();
+    for s in parser.parse().unwrap() {
+        println!("{:?}", &s);
+        let result = int.eval(&s);
+        println!("  {:?}", result);
+    }
+
+
 }

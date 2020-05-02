@@ -9,8 +9,8 @@ pub struct Ident(pub String);
 pub enum SymExp {
     /// An abstract expression that cannot be evaluated.
     /// Only used for matching named arguments.
-    Keyword(String),
-    Variable(String),
+    Keyword(Ident),
+    Variable(Ident),
     Literal(Value),
     List(Vec<SymExp>),
 }

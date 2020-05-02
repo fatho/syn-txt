@@ -82,9 +82,9 @@ impl<'a> Parser<'a> {
             Token::Ident => {
                 let ident = self.get_span(span);
                 if ident.starts_with(':') {
-                    Ok(SymExp::Keyword(ident.to_owned()))
+                    Ok(SymExp::Keyword(Ident(ident.to_owned())))
                 } else {
-                    Ok(SymExp::Variable(ident.to_owned()))
+                    Ok(SymExp::Variable(Ident(ident.to_owned())))
                 }
             }
             _ => Err(ParseError::Unexpected {

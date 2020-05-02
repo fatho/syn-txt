@@ -1,7 +1,7 @@
 use syn_txt::lang::interp::Interpreter;
 use syn_txt::lang::lexer::Lexer;
 use syn_txt::lang::parser::Parser;
-use syn_txt::lang::span::{Span, LineMap};
+use syn_txt::lang::span::{LineMap, Span};
 
 fn main() {
     let input = r#"
@@ -63,7 +63,6 @@ fn main() {
     run_test(input)
 }
 
-
 fn run_test(input: &str) {
     let mut lex = Lexer::new(input);
     let mut tokens = Vec::new();
@@ -72,9 +71,7 @@ fn run_test(input: &str) {
     println!("Lexing...");
     while let Some(token_or_error) = lex.next_token() {
         match token_or_error {
-            Ok(tok) => {
-                tokens.push(tok)
-            },
+            Ok(tok) => tokens.push(tok),
             Err(err) => {
                 print_error(&lines, err.location(), err.kind());
             }

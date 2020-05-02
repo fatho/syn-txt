@@ -55,7 +55,6 @@ impl fmt::Display for IntpErrInfo {
     }
 }
 
-
 pub struct Interpreter {
     scopes: Vec<Scope>,
 }
@@ -88,17 +87,16 @@ impl Interpreter {
                 if let Some(value) = self.lookup_var(var) {
                     Ok(value.clone())
                 } else {
-                    Err(IntpErr::new(sym.src, IntpErrInfo::NoSuchVariable(var.clone())))
+                    Err(IntpErr::new(
+                        sym.src,
+                        IntpErrInfo::NoSuchVariable(var.clone()),
+                    ))
                 }
             }
         }
     }
 
-    fn eval_list(
-        &mut self,
-        span: Span,
-        list: &[ast::SymExpSrc],
-    ) -> InterpreterResult<Value> {
+    fn eval_list(&mut self, span: Span, list: &[ast::SymExpSrc]) -> InterpreterResult<Value> {
         let head_exp = list
             .first()
             .ok_or(IntpErr::new(span, IntpErrInfo::Uncallable))?;
@@ -119,37 +117,48 @@ impl Interpreter {
                 }
                 "+" => {
                     let mut v1 = args.value(self)?;
-                    while ! args.is_empty() {
-                        v1 = v1.add(&args.value(self)?).map_err(|e| IntpErr::new(span, e))?;
+                    while !args.is_empty() {
+                        v1 = v1
+                            .add(&args.value(self)?)
+                            .map_err(|e| IntpErr::new(span, e))?;
                     }
                     drop(args);
                     Ok(v1)
                 }
                 "-" => {
                     let mut v1 = args.value(self)?;
-                    while ! args.is_empty() {
-                        v1 = v1.sub(&args.value(self)?).map_err(|e| IntpErr::new(span, e))?;
+                    while !args.is_empty() {
+                        v1 = v1
+                            .sub(&args.value(self)?)
+                            .map_err(|e| IntpErr::new(span, e))?;
                     }
                     drop(args);
                     Ok(v1)
                 }
                 "*" => {
                     let mut v1 = args.value(self)?;
-                    while ! args.is_empty() {
-                        v1 = v1.mul(&args.value(self)?).map_err(|e| IntpErr::new(span, e))?;
+                    while !args.is_empty() {
+                        v1 = v1
+                            .mul(&args.value(self)?)
+                            .map_err(|e| IntpErr::new(span, e))?;
                     }
                     drop(args);
                     Ok(v1)
                 }
                 "/" => {
                     let mut v1 = args.value(self)?;
-                    while ! args.is_empty() {
-                        v1 = v1.div(&args.value(self)?).map_err(|e| IntpErr::new(span, e))?;
+                    while !args.is_empty() {
+                        v1 = v1
+                            .div(&args.value(self)?)
+                            .map_err(|e| IntpErr::new(span, e))?;
                     }
                     drop(args);
                     Ok(v1)
                 }
-                _ => Err(IntpErr::new(head_exp.src, IntpErrInfo::NoSuchVariable(fun.clone()))),
+                _ => Err(IntpErr::new(
+                    head_exp.src,
+                    IntpErrInfo::NoSuchVariable(fun.clone()),
+                )),
             },
             _ => Err(IntpErr::new(head_exp.src, IntpErrInfo::Uncallable)),
         }
@@ -343,17 +352,17 @@ impl Value {
             Type::Int => {
                 let denom = other.as_int()?;
                 if denom == 0 {
-                    return Err(IntpErrInfo::DivisionByZero)
+                    return Err(IntpErrInfo::DivisionByZero);
                 }
                 Ok(Value::Ratio(Rational::new(self.as_int()?, denom)))
-            },
+            }
             Type::Ratio => {
                 let denom = other.as_ratio()?;
                 if denom.is_zero() {
-                    return Err(IntpErrInfo::DivisionByZero)
+                    return Err(IntpErrInfo::DivisionByZero);
                 }
                 Ok(Value::Ratio(self.as_ratio()? / denom))
-            },
+            }
             _ => Err(IntpErrInfo::Type),
         }
     }

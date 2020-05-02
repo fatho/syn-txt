@@ -1,8 +1,8 @@
 //! Rational numbers are used for designating times on the song level, e.g. note lenghts.
 
-use std::{cmp::Ordering, ops};
-use std::fmt;
 use std::error::Error;
+use std::fmt;
+use std::{cmp::Ordering, ops};
 
 /// Underlying integral type for the rational numbers.
 type Int = i64;
@@ -223,12 +223,9 @@ impl Error for ParseRationalError {}
 impl fmt::Display for ParseRationalError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.0 {
-            RationalErrorKind::InvalidInt =>
-                write!(f, "invalid integer literal"),
-            RationalErrorKind::Zero =>
-                write!(f, "denominator is zero"),
-            RationalErrorKind::Malformed =>
-                write!(f, "malformed fraction"),
+            RationalErrorKind::InvalidInt => write!(f, "invalid integer literal"),
+            RationalErrorKind::Zero => write!(f, "denominator is zero"),
+            RationalErrorKind::Malformed => write!(f, "malformed fraction"),
         }
     }
 }

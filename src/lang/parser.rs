@@ -5,7 +5,6 @@ use super::lexer::Token;
 use super::span::Span;
 use crate::rational::{ParseRationalError, Rational};
 
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParseError {
     location: Span,
@@ -46,22 +45,20 @@ pub enum ParseErrorInfo {
 impl fmt::Display for ParseErrorInfo {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ParseErrorInfo::InvalidInt(err) =>
-                write!(f, "invalid integer literal: {}", err),
-            ParseErrorInfo::InvalidFloat(err) =>
-                write!(f, "invalid float literal: {}", err),
-            ParseErrorInfo::InvalidRational(err) =>
-                write!(f, "invalid rational literal: {}", err),
-            ParseErrorInfo::InvalidString =>
-                write!(f, "invalid string literal"),
-            ParseErrorInfo::Unexpected { expected, actual } =>
-                write!(f, "expected one of {:?}, but got {:?}", &expected[..], actual),
-            ParseErrorInfo::EOF =>
-                write!(f, "end of file reached"),
+            ParseErrorInfo::InvalidInt(err) => write!(f, "invalid integer literal: {}", err),
+            ParseErrorInfo::InvalidFloat(err) => write!(f, "invalid float literal: {}", err),
+            ParseErrorInfo::InvalidRational(err) => write!(f, "invalid rational literal: {}", err),
+            ParseErrorInfo::InvalidString => write!(f, "invalid string literal"),
+            ParseErrorInfo::Unexpected { expected, actual } => write!(
+                f,
+                "expected one of {:?}, but got {:?}",
+                &expected[..],
+                actual
+            ),
+            ParseErrorInfo::EOF => write!(f, "end of file reached"),
         }
     }
 }
-
 
 type ParseResult<T> = Result<T, ParseError>;
 
@@ -164,17 +161,20 @@ impl<'a> Parser<'a> {
                     })
                 }
             }
-            _ => Err(ParseError::new(span, ParseErrorInfo::Unexpected {
-                expected: vec![
-                    Token::ParenOpen,
-                    Token::Int,
-                    Token::Float,
-                    Token::Rational,
-                    Token::String,
-                    Token::Ident,
-                ],
-                actual: token,
-            })),
+            _ => Err(ParseError::new(
+                span,
+                ParseErrorInfo::Unexpected {
+                    expected: vec![
+                        Token::ParenOpen,
+                        Token::Int,
+                        Token::Float,
+                        Token::Rational,
+                        Token::String,
+                        Token::Ident,
+                    ],
+                    actual: token,
+                },
+            )),
         }
     }
 
@@ -258,7 +258,13 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_token(&mut self) -> ParseResult<(Span, Token)> {
-        self.pop_token().ok_or(ParseError::new(Span { begin: self.source.len(), end: self.source.len() }, ParseErrorInfo::EOF))
+        self.pop_token().ok_or(ParseError::new(
+            Span {
+                begin: self.source.len(),
+                end: self.source.len(),
+            },
+            ParseErrorInfo::EOF,
+        ))
     }
 
     fn expect_token(&mut self, expected: Token) -> ParseResult<Span> {
@@ -266,10 +272,13 @@ impl<'a> Parser<'a> {
             if token == expected {
                 Ok(span)
             } else {
-                Err(ParseError::new(span, ParseErrorInfo::Unexpected {
-                    expected: vec![expected],
-                    actual: token,
-                }))
+                Err(ParseError::new(
+                    span,
+                    ParseErrorInfo::Unexpected {
+                        expected: vec![expected],
+                        actual: token,
+                    },
+                ))
             }
         } else {
             Err(self.eof_error())
@@ -277,7 +286,13 @@ impl<'a> Parser<'a> {
     }
 
     fn eof_error(&self) -> ParseError {
-        ParseError::new(Span { begin: self.source.len(), end: self.source.len() }, ParseErrorInfo::EOF)
+        ParseError::new(
+            Span {
+                begin: self.source.len(),
+                end: self.source.len(),
+            },
+            ParseErrorInfo::EOF,
+        )
     }
 
     /// Check if the next token is the expected terminator or EOF.

@@ -31,15 +31,11 @@ pub enum LexerErrorKind {
 impl fmt::Display for LexerErrorKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            LexerErrorKind::UnrecognizedChar =>
-                write!(f, "unrecognized character"),
-            LexerErrorKind::UnterminatedString =>
-                write!(f, "unterminated string literal"),
-            LexerErrorKind::IllegalOperator =>
-                write!(f, "illegal multi-character operator"),
+            LexerErrorKind::UnrecognizedChar => write!(f, "unrecognized character"),
+            LexerErrorKind::UnterminatedString => write!(f, "unterminated string literal"),
+            LexerErrorKind::IllegalOperator => write!(f, "illegal multi-character operator"),
         }
     }
-
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
@@ -136,10 +132,13 @@ impl<'a> Lexer<'a> {
                 '"' => self.lex_string(),
 
                 // Numbers
-                _ if ch.is_ascii_digit() => {
-                    Ok(self.lex_number())
-                }
-                '+' | '-' if self.peek_char().map(|(_, ch)| ch.is_ascii_digit()).unwrap_or(false) => {
+                _ if ch.is_ascii_digit() => Ok(self.lex_number()),
+                '+' | '-'
+                    if self
+                        .peek_char()
+                        .map(|(_, ch)| ch.is_ascii_digit())
+                        .unwrap_or(false) =>
+                {
                     Ok(self.lex_number())
                 }
 
@@ -147,7 +146,7 @@ impl<'a> Lexer<'a> {
                 ';' => {
                     self.skip_to_next_line();
                     continue;
-                },
+                }
 
                 // Ignore whitespace between tokens
                 _ if ch.is_whitespace() => continue,
@@ -197,8 +196,8 @@ impl<'a> Lexer<'a> {
     /// An operator must be followed by whitespace
     fn lex_op(&mut self) -> Result<(Span, Token), LexerError> {
         if let Some((_, ch)) = self.peek_char() {
-            if ! ch.is_whitespace() {
-                return Err(self.pack_error(LexerErrorKind::IllegalOperator))
+            if !ch.is_whitespace() {
+                return Err(self.pack_error(LexerErrorKind::IllegalOperator));
             }
         }
         Ok(self.pack_token(Token::Ident))

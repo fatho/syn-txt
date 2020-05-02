@@ -117,11 +117,7 @@ impl<'a> LineMap<'a> {
             writeln!(&mut out, "{:4}|{}", line, line_str).unwrap();
 
             if line >= start.line && line <= end.line {
-                let col_start = if line == start.line {
-                    start.column
-                } else {
-                    1
-                };
+                let col_start = if line == start.line { start.column } else { 1 };
                 let col_end = if line == end.line {
                     end.column
                 } else {

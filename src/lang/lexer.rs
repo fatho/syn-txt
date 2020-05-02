@@ -1,6 +1,46 @@
 //! Implements the lexer for our s-expression based language.
 
+use std::fmt;
+
 use super::span::Span;
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct LexerError {
+    location: Span,
+    kind: LexerErrorKind,
+}
+
+impl LexerError {
+    pub fn location(&self) -> Span {
+        self.location
+    }
+
+    pub fn kind(&self) -> LexerErrorKind {
+        self.kind
+    }
+}
+
+/// The types of lexer errors.
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub enum LexerErrorKind {
+    UnrecognizedChar,
+    UnterminatedString,
+    IllegalOperator,
+}
+
+impl fmt::Display for LexerErrorKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            LexerErrorKind::UnrecognizedChar =>
+                write!(f, "unrecognized character"),
+            LexerErrorKind::UnterminatedString =>
+                write!(f, "unterminated string literal"),
+            LexerErrorKind::IllegalOperator =>
+                write!(f, "illegal multi-character operator"),
+        }
+    }
+
+}
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum Token {
@@ -15,20 +55,6 @@ pub enum Token {
     // Symbols
     ParenOpen,
     ParenClose,
-
-    // Tokens representing invalid input
-    ErrUnrecognized,
-    ErrUnterminatedString,
-}
-
-impl Token {
-    pub fn is_error(self) -> bool {
-        match self {
-            Token::ErrUnrecognized => true,
-            Token::ErrUnterminatedString => true,
-            _ => false,
-        }
-    }
 }
 
 pub struct Lexer<'a> {
@@ -92,42 +118,50 @@ impl<'a> Lexer<'a> {
     }
 
     /// Indentify the next token
-    pub fn next_token(&mut self) -> Option<(Span, Token)> {
+    pub fn next_token(&mut self) -> Option<Result<(Span, Token), LexerError>> {
         while let Some((pos, ch)) = self.next_char() {
             self.token_start = pos;
-            match ch {
+            let token_or_error = match ch {
                 // Single-character tokens
-                '(' => return Some(self.pack_token(Token::ParenOpen)),
-                ')' => return Some(self.pack_token(Token::ParenClose)),
+                '(' => Ok(self.pack_token(Token::ParenOpen)),
+                ')' => Ok(self.pack_token(Token::ParenClose)),
 
                 // Multi-character tokens
 
                 // Identifiers
-                _ if charsets::is_ident_start(ch) => return Some(self.lex_ident()),
+                _ if charsets::is_ident_start(ch) => Ok(self.lex_ident()),
+                _ if charsets::is_ident_op(ch) => self.lex_op(),
 
                 // Strings
-                '"' => return Some(self.lex_string()),
+                '"' => self.lex_string(),
 
                 // Numbers
-                _ if ch.is_ascii_digit() || ch == '+' || ch == '-' => {
-                    return Some(self.lex_number())
+                _ if ch.is_ascii_digit() => {
+                    Ok(self.lex_number())
+                }
+                '+' | '-' if self.peek_char().map(|(_, ch)| ch.is_ascii_digit()).unwrap_or(false) => {
+                    Ok(self.lex_number())
                 }
 
                 // Line comments
-                ';' => self.skip_to_next_line(),
+                ';' => {
+                    self.skip_to_next_line();
+                    continue;
+                },
 
                 // Ignore whitespace between tokens
                 _ if ch.is_whitespace() => continue,
 
                 // Produce error token for unrecognized characters
-                _ => return Some(self.pack_token(Token::ErrUnrecognized)),
-            }
+                _ => Err(self.pack_error(LexerErrorKind::UnrecognizedChar)),
+            };
+            return Some(token_or_error);
         }
         // If we exhausted the stream without producing a token, we're done
         None
     }
 
-    fn lex_string(&mut self) -> (Span, Token) {
+    fn lex_string(&mut self) -> Result<(Span, Token), LexerError> {
         let mut escaped = false;
         let mut terminated = false;
         while let Some((_, ch)) = self.peek_char() {
@@ -148,18 +182,26 @@ impl<'a> Lexer<'a> {
             }
         }
 
-        let tok = if terminated {
-            Token::String
+        if terminated {
+            Ok(self.pack_token(Token::String))
         } else {
-            Token::ErrUnterminatedString
-        };
-
-        self.pack_token(tok)
+            Err(self.pack_error(LexerErrorKind::UnterminatedString))
+        }
     }
 
     fn lex_ident(&mut self) -> (Span, Token) {
         self.skip_while(charsets::is_ident_cont);
         self.pack_token(Token::Ident)
+    }
+
+    /// An operator must be followed by whitespace
+    fn lex_op(&mut self) -> Result<(Span, Token), LexerError> {
+        if let Some((_, ch)) = self.peek_char() {
+            if ! ch.is_whitespace() {
+                return Err(self.pack_error(LexerErrorKind::IllegalOperator))
+            }
+        }
+        Ok(self.pack_token(Token::Ident))
     }
 
     fn lex_number(&mut self) -> (Span, Token) {
@@ -209,6 +251,16 @@ impl<'a> Lexer<'a> {
             token,
         )
     }
+
+    fn pack_error(&self, kind: LexerErrorKind) -> LexerError {
+        LexerError {
+            location: Span {
+                begin: self.token_start,
+                end: self.current_offset(),
+            },
+            kind,
+        }
+    }
 }
 
 /// Defines the charsets of various things that can be lexed
@@ -222,5 +274,11 @@ mod charsets {
     pub fn is_ident_cont(ch: char) -> bool {
         let extra = ".+-";
         is_ident_start(ch) || ch.is_ascii_digit() || extra.chars().any(|c| c == ch)
+    }
+
+    /// Allowed characters if the identifier consists of a single character operator
+    pub fn is_ident_op(ch: char) -> bool {
+        let extra = "+-"; // * and / are handled as regular identifiers
+        extra.chars().any(|c| c == ch)
     }
 }

@@ -1,5 +1,7 @@
 //! Bits and pieces for working with ranges of text.
 
+use std::fmt::{self, Write};
+
 /// A region with a text.
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub struct Span {
@@ -16,6 +18,12 @@ pub struct Pos {
     pub line: usize,
     /// Position within the line, in characters, starting at 1
     pub column: usize,
+}
+
+impl fmt::Display for Pos {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}:{}", self.line, self.column)
+    }
 }
 
 /// A data structure for mapping byte offsets to line/column based positions.
@@ -78,5 +86,57 @@ impl<'a> LineMap<'a> {
                 }
             }
         }
+    }
+
+    /// Return the extends of the given line (starting at 1)
+    pub fn line_span(&self, line: usize) -> Span {
+        let begin = if line <= 1 {
+            0
+        } else if line - 1 >= self.line_offsets.len() {
+            self.source.len()
+        } else {
+            self.line_offsets[line - 2] + 1
+        };
+
+        let end = if line - 1 < self.line_offsets.len() {
+            self.line_offsets[line - 1]
+        } else {
+            self.source.len()
+        };
+        Span { begin, end }
+    }
+
+    pub fn highlight(&self, start: Pos, end: Pos) -> String {
+        let mut out = String::new();
+        let display_start = 1.max(start.line - 1);
+        let display_end = self.line_offsets.len().min(start.line + 1);
+        for line in display_start..=display_end {
+            let line_span = self.line_span(line);
+            let line_str = &self.source[line_span.begin..line_span.end];
+
+            writeln!(&mut out, "{:4}|{}", line, line_str).unwrap();
+
+            if line >= start.line && line <= end.line {
+                let col_start = if line == start.line {
+                    start.column
+                } else {
+                    1
+                };
+                let col_end = if line == end.line {
+                    end.column
+                } else {
+                    line_str.chars().count()
+                };
+                out.push_str("     ");
+                for _ in 1..col_start {
+                    out.push(' ');
+                }
+                for _ in col_start..col_end {
+                    out.push('^');
+                }
+                out.push('\n');
+            }
+        }
+        out
     }
 }

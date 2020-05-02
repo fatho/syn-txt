@@ -1,41 +1,74 @@
+use std::fmt;
+
 use super::ast::*;
 use super::lexer::Token;
 use super::span::Span;
 use crate::rational::{ParseRationalError, Rational};
 
+
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ParseError {
-    InvalidInt {
-        error: std::num::ParseIntError,
-        span: Span,
-    },
-    InvalidFloat {
-        error: std::num::ParseFloatError,
-        span: Span,
-    },
-    InvalidRational {
-        error: ParseRationalError,
-        span: Span,
-    },
-    InvalidString {
-        span: Span,
-        offset: usize,
-    },
+pub struct ParseError {
+    location: Span,
+    info: ParseErrorInfo,
+}
+
+impl ParseError {
+    pub fn new(location: Span, info: ParseErrorInfo) -> Self {
+        Self { location, info }
+    }
+
+    pub fn location(&self) -> Span {
+        self.location
+    }
+
+    pub fn info(&self) -> &ParseErrorInfo {
+        &self.info
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ParseErrorInfo {
+    InvalidInt(std::num::ParseIntError),
+    InvalidFloat(std::num::ParseFloatError),
+    InvalidRational(ParseRationalError),
+    /// For example, an invalid escape sequence.
+    InvalidString,
     Unexpected {
+        /// One of these tokens was excpected
         expected: Vec<Token>,
+        /// But this was the actual next token
         actual: Token,
-        span: Span,
     },
     /// The end of the input was reached, but the parser was expecting more.
     EOF,
 }
+
+impl fmt::Display for ParseErrorInfo {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ParseErrorInfo::InvalidInt(err) =>
+                write!(f, "invalid integer literal: {}", err),
+            ParseErrorInfo::InvalidFloat(err) =>
+                write!(f, "invalid float literal: {}", err),
+            ParseErrorInfo::InvalidRational(err) =>
+                write!(f, "invalid rational literal: {}", err),
+            ParseErrorInfo::InvalidString =>
+                write!(f, "invalid string literal"),
+            ParseErrorInfo::Unexpected { expected, actual } =>
+                write!(f, "expected one of {:?}, but got {:?}", &expected[..], actual),
+            ParseErrorInfo::EOF =>
+                write!(f, "end of file reached"),
+        }
+    }
+}
+
 
 type ParseResult<T> = Result<T, ParseError>;
 
 pub struct Parser<'a> {
     tokens: &'a [(Span, Token)],
     source: &'a str,
-    current: usize,
+    current_token: usize,
 }
 
 impl<'a> Parser<'a> {
@@ -43,7 +76,7 @@ impl<'a> Parser<'a> {
         Self {
             tokens,
             source,
-            current: 0,
+            current_token: 0,
         }
     }
 
@@ -60,7 +93,7 @@ impl<'a> Parser<'a> {
         match self.parse_exp() {
             Ok(symexpr) => Ok(Some(symexpr)),
             Err(err) => {
-                if let ParseError::EOF = err {
+                if let ParseErrorInfo::EOF = err.info {
                     Ok(None)
                 } else {
                     Err(err)
@@ -131,7 +164,7 @@ impl<'a> Parser<'a> {
                     })
                 }
             }
-            _ => Err(ParseError::Unexpected {
+            _ => Err(ParseError::new(span, ParseErrorInfo::Unexpected {
                 expected: vec![
                     Token::ParenOpen,
                     Token::Int,
@@ -141,8 +174,7 @@ impl<'a> Parser<'a> {
                     Token::Ident,
                 ],
                 actual: token,
-                span,
-            }),
+            })),
         }
     }
 
@@ -151,19 +183,19 @@ impl<'a> Parser<'a> {
     fn parse_int(&self, span: Span) -> ParseResult<i64> {
         let s = self.get_span(span);
         s.parse()
-            .map_err(|error| ParseError::InvalidInt { error, span })
+            .map_err(|error| ParseError::new(span, ParseErrorInfo::InvalidInt(error)))
     }
 
     fn parse_float(&self, span: Span) -> ParseResult<f64> {
         let s = self.get_span(span);
         s.parse()
-            .map_err(|error| ParseError::InvalidFloat { error, span })
+            .map_err(|error| ParseError::new(span, ParseErrorInfo::InvalidFloat(error)))
     }
 
     fn parse_rational(&self, span: Span) -> ParseResult<Rational> {
         let s = self.get_span(span);
         s.parse()
-            .map_err(|error| ParseError::InvalidRational { error, span })
+            .map_err(|error| ParseError::new(span, ParseErrorInfo::InvalidRational(error)))
     }
 
     fn parse_string(&self, span: Span) -> ParseResult<String> {
@@ -172,7 +204,7 @@ impl<'a> Parser<'a> {
 
         // Ensure it starts with a quote
         if chars.next().map(|(_, ch)| ch) != Some('"') {
-            return Err(ParseError::InvalidString { span, offset: 0 });
+            return Err(ParseError::new(span, ParseErrorInfo::InvalidString));
         }
 
         // Process escape sequences
@@ -195,10 +227,7 @@ impl<'a> Parser<'a> {
 
         // Must end with quote
         if !terminated {
-            return Err(ParseError::InvalidString {
-                span,
-                offset: s.len() - 1,
-            });
+            return Err(ParseError::new(span, ParseErrorInfo::InvalidString));
         }
 
         Ok(out)
@@ -207,9 +236,9 @@ impl<'a> Parser<'a> {
     // Manipulating/Inspecting the token stream
 
     fn pop_token(&mut self) -> Option<(Span, Token)> {
-        if self.current < self.tokens.len() {
-            let tok = self.tokens[self.current];
-            self.current += 1;
+        if self.current_token < self.tokens.len() {
+            let tok = self.tokens[self.current_token];
+            self.current_token += 1;
             Some(tok)
         } else {
             None
@@ -217,8 +246,8 @@ impl<'a> Parser<'a> {
     }
 
     fn peek_token(&self) -> Option<(Span, Token)> {
-        if self.current < self.tokens.len() {
-            Some(self.tokens[self.current])
+        if self.current_token < self.tokens.len() {
+            Some(self.tokens[self.current_token])
         } else {
             None
         }
@@ -229,7 +258,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_token(&mut self) -> ParseResult<(Span, Token)> {
-        self.pop_token().ok_or(ParseError::EOF)
+        self.pop_token().ok_or(ParseError::new(Span { begin: self.source.len(), end: self.source.len() }, ParseErrorInfo::EOF))
     }
 
     fn expect_token(&mut self, expected: Token) -> ParseResult<Span> {
@@ -237,15 +266,18 @@ impl<'a> Parser<'a> {
             if token == expected {
                 Ok(span)
             } else {
-                Err(ParseError::Unexpected {
+                Err(ParseError::new(span, ParseErrorInfo::Unexpected {
                     expected: vec![expected],
                     actual: token,
-                    span,
-                })
+                }))
             }
         } else {
-            Err(ParseError::EOF)
+            Err(self.eof_error())
         }
+    }
+
+    fn eof_error(&self) -> ParseError {
+        ParseError::new(Span { begin: self.source.len(), end: self.source.len() }, ParseErrorInfo::EOF)
     }
 
     /// Check if the next token is the expected terminator or EOF.

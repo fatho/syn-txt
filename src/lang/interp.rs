@@ -1,11 +1,60 @@
 use std::collections::HashMap;
+use std::fmt;
 
 use super::ast;
 use super::span::Span;
 use crate::rational::Rational;
 
-type InterpreterError = String;
-type InterpreterResult<T> = Result<T, InterpreterError>;
+pub type InterpreterResult<T> = Result<T, IntpErr>;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IntpErr {
+    location: Span,
+    info: IntpErrInfo,
+}
+
+impl IntpErr {
+    pub fn new(location: Span, info: IntpErrInfo) -> Self {
+        Self { location, info }
+    }
+
+    pub fn location(&self) -> Span {
+        self.location
+    }
+
+    pub fn info(&self) -> &IntpErrInfo {
+        &self.info
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum IntpErrInfo {
+    /// Some expressions, such as keywords or empty lists, cannot be evaluated
+    Unevaluatable,
+    /// Variable/function was not found
+    NoSuchVariable(ast::Ident),
+    /// Tried to call something that cannot be called, such as the int in `(1 a b)`.
+    Uncallable,
+    /// There was a problem with the arguments in a call
+    Arguments,
+    DivisionByZero,
+    /// Type error (e.g. trying to add two incompatible types).
+    Type,
+}
+
+impl fmt::Display for IntpErrInfo {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            IntpErrInfo::Unevaluatable => write!(f, "unevaluatable"),
+            IntpErrInfo::NoSuchVariable(var) => write!(f, "no such variable `{}`", &var.0),
+            IntpErrInfo::Uncallable => write!(f, "uncallable"),
+            IntpErrInfo::Arguments => write!(f, "incompatible arguments"),
+            IntpErrInfo::DivisionByZero => write!(f, "division by zero"),
+            IntpErrInfo::Type => write!(f, "type error"),
+        }
+    }
+}
+
 
 pub struct Interpreter {
     scopes: Vec<Scope>,
@@ -29,7 +78,7 @@ impl Interpreter {
 
     pub fn eval(&mut self, sym: &ast::SymExpSrc) -> InterpreterResult<Value> {
         match &sym.exp {
-            ast::SymExp::Keyword(_) => Err(format!("cannot evaluate keyword at {:?}", sym.src)),
+            ast::SymExp::Keyword(_) => Err(IntpErr::new(sym.src, IntpErrInfo::Unevaluatable)),
             ast::SymExp::List(list) => self.eval_list(sym.src, &list),
             ast::SymExp::Str(v) => Ok(Value::Str(v.clone())),
             ast::SymExp::Float(v) => Ok(Value::Float(*v)),
@@ -39,7 +88,7 @@ impl Interpreter {
                 if let Some(value) = self.lookup_var(var) {
                     Ok(value.clone())
                 } else {
-                    Err(format!("no such variable {} at {:?}", var.0, sym.src))
+                    Err(IntpErr::new(sym.src, IntpErrInfo::NoSuchVariable(var.clone())))
                 }
             }
         }
@@ -52,7 +101,7 @@ impl Interpreter {
     ) -> InterpreterResult<Value> {
         let head_exp = list
             .first()
-            .ok_or("cannot evaluate empty list".to_owned())?;
+            .ok_or(IntpErr::new(span, IntpErrInfo::Uncallable))?;
         let mut args = ArgParser::new(span, &list[1..]);
 
         // TODO: allow arbitrary expression as head and evaluate it
@@ -71,13 +120,7 @@ impl Interpreter {
                 "+" => {
                     let mut v1 = args.value(self)?;
                     while ! args.is_empty() {
-                        let v2 = args.value(self)?;
-
-                        if let Some(result) = v1.add(&v2) {
-                            v1 = result;
-                        } else {
-                            return Err(format!("cannot add {:?} and {:?} at {:?}", v1.get_type(), v2.get_type(), span));
-                        }
+                        v1 = v1.add(&args.value(self)?).map_err(|e| IntpErr::new(span, e))?;
                     }
                     drop(args);
                     Ok(v1)
@@ -85,13 +128,7 @@ impl Interpreter {
                 "-" => {
                     let mut v1 = args.value(self)?;
                     while ! args.is_empty() {
-                        let v2 = args.value(self)?;
-
-                        if let Some(result) = v1.sub(&v2) {
-                            v1 = result;
-                        } else {
-                            return Err(format!("cannot subtract {:?} and {:?} at {:?}", v1.get_type(), v2.get_type(), span));
-                        }
+                        v1 = v1.sub(&args.value(self)?).map_err(|e| IntpErr::new(span, e))?;
                     }
                     drop(args);
                     Ok(v1)
@@ -99,13 +136,7 @@ impl Interpreter {
                 "*" => {
                     let mut v1 = args.value(self)?;
                     while ! args.is_empty() {
-                        let v2 = args.value(self)?;
-
-                        if let Some(result) = v1.mul(&v2) {
-                            v1 = result;
-                        } else {
-                            return Err(format!("cannot multiply {:?} and {:?} at {:?}", v1.get_type(), v2.get_type(), span));
-                        }
+                        v1 = v1.mul(&args.value(self)?).map_err(|e| IntpErr::new(span, e))?;
                     }
                     drop(args);
                     Ok(v1)
@@ -113,20 +144,14 @@ impl Interpreter {
                 "/" => {
                     let mut v1 = args.value(self)?;
                     while ! args.is_empty() {
-                        let v2 = args.value(self)?;
-
-                        if let Some(result) = v1.div(&v2) {
-                            v1 = result;
-                        } else {
-                            return Err(format!("cannot divide {:?} and {:?} at {:?}", v1.get_type(), v2.get_type(), span));
-                        }
+                        v1 = v1.div(&args.value(self)?).map_err(|e| IntpErr::new(span, e))?;
                     }
                     drop(args);
                     Ok(v1)
                 }
-                unknown => Err(format!("unknown function {:?}", unknown)),
+                _ => Err(IntpErr::new(head_exp.src, IntpErrInfo::NoSuchVariable(fun.clone()))),
             },
-            _ => Err(format!("cannot call {:?}", head_exp)),
+            _ => Err(IntpErr::new(head_exp.src, IntpErrInfo::Uncallable)),
         }
     }
 }
@@ -159,7 +184,8 @@ impl<'a> ArgParser<'a> {
             self.expected += 1;
             Ok(sym)
         } else {
-            Err(format!("not enough arguments at {:?}", self.list_span))
+            // TODO: more specific error
+            Err(IntpErr::new(self.list_span, IntpErrInfo::Arguments))
         }
     }
 
@@ -169,7 +195,8 @@ impl<'a> ArgParser<'a> {
         if let ast::SymExp::Variable(ident) = &arg.exp {
             Ok(ident)
         } else {
-            Err(format!("expected variable at {:?}", arg.src))
+            // TODO: more specific error
+            Err(IntpErr::new(self.list_span, IntpErrInfo::Arguments))
         }
     }
 
@@ -183,12 +210,14 @@ impl<'a> ArgParser<'a> {
         if self.args.is_empty() {
             Ok(())
         } else {
-            Err(format!(
-                "{} arguments expected, but {} given at {:?}",
-                self.expected,
-                self.args.len() + self.expected,
-                self.list_span
-            ))
+            Err(IntpErr::new(self.list_span, IntpErrInfo::Arguments))
+            // TODO: more specific error
+            // Err(format!(
+            //     "{} arguments expected, but {} given at {:?}",
+            //     self.expected,
+            //     self.args.len() + self.expected,
+            //     self.list_span
+            // ))
         }
     }
 }
@@ -250,91 +279,104 @@ impl Value {
 
     // Extracting values
 
-    pub fn as_float(&self) -> Option<f64> {
+    pub fn as_float(&self) -> Result<f64, IntpErrInfo> {
         match self {
-            Value::Float(f) => Some(*f),
-            Value::Int(i) => Some(*i as f64),
-            Value::Ratio(r) => Some(r.numerator() as f64 / r.denominator() as f64),
-            _ => None,
+            Value::Float(f) => Ok(*f),
+            Value::Int(i) => Ok(*i as f64),
+            Value::Ratio(r) => Ok(r.numerator() as f64 / r.denominator() as f64),
+            _ => Err(IntpErrInfo::Type),
         }
     }
 
-    pub fn as_ratio(&self) -> Option<Rational> {
+    pub fn as_ratio(&self) -> Result<Rational, IntpErrInfo> {
         match self {
-            Value::Int(i) => Some(Rational::from_int(*i)),
-            Value::Ratio(r) => Some(*r),
-            _ => None,
+            Value::Int(i) => Ok(Rational::from_int(*i)),
+            Value::Ratio(r) => Ok(*r),
+            _ => Err(IntpErrInfo::Type),
         }
     }
 
-    pub fn as_int(&self) -> Option<i64> {
+    pub fn as_int(&self) -> Result<i64, IntpErrInfo> {
         match self {
-            Value::Int(i) => Some(*i),
-            _ => None,
+            Value::Int(i) => Ok(*i),
+            _ => Err(IntpErrInfo::Type),
         }
     }
 
     // Operations
 
-    pub fn add(&self, other: &Value) -> Option<Value> {
+    pub fn add(&self, other: &Value) -> Result<Value, IntpErrInfo> {
         let result = self.get_type().merge_coercible(other.get_type())?;
         match result {
-            Type::Float => Some(Value::Float(self.as_float()? + other.as_float()?)),
-            Type::Int => Some(Value::Int(self.as_int()? + other.as_int()?)),
-            Type::Ratio => Some(Value::Ratio(self.as_ratio()? + other.as_ratio()?)),
-            _ => None,
+            Type::Float => Ok(Value::Float(self.as_float()? + other.as_float()?)),
+            Type::Int => Ok(Value::Int(self.as_int()? + other.as_int()?)),
+            Type::Ratio => Ok(Value::Ratio(self.as_ratio()? + other.as_ratio()?)),
+            _ => Err(IntpErrInfo::Type),
         }
     }
 
-    pub fn sub(&self, other: &Value) -> Option<Value> {
+    pub fn sub(&self, other: &Value) -> Result<Value, IntpErrInfo> {
         let result = self.get_type().merge_coercible(other.get_type())?;
         match result {
-            Type::Float => Some(Value::Float(self.as_float()? - other.as_float()?)),
-            Type::Int => Some(Value::Int(self.as_int()? - other.as_int()?)),
-            Type::Ratio => Some(Value::Ratio(self.as_ratio()? - other.as_ratio()?)),
-            _ => None,
+            Type::Float => Ok(Value::Float(self.as_float()? - other.as_float()?)),
+            Type::Int => Ok(Value::Int(self.as_int()? - other.as_int()?)),
+            Type::Ratio => Ok(Value::Ratio(self.as_ratio()? - other.as_ratio()?)),
+            _ => Err(IntpErrInfo::Type),
         }
     }
 
-    pub fn mul(&self, other: &Value) -> Option<Value> {
+    pub fn mul(&self, other: &Value) -> Result<Value, IntpErrInfo> {
         let result = self.get_type().merge_coercible(other.get_type())?;
         match result {
-            Type::Float => Some(Value::Float(self.as_float()? * other.as_float()?)),
-            Type::Int => Some(Value::Int(self.as_int()? * other.as_int()?)),
-            Type::Ratio => Some(Value::Ratio(self.as_ratio()? * other.as_ratio()?)),
-            _ => None,
+            Type::Float => Ok(Value::Float(self.as_float()? * other.as_float()?)),
+            Type::Int => Ok(Value::Int(self.as_int()? * other.as_int()?)),
+            Type::Ratio => Ok(Value::Ratio(self.as_ratio()? * other.as_ratio()?)),
+            _ => Err(IntpErrInfo::Type),
         }
     }
 
-    pub fn div(&self, other: &Value) -> Option<Value> {
+    pub fn div(&self, other: &Value) -> Result<Value, IntpErrInfo> {
         let result = self.get_type().merge_coercible(other.get_type())?;
         match result {
-            Type::Float => Some(Value::Float(self.as_float()? / other.as_float()?)),
-            Type::Int => Some(Value::Int(self.as_int()? / other.as_int()?)),
-            Type::Ratio => Some(Value::Ratio(self.as_ratio()? / other.as_ratio()?)),
-            _ => None,
+            Type::Float => Ok(Value::Float(self.as_float()? / other.as_float()?)),
+            // NOTE: dividing two ints always results in a rational
+            Type::Int => {
+                let denom = other.as_int()?;
+                if denom == 0 {
+                    return Err(IntpErrInfo::DivisionByZero)
+                }
+                Ok(Value::Ratio(Rational::new(self.as_int()?, denom)))
+            },
+            Type::Ratio => {
+                let denom = other.as_ratio()?;
+                if denom.is_zero() {
+                    return Err(IntpErrInfo::DivisionByZero)
+                }
+                Ok(Value::Ratio(self.as_ratio()? / denom))
+            },
+            _ => Err(IntpErrInfo::Type),
         }
     }
 }
 
 impl Type {
     /// Return the type, if any exists, to which both types can be coerced.
-    pub fn merge_coercible(self, other: Type) -> Option<Type> {
+    pub fn merge_coercible(self, other: Type) -> Result<Type, IntpErrInfo> {
         match (self, other) {
             // Operations involving one float always become all-float
-            (Type::Float, Type::Ratio) => Some(Type::Float),
-            (Type::Ratio, Type::Float) => Some(Type::Float),
-            (Type::Float, Type::Int) => Some(Type::Float),
-            (Type::Int, Type::Float) => Some(Type::Float),
+            (Type::Float, Type::Ratio) => Ok(Type::Float),
+            (Type::Ratio, Type::Float) => Ok(Type::Float),
+            (Type::Float, Type::Int) => Ok(Type::Float),
+            (Type::Int, Type::Float) => Ok(Type::Float),
 
             // Operations involving one rational always become all-rational
-            (Type::Ratio, Type::Int) => Some(Type::Ratio),
-            (Type::Int, Type::Ratio) => Some(Type::Ratio),
+            (Type::Ratio, Type::Int) => Ok(Type::Ratio),
+            (Type::Int, Type::Ratio) => Ok(Type::Ratio),
 
             // Reflexivity
-            _ if self == other => Some(self),
+            _ if self == other => Ok(self),
 
-            _ => None,
+            _ => Err(IntpErrInfo::Type),
         }
     }
 }

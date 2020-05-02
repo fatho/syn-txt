@@ -1,6 +1,6 @@
+/// A region with a text.
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
-pub struct Span<T> {
-    pub value: T,
+pub struct Span {
     /// The byte-offset of the first character of the span.
     pub begin: usize,
     /// The byte-offset of the first character *after* the span.
@@ -26,11 +26,21 @@ pub enum Token {
     ErrUnterminatedString,
 }
 
-// TODO: create proper error type for lexer
+impl Token {
+    pub fn is_error(self) -> bool {
+        match self {
+            Token::ErrUnrecognized => true,
+            Token::ErrUnterminatedString => true,
+            _ => false,
+        }
+    }
+}
 
 pub struct Lexer<'a> {
     input: &'a str,
     stream: std::str::CharIndices<'a>,
+    /// Byte-offset where the current token started
+    token_start: usize,
 }
 
 impl<'a> Lexer<'a> {
@@ -39,6 +49,7 @@ impl<'a> Lexer<'a> {
         Self {
             input,
             stream,
+            token_start: 0,
         }
     }
 
@@ -75,44 +86,51 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    /// Indentify the next token
-    pub fn next_token(&mut self) -> Option<Span<Token>> {
-        macro_rules! token_char {
-            ($pos:expr, $ch:expr, $tok:expr) => {
-                return Some(Span { value: $tok, begin: $pos, end: $pos + $ch.len_utf8() })
+    fn skip_while<P: Fn(char) -> bool>(&mut self, predicate: P) {
+        while let Some((_, ch)) = self.peek_char() {
+            if predicate(ch) {
+                self.next_char();
+            } else {
+                break;
             }
         }
+    }
 
+    /// Indentify the next token
+    pub fn next_token(&mut self) -> Option<(Span, Token)> {
         while let Some((pos, ch)) = self.next_char() {
+            self.token_start = pos;
             match ch {
                 // Single-character tokens
-                '(' => token_char!(pos, ch, Token::ParenOpen),
-                ')' => token_char!(pos, ch, Token::ParenClose),
+                '(' => return Some(self.pack_token(Token::ParenOpen)),
+                ')' => return Some(self.pack_token(Token::ParenClose)),
 
                 // Multi-character tokens
 
                 // Identifiers
-                _ if charsets::is_ident_start(ch) => return Some(self.lex_ident(pos)),
+                _ if charsets::is_ident_start(ch) => return Some(self.lex_ident()),
 
                 // Strings
-                '"' => return Some(self.lex_string(pos)),
+                '"' => return Some(self.lex_string()),
 
                 // Numbers
-                _ if ch.is_ascii_digit() || ch == '+' || ch == '-' => return Some(self.lex_number(pos)),
+                _ if ch.is_ascii_digit() || ch == '+' || ch == '-' => return Some(self.lex_number()),
 
                 // Line comments
                 ';' => self.skip_to_next_line(),
 
                 // Ignore whitespace between tokens
                 _ if ch.is_whitespace() => continue,
-                _ => token_char!(pos, ch, Token::ErrUnrecognized),
+
+                // Produce error token for unrecognized characters
+                _ => return Some(self.pack_token(Token::ErrUnrecognized)),
             }
         }
         // If we exhausted the stream without producing a token, we're done
         None
     }
 
-    fn lex_string(&mut self, start: usize) -> Span<Token> {
+    fn lex_string(&mut self) -> (Span, Token) {
         let mut escaped = false;
         let mut terminated = false;
         while let Some((_, ch)) = self.peek_char() {
@@ -139,34 +157,15 @@ impl<'a> Lexer<'a> {
             Token::ErrUnterminatedString
         };
 
-        Span {
-            value: tok,
-            begin: start,
-            end: self.current_offset(),
-        }
+        self.pack_token(tok)
     }
 
-
-    fn lex_while<P: Fn(char) -> bool>(&mut self, start: usize, token: Token, predicate: P) -> Span<Token> {
-        while let Some((_, ch)) = self.peek_char() {
-            if predicate(ch) {
-                self.next_char();
-            } else {
-                break;
-            }
-        }
-        Span {
-            value: token,
-            begin: start,
-            end: self.current_offset(),
-        }
+    fn lex_ident(&mut self) -> (Span, Token) {
+        self.skip_while(charsets::is_ident_cont);
+        self.pack_token(Token::Ident)
     }
 
-    fn lex_ident(&mut self, start: usize) -> Span<Token> {
-        self.lex_while(start, Token::Ident, charsets::is_ident_cont)
-    }
-
-    fn lex_number(&mut self, start: usize) -> Span<Token> {
+    fn lex_number(&mut self) -> (Span, Token) {
         while let Some((_, ch)) = self.peek_char() {
             if ch.is_ascii_digit() {
                 self.next_char();
@@ -175,57 +174,37 @@ impl<'a> Lexer<'a> {
                 if let Some((_, after)) = self.peek_char_skip(1) {
                     if after.is_ascii_digit() {
                         self.next_char();
-                        return self.lex_rational_denominator(start);
+                        return self.lex_rational_denominator();
                     }
                 }
                 break;
             } else if ch == '.' {
                 self.next_char();
-                return self.lex_float_fractional(start);
+                return self.lex_float_fractional();
             } else {
                 break;
             }
         }
         // If we made it out, it's an int
-        Span {
-            value: Token::Int,
-            begin: start,
-            end: self.current_offset(),
-        }
+        self.pack_token(Token::Int)
     }
 
-    fn lex_rational_denominator(&mut self, start: usize) -> Span<Token> {
-        while let Some((_, ch)) = self.peek_char() {
-            if ch.is_ascii_digit() {
-                self.next_char();
-            } else {
-                break;
-            }
-        }
-        Span {
-            value: Token::Rational,
-            begin: start,
-            end: self.current_offset(),
-        }
+    fn lex_rational_denominator(&mut self) -> (Span, Token) {
+        self.skip_while(|c| c.is_ascii_digit());
+        self.pack_token(Token::Rational)
     }
 
     /// Lex the part of a float after the dot.
     /// `start` refers to the start of the number itself,
     /// not to the start of the fractional part.
     /// TODO: add support for scientific notation.
-    fn lex_float_fractional(&mut self, start: usize) -> Span<Token> {
-        while let Some((_, ch)) = self.peek_char() {
-            if ch.is_ascii_digit() {
-                self.next_char();
-            } else {
-                break;
-            }
-        }
-        Span {
-            value: Token::Float,
-            begin: start,
-            end: self.current_offset(),
-        }
+    fn lex_float_fractional(&mut self) -> (Span, Token) {
+        self.skip_while(|c| c.is_ascii_digit());
+        self.pack_token(Token::Float)
+    }
+
+    fn pack_token(&self, token: Token) -> (Span, Token) {
+        (Span { begin: self.token_start, end: self.current_offset()}, token)
     }
 }
 

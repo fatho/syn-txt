@@ -200,6 +200,49 @@ impl Ord for Rational {
     }
 }
 
+/// An error which can be returned when parsing a rational.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParseRationalError(RationalErrorKind);
+
+impl ParseRationalError {
+    pub fn kind(&self) -> RationalErrorKind {
+        self.0
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub enum RationalErrorKind {
+    /// The numerator or denominator could not be parsed as integer.
+    InvalidInt,
+    /// The denominator was zero
+    Zero,
+    /// The rational was not of the form `<int>` or `<int>/<int>
+    Malformed,
+}
+
+impl std::str::FromStr for Rational {
+    type Err = ParseRationalError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let mut parts = s.split('/');
+        let numerator_str = parts.next().unwrap();
+        let numerator = numerator_str.parse().map_err(|_| ParseRationalError(RationalErrorKind::InvalidInt))?;
+
+        if let Some(denominator_str) = parts.next() {
+            let denominator = denominator_str.parse().map_err(|_| ParseRationalError(RationalErrorKind::InvalidInt))?;
+            if denominator == 0 {
+                return Err(ParseRationalError(RationalErrorKind::Zero))
+            } else if let Some(_) = parts.next() {
+                return Err(ParseRationalError(RationalErrorKind::Malformed))
+            } else {
+                Ok(Rational::new(numerator, denominator))
+            }
+        } else {
+            Ok(Rational::new(numerator, 1))
+        }
+    }
+}
+
 /// Computes the greates common divisor of two numbers using euclids algorithm.
 ///
 /// # Example

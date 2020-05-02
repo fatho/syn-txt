@@ -55,7 +55,8 @@ fn main() {
     let input = r#"
         (define x 1/4)
         (define y (* 2 x))
-        (define z (/ 1 0))
+        (define z (/ 1
+                     0))
         (define a (+ x y z))
         a
     "#;
@@ -107,5 +108,5 @@ fn print_error<E: std::fmt::Display>(lines: &LineMap, location: Span, message: E
     let start = lines.offset_to_pos(location.begin);
     let end = lines.offset_to_pos(location.end);
     println!("error: {} (<input>:{}-{})", message, start, end);
-    println!("{}", lines.highlight(start, end));
+    println!("{}", lines.highlight(start, end, true));
 }

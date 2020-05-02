@@ -88,6 +88,18 @@ impl<'a> LineMap<'a> {
         }
     }
 
+    pub fn pos_to_offset(&self, pos: Pos) -> usize {
+        let line_begin = if pos.line <= 1 {
+            0
+        } else if pos.line - 1 >= self.line_offsets.len() {
+            self.source.len()
+        } else {
+            self.line_offsets[pos.line - 2] + 1
+        };
+        let offset = self.source[line_begin..].char_indices().skip(pos.column - 1).next().map_or(0, |(pos, _)| pos);
+        line_begin + offset
+    }
+
     /// Return the extends of the given line (starting at 1)
     pub fn line_span(&self, line: usize) -> Span {
         let begin = if line <= 1 {
@@ -106,7 +118,7 @@ impl<'a> LineMap<'a> {
         Span { begin, end }
     }
 
-    pub fn highlight(&self, start: Pos, end: Pos) -> String {
+    pub fn highlight(&self, start: Pos, end: Pos, colored: bool) -> String {
         let mut out = String::new();
         let display_start = 1.max(start.line - 1);
         let display_end = self.line_offsets.len().min(start.line + 1);
@@ -114,14 +126,38 @@ impl<'a> LineMap<'a> {
             let line_span = self.line_span(line);
             let line_str = &self.source[line_span.begin..line_span.end];
 
-            writeln!(&mut out, "{:4}|{}", line, line_str).unwrap();
+            let red = "\x1b[31;1m";
+            let reset = "\x1b[0m";
+
+            if colored && (line == start.line) {
+                out.push_str(red);
+            }
+            write!(&mut out, "{:4}|", line).unwrap();
+            if colored && (line == start.line) {
+                out.push_str(reset);
+            }
+
+            if colored {
+                for (i, ch) in line_str.chars().enumerate() {
+                    if i + 1 == start.column && line == start.line {
+                        out.push_str(red);
+                    }
+                    if i + 1 == end.column && line == end.line {
+                        out.push_str(reset);
+                    }
+                    out.push(ch);
+                }
+            } else {
+                out.push_str(line_str);
+            }
+            out.push('\n');
 
             if line >= start.line && line <= end.line {
                 let col_start = if line == start.line { start.column } else { 1 };
                 let col_end = if line == end.line {
                     end.column
                 } else {
-                    line_str.chars().count()
+                    line_str.chars().count() + 1
                 };
                 out.push_str("     ");
                 for _ in 1..col_start {

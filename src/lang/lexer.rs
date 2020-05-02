@@ -1,11 +1,6 @@
-/// A region with a text.
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
-pub struct Span {
-    /// The byte-offset of the first character of the span.
-    pub begin: usize,
-    /// The byte-offset of the first character *after* the span.
-    pub end: usize,
-}
+//! Implements the lexer for our s-expression based language.
+
+use super::span::Span;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum Token {
@@ -114,7 +109,9 @@ impl<'a> Lexer<'a> {
                 '"' => return Some(self.lex_string()),
 
                 // Numbers
-                _ if ch.is_ascii_digit() || ch == '+' || ch == '-' => return Some(self.lex_number()),
+                _ if ch.is_ascii_digit() || ch == '+' || ch == '-' => {
+                    return Some(self.lex_number())
+                }
 
                 // Line comments
                 ';' => self.skip_to_next_line(),
@@ -204,10 +201,15 @@ impl<'a> Lexer<'a> {
     }
 
     fn pack_token(&self, token: Token) -> (Span, Token) {
-        (Span { begin: self.token_start, end: self.current_offset()}, token)
+        (
+            Span {
+                begin: self.token_start,
+                end: self.current_offset(),
+            },
+            token,
+        )
     }
 }
-
 
 /// Defines the charsets of various things that can be lexed
 mod charsets {

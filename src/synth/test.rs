@@ -1,9 +1,9 @@
 //! Exemplary implementation of a synthesizer.
 
 use super::envelope::*;
+use super::event::*;
 use super::oscillator::*;
 use super::tuning::*;
-use super::event::*;
 
 use crate::note::*;
 use crate::wave::*;

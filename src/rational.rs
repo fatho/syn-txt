@@ -3,7 +3,7 @@
 use std::{cmp::Ordering, ops};
 
 /// Underlying integral type for the rational numbers.
-type Int = i32;
+type Int = i64;
 
 /// A rational number, always fully normalized.
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
@@ -57,7 +57,7 @@ impl Rational {
         Rational::new(1, 1)
     }
 
-    pub fn nth(n: i32) -> Self {
+    pub fn nth(n: Int) -> Self {
         Rational::new(1, n)
     }
 
@@ -226,14 +226,18 @@ impl std::str::FromStr for Rational {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let mut parts = s.split('/');
         let numerator_str = parts.next().unwrap();
-        let numerator = numerator_str.parse().map_err(|_| ParseRationalError(RationalErrorKind::InvalidInt))?;
+        let numerator = numerator_str
+            .parse()
+            .map_err(|_| ParseRationalError(RationalErrorKind::InvalidInt))?;
 
         if let Some(denominator_str) = parts.next() {
-            let denominator = denominator_str.parse().map_err(|_| ParseRationalError(RationalErrorKind::InvalidInt))?;
+            let denominator = denominator_str
+                .parse()
+                .map_err(|_| ParseRationalError(RationalErrorKind::InvalidInt))?;
             if denominator == 0 {
-                return Err(ParseRationalError(RationalErrorKind::Zero))
+                return Err(ParseRationalError(RationalErrorKind::Zero));
             } else if let Some(_) = parts.next() {
-                return Err(ParseRationalError(RationalErrorKind::Malformed))
+                return Err(ParseRationalError(RationalErrorKind::Malformed));
             } else {
                 Ok(Rational::new(numerator, denominator))
             }

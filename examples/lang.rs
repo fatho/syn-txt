@@ -1,6 +1,6 @@
+use syn_txt::lang::interp::Interpreter;
 use syn_txt::lang::lexer::Lexer;
 use syn_txt::lang::parser::Parser;
-use syn_txt::lang::interp::Interpreter;
 
 fn main() {
     let input = r#"
@@ -53,9 +53,8 @@ fn main() {
 
     let input = r#"
         (define x 1/4)
-        (define y x)
-        (define z y)
-        z
+        (define y (* 2 x))
+        y
     "#;
 
     let mut lex = Lexer::new(input);
@@ -78,6 +77,4 @@ fn main() {
         let result = int.eval(&s);
         println!("  {:?}", result);
     }
-
-
 }

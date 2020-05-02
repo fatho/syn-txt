@@ -86,5 +86,7 @@ impl PianoRoll {
 }
 
 impl Default for PianoRoll {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }

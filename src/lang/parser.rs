@@ -1,14 +1,31 @@
 use super::ast::*;
-use super::lexer::*;
-use crate::rational::{Rational, ParseRationalError};
+use super::lexer::Token;
+use super::span::Span;
+use crate::rational::{ParseRationalError, Rational};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ParseError {
-    InvalidInt { error: std::num::ParseIntError, span: Span },
-    InvalidFloat { error: std::num::ParseFloatError, span: Span },
-    InvalidRational { error: ParseRationalError, span: Span },
-    InvalidString { span: Span, offset: usize },
-    Unexpected { expected: Vec<Token>, actual: Token, span: Span },
+    InvalidInt {
+        error: std::num::ParseIntError,
+        span: Span,
+    },
+    InvalidFloat {
+        error: std::num::ParseFloatError,
+        span: Span,
+    },
+    InvalidRational {
+        error: ParseRationalError,
+        span: Span,
+    },
+    InvalidString {
+        span: Span,
+        offset: usize,
+    },
+    Unexpected {
+        expected: Vec<Token>,
+        actual: Token,
+        span: Span,
+    },
     /// The end of the input was reached, but the parser was expecting more.
     EOF,
 }
@@ -31,7 +48,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse a document consisting of zero or more symbolic expressions.
-    pub fn parse(&mut self) -> ParseResult<Vec<SymExp>> {
+    pub fn parse(&mut self) -> ParseResult<Vec<SymExpSrc>> {
         let mut out = Vec::new();
         while let Some(sym) = self.next_symexp()? {
             out.push(sym)
@@ -39,59 +56,93 @@ impl<'a> Parser<'a> {
         Ok(out)
     }
 
-    pub fn next_symexp(&mut self) -> ParseResult<Option<SymExp>> {
+    pub fn next_symexp(&mut self) -> ParseResult<Option<SymExpSrc>> {
         match self.parse_exp() {
             Ok(symexpr) => Ok(Some(symexpr)),
-            Err(err) => if let ParseError::EOF = err {
-                Ok(None)
-            } else {
-                Err(err)
+            Err(err) => {
+                if let ParseError::EOF = err {
+                    Ok(None)
+                } else {
+                    Err(err)
+                }
             }
         }
     }
 
     // Parser for expressions
 
-    fn parse_exp(&mut self) -> ParseResult<SymExp> {
+    fn parse_exp(&mut self) -> ParseResult<SymExpSrc> {
         let (span, token) = self.parse_token()?;
         match token {
             Token::ParenOpen => {
                 let mut list = Vec::new();
-                while ! self.is_terminated(Token::ParenClose) {
+                while !self.is_terminated(Token::ParenClose) {
                     list.push(self.parse_exp()?);
                 }
-                self.expect_token(Token::ParenClose)?;
-                Ok(SymExp::List(list))
+                let end = self.expect_token(Token::ParenClose)?;
+                let list_span = Span {
+                    begin: span.begin,
+                    end: end.end,
+                };
+                Ok(SymExpSrc {
+                    src: list_span,
+                    exp: SymExp::List(list),
+                })
             }
             Token::Int => {
                 let i = self.parse_int(span)?;
-                Ok(SymExp::Literal(Value::Int(i)))
+                Ok(SymExpSrc {
+                    src: span,
+                    exp: SymExp::Int(i),
+                })
             }
             Token::Rational => {
                 let r = self.parse_rational(span)?;
-                Ok(SymExp::Literal(Value::Ratio(r)))
+                Ok(SymExpSrc {
+                    src: span,
+                    exp: SymExp::Ratio(r),
+                })
             }
             Token::Float => {
                 let f = self.parse_float(span)?;
-                Ok(SymExp::Literal(Value::Float(f)))
+                Ok(SymExpSrc {
+                    src: span,
+                    exp: SymExp::Float(f),
+                })
             }
             Token::String => {
                 let s = self.parse_string(span)?;
-                Ok(SymExp::Literal(Value::Str(s)))
+                Ok(SymExpSrc {
+                    src: span,
+                    exp: SymExp::Str(s),
+                })
             }
             Token::Ident => {
                 let ident = self.get_span(span);
                 if ident.starts_with(':') {
-                    Ok(SymExp::Keyword(Ident(ident.to_owned())))
+                    Ok(SymExpSrc {
+                        src: span,
+                        exp: SymExp::Keyword(Ident(ident.to_owned())),
+                    })
                 } else {
-                    Ok(SymExp::Variable(Ident(ident.to_owned())))
+                    Ok(SymExpSrc {
+                        src: span,
+                        exp: SymExp::Variable(Ident(ident.to_owned())),
+                    })
                 }
             }
             _ => Err(ParseError::Unexpected {
-                expected: vec![Token::ParenOpen, Token::Int, Token::Float, Token::Rational, Token::String, Token::Ident],
+                expected: vec![
+                    Token::ParenOpen,
+                    Token::Int,
+                    Token::Float,
+                    Token::Rational,
+                    Token::String,
+                    Token::Ident,
+                ],
                 actual: token,
                 span,
-            })
+            }),
         }
     }
 
@@ -99,17 +150,20 @@ impl<'a> Parser<'a> {
 
     fn parse_int(&self, span: Span) -> ParseResult<i64> {
         let s = self.get_span(span);
-        s.parse().map_err(|error| ParseError::InvalidInt { error, span })
+        s.parse()
+            .map_err(|error| ParseError::InvalidInt { error, span })
     }
 
     fn parse_float(&self, span: Span) -> ParseResult<f64> {
         let s = self.get_span(span);
-        s.parse().map_err(|error| ParseError::InvalidFloat { error, span })
+        s.parse()
+            .map_err(|error| ParseError::InvalidFloat { error, span })
     }
 
     fn parse_rational(&self, span: Span) -> ParseResult<Rational> {
         let s = self.get_span(span);
-        s.parse().map_err(|error| ParseError::InvalidRational { error, span })
+        s.parse()
+            .map_err(|error| ParseError::InvalidRational { error, span })
     }
 
     fn parse_string(&self, span: Span) -> ParseResult<String> {
@@ -118,7 +172,7 @@ impl<'a> Parser<'a> {
 
         // Ensure it starts with a quote
         if chars.next().map(|(_, ch)| ch) != Some('"') {
-            return Err(ParseError::InvalidString { span, offset: 0 })
+            return Err(ParseError::InvalidString { span, offset: 0 });
         }
 
         // Process escape sequences
@@ -140,8 +194,11 @@ impl<'a> Parser<'a> {
         }
 
         // Must end with quote
-        if ! terminated {
-            return Err(ParseError::InvalidString { span, offset: s.len() - 1 })
+        if !terminated {
+            return Err(ParseError::InvalidString {
+                span,
+                offset: s.len() - 1,
+            });
         }
 
         Ok(out)
@@ -175,10 +232,10 @@ impl<'a> Parser<'a> {
         self.pop_token().ok_or(ParseError::EOF)
     }
 
-    fn expect_token(&mut self, expected: Token) -> ParseResult<&'a str> {
+    fn expect_token(&mut self, expected: Token) -> ParseResult<Span> {
         if let Some((span, token)) = self.pop_token() {
             if token == expected {
-                Ok(self.get_span(span))
+                Ok(span)
             } else {
                 Err(ParseError::Unexpected {
                     expected: vec![expected],

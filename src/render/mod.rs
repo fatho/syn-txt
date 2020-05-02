@@ -1,6 +1,6 @@
 //! The glue responsible for turning the description of music into actual waveforms.
 
-use crate::synth::{Synthesizer, Event};
+use crate::synth::{Event, Synthesizer};
 use crate::wave::Stereo;
 
 /// Feeds a synthesizer with events, generating (buffered) audio output.
@@ -13,7 +13,11 @@ pub struct SynthPlayer<'e, S> {
 impl<'e, S: Synthesizer> SynthPlayer<'e, S> {
     /// The events must be ordered chronologically by their start time.
     pub fn new(synth: S, events: &'e [Event]) -> Self {
-        Self { synth, events, current_sample: 0 }
+        Self {
+            synth,
+            events,
+            current_sample: 0,
+        }
     }
 
     pub fn remaining_events(&self) -> &'e [Event] {
@@ -25,7 +29,9 @@ impl<'e, S: Synthesizer> SynthPlayer<'e, S> {
         self.current_sample += output.len();
 
         // Skip all events that were processed in this iteration
-        let skipped = self.events.iter()
+        let skipped = self
+            .events
+            .iter()
             .position(|e| e.time >= self.current_sample)
             .unwrap_or(self.events.len());
         self.events = &self.events[skipped..];

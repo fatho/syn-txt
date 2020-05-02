@@ -5,9 +5,9 @@ use std::io;
 use syn_txt;
 use syn_txt::note::*;
 use syn_txt::pianoroll::{PianoRoll, Time};
-use syn_txt::synth;
-use syn_txt::wave;
 use syn_txt::render;
+use syn_txt::synth::{self, Synthesizer};
+use syn_txt::wave;
 use syn_txt::output;
 
 fn main() -> io::Result<()> {
@@ -73,8 +73,7 @@ fn main() -> io::Result<()> {
     let synth = synth::test::TestSynth::new(0, sample_rate as f64);
     let mut player = render::SynthPlayer::new(synth, &events);
 
-
-    syn_txt::output::sox::with_sox_player(sample_rate, |audio_stream| {
+    syn_txt::output::sox::with_sox_player(sample_rate as i32, |audio_stream| {
         let mut audio_buffer: Vec<wave::Stereo<f64>> = vec![
             wave::Stereo {
                 left: 0.0,
@@ -86,7 +85,9 @@ fn main() -> io::Result<()> {
 
         let mut samples_total = 0;
         while samples_total < max_samples {
-            audio_buffer.iter_mut().for_each(|s| *s = wave::Stereo::new(0.0, 0.0));
+            audio_buffer
+                .iter_mut()
+                .for_each(|s| *s = wave::Stereo::new(0.0, 0.0));
             player.generate(&mut audio_buffer);
             let n = output::copy_f64_bytes(&audio_buffer, &mut byte_buffer);
             assert_eq!(n, audio_buffer.len());

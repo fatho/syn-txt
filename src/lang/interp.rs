@@ -389,3 +389,56 @@ impl Type {
         }
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::super::{lexer::*, parser::*};
+    use super::*;
+
+    fn expect_values(input: &str, expected: &[Value]) {
+        let tokens = Lexer::new(input)
+            .collect::<Result<Vec<(Span, Token)>, _>>()
+            .unwrap();
+        let expressions = Parser::new(input, &tokens).parse().unwrap();
+        let mut interp = Interpreter::new();
+
+        for (e, val) in expressions.iter().zip(expected) {
+            let result = interp.eval(e).unwrap();
+            assert_eq!(&result, val);
+        }
+    }
+
+    #[test]
+    fn test_arithmetic() {
+        expect_values("(+ 1 2)", &[Value::Int(3)]);
+        expect_values("(- 8 12)", &[Value::Int(-4)]);
+
+        expect_values("(- -4 -9)", &[Value::Int(5)]);
+
+        expect_values("(* 2 (/ 8 12))", &[Value::Ratio(Rational::new(4, 3))]);
+        expect_values("(/ 5/4 8/7)", &[Value::Ratio(Rational::new(35, 32))]);
+    }
+
+    #[test]
+    fn test_defines() {
+        expect_values(
+            r#"
+            (define pi 3.14)
+            (define r (/ 5 2))
+            (define result
+                (* r (* 2 pi)))
+            result
+            (set! result
+                (* pi (* r r)))
+            result"#,
+            &[
+                Value::Unit,
+                Value::Unit,
+                Value::Unit,
+                Value::Float(15.700000000000001),
+                Value::Unit,
+                Value::Float(19.625),
+            ],
+        );
+    }
+}

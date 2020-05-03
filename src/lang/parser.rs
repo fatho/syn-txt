@@ -333,6 +333,8 @@ mod test {
     use super::super::lexer::*;
     use super::*;
 
+    // TODO: test some error cases as well
+
     fn expect_single_expression(input: &str, expected: SymExp) {
         let tokens = Lexer::new(input)
             .collect::<Result<Vec<(Span, Token)>, _>>()

@@ -104,7 +104,7 @@ impl<'a> LineMap<'a> {
     pub fn line_span(&self, line: usize) -> Span {
         let begin = if line <= 1 {
             0
-        } else if line - 1 >= self.line_offsets.len() {
+        } else if line - 2 >= self.line_offsets.len() {
             self.source.len()
         } else {
             self.line_offsets[line - 2] + 1
@@ -118,10 +118,33 @@ impl<'a> LineMap<'a> {
         Span { begin, end }
     }
 
+
+    /// Takes the lines indicated by the given range, plus one before and one after,
+    /// and prints them with line numbers, while underlining the range itself with `^`
+    /// symbols.
+    /// The end position is exclusive.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use syn_txt::lang::span::*;
+    /// let s = "abcd\nefgh\nijkl\nmnop";
+    /// let m = LineMap::new(s);
+    /// assert_eq!(
+    ///   m.highlight(Pos { line: 2, column: 3 }, Pos { line: 3, column: 2 }, false),
+    /// r#"   1|abcd
+    ///    2|efgh
+    ///        ^^
+    ///    3|ijkl
+    ///      ^
+    ///    4|mnop
+    /// "#
+    /// )
+    /// ```
     pub fn highlight(&self, start: Pos, end: Pos, colored: bool) -> String {
         let mut out = String::new();
         let display_start = 1.max(start.line - 1);
-        let display_end = self.line_offsets.len().min(end.line + 1);
+        let display_end = (self.line_offsets.len() + 1).min(end.line + 1);
         for line in display_start..=display_end {
             let line_span = self.line_span(line);
             let line_str = &self.source[line_span.begin..line_span.end];

@@ -66,6 +66,7 @@ fn main() {
         (define f1 (foo/new))
         (define f2 (foo/new))
         (print f1 f2)
+        (f1)
     "#;
 
     run_test(input)
@@ -100,7 +101,10 @@ fn run_test(input: &str) {
     println!("Evaluating...");
     let mut int = Interpreter::new();
     let extension_state = Rc::new(RefCell::new(0));
-    int.register_stateful_primop("foo/new", PrimOpExt::with_shared_state(extension_state, foo_ext_foo_new));
+    int.register_stateful_primop(
+        "foo/new",
+        PrimOpExt::with_shared_state(extension_state, foo_ext_foo_new),
+    );
 
     for s in ast {
         println!("{}", &input[s.src.begin..s.src.end]);
@@ -146,5 +150,14 @@ impl interpreter::ExtensionValue for FooVal {
 
     fn as_any(&self) -> &dyn std::any::Any {
         self
+    }
+
+    fn call(
+        &self,
+        _intp: &mut Interpreter,
+        args: interpreter::ArgParser,
+    ) -> interpreter::InterpreterResult<interpreter::Value> {
+        args.done()?;
+        Ok(interpreter::Value::Int(self.0 as i64))
     }
 }

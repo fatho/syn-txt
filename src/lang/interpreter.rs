@@ -1,6 +1,6 @@
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::{fmt, rc::Rc};
-use std::cell::RefCell;
 
 use super::ast;
 use super::primops;
@@ -165,6 +165,7 @@ impl Interpreter {
         match head {
             Value::FnPrim(PrimOp(prim_fn)) => prim_fn(self, args),
             Value::FnExt(PrimOpExt(prim_fn_ext)) => prim_fn_ext(self, args),
+            Value::Ext(val) => val.0.call(self, args),
             _ => Err(IntpErr::new(head_exp.src, IntpErrInfo::Uncallable)),
         }
     }
@@ -312,12 +313,7 @@ impl PrimOpExt {
     pub fn with_shared_state<S, F>(state: Rc<RefCell<S>>, fun: F) -> PrimOpExt
     where
         S: 'static,
-        F: Fn(
-                &mut S,
-                &mut Interpreter,
-                ArgParser,
-            ) -> InterpreterResult<Value>
-            + 'static,
+        F: Fn(&mut S, &mut Interpreter, ArgParser) -> InterpreterResult<Value> + 'static,
     {
         PrimOpExt(Rc::new(move |intp, args| {
             let mut state_mut = state.borrow_mut();
@@ -377,6 +373,11 @@ pub trait ExtensionValue: std::any::Any + fmt::Debug {
     /// Workaround for the lack of trait-upcasting in Rust.
     /// This method allows the self in `partial_eq` to downcast the `other`.
     fn as_any(&self) -> &dyn std::any::Any;
+
+    /// Allows external values to be callable. The default implementation returns an error.
+    fn call(&self, _intp: &mut Interpreter, args: ArgParser) -> InterpreterResult<Value> {
+        Err(IntpErr::new(args.list_span, IntpErrInfo::Uncallable))
+    }
 }
 
 #[cfg(test)]

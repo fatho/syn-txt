@@ -188,12 +188,15 @@ impl Interpreter {
 pub struct ArgParser<'a> {
     /// The span of the whole list whose arguments are parsed.
     list_span: Span,
+    /// Span of the most recently parsed argument, of of the whole list,
+    /// if no argument has been parsed yet. Used for error attribution.
+    last_span: Span,
     args: &'a [ast::SymExpSrc],
 }
 
 impl<'a> ArgParser<'a> {
     pub fn new(list_span: Span, args: &'a [ast::SymExpSrc]) -> Self {
-        Self { list_span, args }
+        Self { list_span, last_span: list_span, args }
     }
 
     /// Return the number of unparsed arguments
@@ -211,10 +214,16 @@ impl<'a> ArgParser<'a> {
         self.args.is_empty()
     }
 
+    /// The source location of the most recently parsed argument.
+    pub fn last_span(&self) -> Span {
+        self.last_span
+    }
+
     /// Return the current argument as symbolic expression.
     pub fn symbolic<'b>(&'b mut self) -> InterpreterResult<&'a ast::SymExpSrc> {
         if let Some(sym) = self.args.first() {
             self.args = &self.args[1..];
+            self.last_span = sym.src;
             Ok(sym)
         } else {
             Err(IntpErr::new(
@@ -260,7 +269,7 @@ impl<'a> ArgParser<'a> {
     pub fn extract<T: FromValue>(&mut self, interp: &mut Interpreter) -> InterpreterResult<T> {
         let arg = self.symbolic()?;
         let result = interp.eval(arg)?;
-        T::from_value(result).map_err(|info| IntpErr::new(arg.src, info))
+        T::from_value(result).map_err(|_| IntpErr::new(arg.src, IntpErrInfo::Type))
     }
 
     /// End the argument parsing process. There must not be any more arguments remaining.
@@ -440,58 +449,62 @@ macro_rules! declare_extension_value {
 
 /// Trait for unmarshalling `Value`.
 pub trait FromValue: Sized {
-    fn from_value(value: Value) -> Result<Self, IntpErrInfo>;
+    fn from_value(value: Value) -> Result<Self, Value>;
 }
 
 impl FromValue for String {
-    fn from_value(value: Value) -> Result<String, IntpErrInfo> {
+    fn from_value(value: Value) -> Result<String, Value> {
         match value {
             Value::Str(x) => Ok(x),
             Value::Int(x) => Ok(format!("{}", x)),
             Value::Float(x) => Ok(format!("{}", x)),
             Value::Ratio(x) => Ok(format!("{}", x)),
-            _ => Err(IntpErrInfo::Type),
+            value => Err(value),
         }
     }
 }
 
 impl FromValue for i64 {
-    fn from_value(value: Value) -> Result<i64, IntpErrInfo> {
+    fn from_value(value: Value) -> Result<i64, Value> {
         match value {
             Value::Int(x) => Ok(x),
-            _ => Err(IntpErrInfo::Type),
+            value => Err(value),
         }
     }
 }
 
 impl FromValue for f64 {
-    fn from_value(value: Value) -> Result<f64, IntpErrInfo> {
+    fn from_value(value: Value) -> Result<f64, Value> {
         match value {
             Value::Int(x) => Ok(x as f64),
             Value::Float(x) => Ok(x),
-            _ => Err(IntpErrInfo::Type),
+            value => Err(value),
         }
     }
 }
 
 impl FromValue for Rational {
-    fn from_value(value: Value) -> Result<Rational, IntpErrInfo> {
+    fn from_value(value: Value) -> Result<Rational, Value> {
         match value {
             Value::Int(x) => Ok(Rational::from_int(x)),
             Value::Ratio(x) => Ok(x),
-            _ => Err(IntpErrInfo::Type),
+            value => Err(value),
         }
     }
 }
 
 impl<E: ExtensionValue + Clone> FromValue for E {
-    fn from_value(value: Value) -> Result<Self, IntpErrInfo> {
-        if let Value::Ext(ext) = value {
-            if let Some(e) = ext.0.as_any().downcast_ref::<E>() {
-                return Ok(e.clone());
+    fn from_value(value: Value) -> Result<Self, Value> {
+        match value {
+            Value::Ext(ref ext) => {
+                if let Some(e) = ext.0.as_any().downcast_ref::<E>() {
+                    Ok(e.clone())
+                } else {
+                    Err(value)
+                }
             }
+            value => Err(value),
         }
-        Err(IntpErrInfo::Type)
     }
 }
 

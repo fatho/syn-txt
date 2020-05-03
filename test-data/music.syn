@@ -1,18 +1,46 @@
-(define ascending-melody
+(define part1-1
     (piano-roll
-        (note :pitch "a4" :length 1/4 :velocity 0.1)
-        (note :pitch "b4" :length 1/4 :velocity 0.3)
-        (note :pitch "c5" :length 1/4 :velocity 0.5)
-        (note :pitch "d5" :length 1/4 :velocity 0.7)
-        (note :pitch "e5" :length 1/1 :velocity 1.0)
-        ; Note how these two notes don't start *after* the previous note ended,
-        ; but only 1/4th after the previous note *started*,
-        (note :pitch "a5" :length 3/4 :velocity 1.0 :offset 1/4)
-        (note :pitch "c5" :length 1/2 :velocity 1.0 :offset 1/4)
+        (note :pitch "A4" :length 1/16)
+        (note :pitch "e4" :length 1/16 :velocity 0.3)
+        (note :pitch "B4" :length 1/16)
+        (note :pitch "e4" :length 1/16 :velocity 0.3)
+        (note :pitch "C5" :length 1/16)
+        (note :pitch "e4" :length 1/16 :velocity 0.3)
+        (note :pitch "B4" :length 1/16)
+        (note :pitch "e4" :length 1/16 :velocity 0.3)
+        (note :pitch "A4" :length 1/16)
+        (note :pitch "e4" :length 1/16 :velocity 0.3)
+        (note :pitch "C5" :length 1/16)
+        (note :pitch "e4" :length 1/16 :velocity 0.3)
     )
 )
 
-ascending-melody
+(define part1-2
+    (piano-roll
+        (note :pitch "B4" :length 1/16)
+        (note :pitch "e4" :length 1/16 :velocity 0.3)
+        (note :pitch "A4" :length 1/16)
+        (note :pitch "e4" :length 1/16 :velocity 0.3)
+        (note :pitch "G4" :length 1/16)
+        (note :pitch "e4" :length 1/16 :velocity 0.3)
+        (note :pitch "A4" :length 1/16)
+        (note :pitch "e4" :length 1/16 :velocity 0.3)
+        (note :pitch "B4" :length 1/16)
+        (note :pitch "e4" :length 1/16 :velocity 0.3)
+        (note :pitch "E5" :length 1/16)
+        (note :pitch "e4" :length 1/16 :velocity 0.3)
+    )
+)
+
+(define part1
+    (piano-roll
+        part1-1
+        part1-2
+        part1-2
+    )
+)
+
+part1
 
 ; 
 ; ; Play the above melody twice
@@ -23,3 +51,13 @@ ascending-melody
 ; )
 ; 
 ; final-melody
+
+
+        ; (note :pitch "b4" :length 1/8 :velocity 0.3)
+        ; (note :pitch "c5" :length 1/8 :velocity 0.5)
+        ; (note :pitch "d5" :length 1/8 :velocity 0.7)
+        ; (note :pitch "e5" :length 1/1 :velocity 1.0)
+        ; ; Note how these two notes don't start *after* the previous note ended,
+        ; ; but only 1/4th after the previous note *started*,
+        ; (note :pitch "a5" :length 3/4 :velocity 1.0 :offset 1/4)
+        ; (note :pitch "c5" :length 1/2 :velocity 1.0 :offset 1/4)

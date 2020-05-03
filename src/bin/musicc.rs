@@ -218,18 +218,27 @@ impl PianoRollValue {
     fn prim_new(intp: &mut Interpreter, mut args: ArgParser) -> InterpreterResult<Value> {
         let mut roll = PianoRoll::new();
         while !args.is_empty() {
-            let note: NoteValue = args.extract(intp)?;
-
-            if let Some(offset) = note.offset {
-                roll.add_stack_offset(
-                    note.pitch,
-                    note.length,
-                    Velocity::from_f64(note.velocity),
-                    offset,
-                )
-            } else {
-                roll.add_after(note.pitch, note.length, Velocity::from_f64(note.velocity))
+            let value = args.value(intp)?;
+            // Allow both notes and other piano rolls when constructing new piano rolls
+            match NoteValue::from_value(value) {
+                Ok(note) =>
+                    if let Some(offset) = note.offset {
+                        roll.add_stack_offset(
+                            note.pitch,
+                            note.length,
+                            Velocity::from_f64(note.velocity),
+                            offset,
+                        )
+                    } else {
+                        roll.add_after(note.pitch, note.length, Velocity::from_f64(note.velocity))
+                    }
+                Err(other) => match PianoRollValue::from_value(other) {
+                    Ok(other_roll) => roll.append(&other_roll.0),
+                    Err(_) =>
+                        return Err(IntpErr::new(args.last_span(), IntpErrInfo::Type))
+                }
             }
+
         }
         Ok(Value::ext(PianoRollValue(roll)))
     }

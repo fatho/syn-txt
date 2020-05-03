@@ -4,11 +4,11 @@ use std::io;
 
 use syn_txt;
 use syn_txt::note::*;
+use syn_txt::output;
 use syn_txt::pianoroll::{PianoRoll, Time};
 use syn_txt::render;
 use syn_txt::synth::{self, Synthesizer};
 use syn_txt::wave;
-use syn_txt::output;
 
 fn main() -> io::Result<()> {
     let eigth = Time::nth(8);

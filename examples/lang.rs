@@ -53,13 +53,13 @@ fn main() {
     "#;
 
     let input = r#"
+        (define u 1/13)
         (define x 1/4)
-        (define y (* 2 x))
+        (define y (* -2 x))
         (define z (/ 1
-                     0))
+                     1))
         (define a (+ x y z))
-        a
-    "#;
+        a"#;
 
     run_test(input)
 }

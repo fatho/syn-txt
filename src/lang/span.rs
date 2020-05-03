@@ -96,7 +96,11 @@ impl<'a> LineMap<'a> {
         } else {
             self.line_offsets[pos.line - 2] + 1
         };
-        let offset = self.source[line_begin..].char_indices().skip(pos.column - 1).next().map_or(0, |(pos, _)| pos);
+        let offset = self.source[line_begin..]
+            .char_indices()
+            .skip(pos.column - 1)
+            .next()
+            .map_or(0, |(pos, _)| pos);
         line_begin + offset
     }
 
@@ -117,7 +121,6 @@ impl<'a> LineMap<'a> {
         };
         Span { begin, end }
     }
-
 
     /// Takes the lines indicated by the given range, plus one before and one after,
     /// and prints them with line numbers, while underlining the range itself with `^`
@@ -163,7 +166,9 @@ impl<'a> LineMap<'a> {
 
             if colored {
                 for (i, ch) in line_str.chars().enumerate() {
-                    if (i + 1 == start.column && line == start.line) || (i == 0 && line > start.line && line <= end.line) {
+                    if (i + 1 == start.column && line == start.line)
+                        || (i == 0 && line > start.line && line <= end.line)
+                    {
                         out.push_str(red);
                     }
                     if i + 1 == end.column && line == end.line {

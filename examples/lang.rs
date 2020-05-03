@@ -1,4 +1,4 @@
-use syn_txt::lang::interpreter::Interpreter;
+use syn_txt::lang::interpreter::{Interpreter, Extension};
 use syn_txt::lang::lexer::Lexer;
 use syn_txt::lang::parser::Parser;
 use syn_txt::lang::span::{LineMap, Span};
@@ -113,4 +113,23 @@ fn print_error<E: std::fmt::Display>(lines: &LineMap, location: Span, message: E
     let end = lines.offset_to_pos(location.end);
     println!("error: {} (<input>:{}-{})", message, start, end);
     println!("{}", lines.highlight(start, end, true));
+}
+
+struct Test;
+
+impl Extension for Test {
+    type State = ();
+
+    fn primops(&self) -> &[(String, syn_txt::lang::interpreter::PrimOpExt<Self::State>)] {
+        &[]
+    }
+}
+
+
+fn experiment() {
+    use std::rc::Rc;
+    use std::cell::RefCell;
+
+    let foo: Rc<RefCell<dyn Extension>> = Rc::new(RefCell::new(Test));
+    foo.borrow().primops()
 }

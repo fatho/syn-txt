@@ -271,6 +271,26 @@ impl PartialEq for PrimOp {
 }
 impl Eq for PrimOp {}
 
+/// A primitive operation exposed to the interpreted language by an extension.
+#[derive(Copy, Clone)]
+pub struct PrimOpExt<E>(pub for<'a> fn(&mut Interpreter, &mut E, ArgParser<'a>) -> InterpreterResult<Value>);
+
+impl<E> fmt::Debug for PrimOpExt<E> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let ptr = self.0 as *const ();
+        write!(f, "PrimOpExt<E>({:p})", ptr)
+    }
+}
+
+impl<E> PartialEq for PrimOpExt<E> {
+    fn eq(&self, other: &Self) -> bool {
+        let self_ptr = self.0 as *const ();
+        let other_ptr = other.0 as *const ();
+        self_ptr == other_ptr
+    }
+}
+impl<E> Eq for PrimOpExt<E> {}
+
 /// Evaluating expressions results in values.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
@@ -286,30 +306,18 @@ pub enum Value {
     Unit,
     /// A primitive operation
     FnPrim(PrimOp),
+    /// A value provided by an interpreter extension.
+    /// Interpretation of it is up to the extension.
+    Ext(usize),
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub enum Type {
-    Str,
-    Float,
-    Ratio,
-    Int,
-    Unit,
-    Callable,
+
+pub trait Extension {
+    type State: Sized;
+
+    fn primops(&self) -> &[(String, PrimOpExt<Self::State>)];
 }
 
-impl Value {
-    pub fn get_type(&self) -> Type {
-        match self {
-            Value::Str(_) => Type::Str,
-            Value::Float(_) => Type::Float,
-            Value::Ratio(_) => Type::Ratio,
-            Value::Int(_) => Type::Int,
-            Value::Unit => Type::Unit,
-            Value::FnPrim(_) => Type::Callable,
-        }
-    }
-}
 
 #[cfg(test)]
 mod test {

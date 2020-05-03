@@ -17,6 +17,9 @@
 
 (define part1-2
     (piano-roll
+        ; The note pitch is denoted using the standard 12-tone chromatic scale
+        ; Capitalization does not matter, sharps are denoted as `#` or `♯` (e.g `a♯5`),
+        ; flats are denoted as `b` or `♭` (e.g. `eb3`).
         (note :pitch "B4" :length 1/16)
         (note :pitch "e4" :length 1/16 :velocity 0.3)
         (note :pitch "A4" :length 1/16)
@@ -34,30 +37,21 @@
 
 (define part1
     (piano-roll
+        ; Piano rolls can be made from other piano rolls
         part1-1
+        ; and even the same one multiple times
         part1-2
         part1-2
+
+        (note :pitch "e4" :length 3/4 :velocity 0.5)
+        ; These three notes don't start *after* the previous note ended,
+        ; but together with it, as denoted by the zero `offset`.
+        ; The offset can be any non-negative integer or rational.
+        (note :pitch "a4" :length 3/4 :velocity 0.5 :offset 0)
+        (note :pitch "c5" :length 3/4 :velocity 0.5 :offset 0)
+        (note :pitch "e5" :length 3/4 :velocity 0.5 :offset 0)
     )
 )
 
+; The final expression in a file must currently evaluate to a piano roll
 part1
-
-; 
-; ; Play the above melody twice
-; (define final-melody
-;     (sequence
-;         ascending-melody
-;         ascending-melody)
-; )
-; 
-; final-melody
-
-
-        ; (note :pitch "b4" :length 1/8 :velocity 0.3)
-        ; (note :pitch "c5" :length 1/8 :velocity 0.5)
-        ; (note :pitch "d5" :length 1/8 :velocity 0.7)
-        ; (note :pitch "e5" :length 1/1 :velocity 1.0)
-        ; ; Note how these two notes don't start *after* the previous note ended,
-        ; ; but only 1/4th after the previous note *started*,
-        ; (note :pitch "a5" :length 3/4 :velocity 1.0 :offset 1/4)
-        ; (note :pitch "c5" :length 1/2 :velocity 1.0 :offset 1/4)

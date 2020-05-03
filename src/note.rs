@@ -42,7 +42,6 @@ impl Note {
     /// use syn_txt::note::*;
     ///
     /// assert_eq!(Note::named_checked(NoteName::A, NoteOffset::Base, 4), Some(Note::from_midi(69)));
-    /// assert_eq!(Note::named_checked(NoteName::A, NoteOffset::Base, 4), Some(Note::from_midi(69)));
     /// assert_eq!(Note::named_checked(NoteName::C, NoteOffset::Sharp, 6), Some(Note::from_midi(85)));
     /// assert_eq!(Note::named_checked(NoteName::G, NoteOffset::Flat, 2), Some(Note::from_midi(42)));
     /// ```
@@ -81,15 +80,56 @@ impl Note {
     /// # Examples
     ///
     /// ```
-    /// use syn_txt::note::*;
+    /// # use syn_txt::note::*;
     ///
-    /// assert_eq!(Note::named(NoteName::A, NoteOffset::Base, 4), Note::from_midi(69));
     /// assert_eq!(Note::named(NoteName::A, NoteOffset::Base, 4), Note::from_midi(69));
     /// assert_eq!(Note::named(NoteName::C, NoteOffset::Sharp, 6), Note::from_midi(85));
     /// assert_eq!(Note::named(NoteName::G, NoteOffset::Flat, 2), Note::from_midi(42));
     /// ```
     pub fn named(name: NoteName, offset: NoteOffset, octave: i32) -> Note {
         Note::named_checked(name, offset, octave).expect("Note not representable in MIDI system.")
+    }
+
+    /// Parse a name string of the format `<letter><offset><octave>`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use syn_txt::note::*;
+    ///
+    /// assert_eq!(Note::named_str("A4"), Some(Note::from_midi(69)));
+    /// assert_eq!(Note::named_str("a4"), Some(Note::from_midi(69)));
+    /// assert_eq!(Note::named_str("Csharp6"), Some(Note::from_midi(85)));
+    /// assert_eq!(Note::named_str("C♯6"), Some(Note::from_midi(85)));
+    /// assert_eq!(Note::named_str("Gb2"), Some(Note::from_midi(42)));
+    /// ```
+    pub fn named_str(name_str: &str) -> Option<Note> {
+        let mut name_chars = name_str.chars();
+        let name_ch = name_chars.next()?;
+        let name = match name_ch.to_ascii_uppercase() {
+            'A' => NoteName::A,
+            'B' => NoteName::B,
+            'C' => NoteName::C,
+            'D' => NoteName::D,
+            'E' => NoteName::E,
+            'F' => NoteName::F,
+            'G' => NoteName::G,
+            _ => return None,
+        };
+
+        let offset_str = name_chars
+            .as_str()
+            .trim_end_matches(|ch: char| ch.is_ascii_digit());
+        let offset = match offset_str {
+            "sharp" | "♯" | "#" => NoteOffset::Sharp,
+            "flat" | "♭" | "b" => NoteOffset::Flat,
+            "" => NoteOffset::Base,
+            _ => return None,
+        };
+
+        let octave_str = &name_chars.as_str()[offset_str.len()..];
+        let octave = octave_str.parse().ok()?;
+        Note::named_checked(name, offset, octave)
     }
 
     pub fn from_midi(midi_note: u8) -> Note {

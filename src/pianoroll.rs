@@ -6,6 +6,7 @@ use crate::rational::Rational;
 pub type Time = Rational;
 
 /// A piano roll is a set of notes that are played in a specific arrangement.
+#[derive(Debug, Clone, PartialEq)]
 pub struct PianoRoll {
     /// Nominal length of the piano roll. This determines at what time new notes are appended.
     length: Time,
@@ -13,7 +14,7 @@ pub struct PianoRoll {
     notes: Vec<PlayedNote>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct PlayedNote {
     /// Which key was pressed
     pub note: Note,
@@ -47,6 +48,27 @@ impl PianoRoll {
             duration,
         });
         self.length = self.length.max(start + duration)
+    }
+
+    /// Add a note at the same time as the last played note started.
+    /// The offset must be positive.
+    pub fn add_stack_offset(
+        &mut self,
+        note: Note,
+        duration: Time,
+        velocity: Velocity,
+        offset: Time,
+    ) {
+        // TODO: allow any offset here
+        assert!(offset >= Rational::zero());
+        let start = self.last_note_start_time();
+        self.notes.push(PlayedNote {
+            note,
+            velocity,
+            start: start + offset,
+            duration,
+        });
+        self.length = self.length.max(start + offset + duration)
     }
 
     /// Add a note at the end of the piano roll, extending its length.

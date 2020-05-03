@@ -1,4 +1,3 @@
-use std::cell::RefCell;
 use std::collections::HashMap;
 use std::{fmt, rc::Rc};
 
@@ -41,6 +40,8 @@ pub enum IntpErrInfo {
     IncompatibleArguments,
     NotEnoughArguments,
     TooManyArguments,
+    /// Keyword was not understood by callee.
+    UnknownKeyword(ast::Ident),
     DivisionByZero,
     /// Type error (e.g. trying to add two incompatible types).
     Type,
@@ -60,6 +61,7 @@ impl fmt::Display for IntpErrInfo {
             IntpErrInfo::IncompatibleArguments => write!(f, "incompatible arguments"),
             IntpErrInfo::NotEnoughArguments => write!(f, "not enough arguments in function call"),
             IntpErrInfo::TooManyArguments => write!(f, "too many arguments in function call"),
+            IntpErrInfo::UnknownKeyword(var) => write!(f, "unknown keyword `{}`", &var.0),
             IntpErrInfo::DivisionByZero => write!(f, "division by zero"),
             IntpErrInfo::Redefinition(var) => write!(f, "redefined variable `{}`", &var.0),
             IntpErrInfo::Type => write!(f, "type error"),
@@ -101,6 +103,15 @@ impl Interpreter {
             builtins: builtin_scope,
             scopes: vec![Scope::new()],
         }
+    }
+
+    pub fn register_primop(
+        &mut self,
+        name: &str,
+        op: fn(&mut Interpreter, ArgParser) -> InterpreterResult<Value>,
+    ) {
+        self.builtins
+            .set_var(ast::Ident((*name).to_owned()), Value::FnPrim(PrimOp(op)));
     }
 
     pub fn register_primop_ext<F>(&mut self, name: &str, op: F)
@@ -213,10 +224,23 @@ impl<'a> ArgParser<'a> {
         }
     }
 
-    /// The current argument must have a plain variable.
+    /// The current argument must be a plain variable.
     pub fn variable<'b>(&'b mut self) -> InterpreterResult<&'a ast::Ident> {
         let arg = self.symbolic()?;
         if let ast::SymExp::Variable(ident) = &arg.exp {
+            Ok(ident)
+        } else {
+            Err(IntpErr::new(
+                self.list_span,
+                IntpErrInfo::IncompatibleArguments,
+            ))
+        }
+    }
+
+    /// The current argument must be a keyword.
+    pub fn keyword<'b>(&'b mut self) -> InterpreterResult<&'a ast::Ident> {
+        let arg = self.symbolic()?;
+        if let ast::SymExp::Keyword(ident) = &arg.exp {
             Ok(ident)
         } else {
             Err(IntpErr::new(
@@ -230,6 +254,13 @@ impl<'a> ArgParser<'a> {
     pub fn value(&mut self, interp: &mut Interpreter) -> InterpreterResult<Value> {
         let arg = self.symbolic()?;
         interp.eval(arg)
+    }
+
+    /// Evaluate the current argument and return it as a Rust value.
+    pub fn extract<T: FromValue>(&mut self, interp: &mut Interpreter) -> InterpreterResult<T> {
+        let arg = self.symbolic()?;
+        let result = interp.eval(arg)?;
+        T::from_value(result).map_err(|info| IntpErr::new(arg.src, info))
     }
 
     /// End the argument parsing process. There must not be any more arguments remaining.
@@ -268,6 +299,7 @@ impl Scope {
         self.bindings.get_mut(var)
     }
 }
+
 /// A primitive operation exposed to the interpreted language.
 #[derive(Copy, Clone)]
 pub struct PrimOp(pub for<'a> fn(&mut Interpreter, ArgParser<'a>) -> InterpreterResult<Value>);
@@ -384,6 +416,82 @@ where
 
     fn call(&self, intp: &mut Interpreter, args: ArgParser) -> InterpreterResult<Value> {
         self.0(intp, args)
+    }
+}
+
+#[macro_export]
+macro_rules! declare_extension_value {
+    ($value_type: ty) => {
+        impl ExtensionValue for $value_type {
+            fn partial_eq(&self, other: &dyn ExtensionValue) -> bool {
+                if let Some(foo) = other.as_any().downcast_ref::<Self>() {
+                    self == foo
+                } else {
+                    false
+                }
+            }
+
+            fn as_any(&self) -> &dyn std::any::Any {
+                self
+            }
+        }
+    };
+}
+
+/// Trait for unmarshalling `Value`.
+pub trait FromValue: Sized {
+    fn from_value(value: Value) -> Result<Self, IntpErrInfo>;
+}
+
+impl FromValue for String {
+    fn from_value(value: Value) -> Result<String, IntpErrInfo> {
+        match value {
+            Value::Str(x) => Ok(x),
+            Value::Int(x) => Ok(format!("{}", x)),
+            Value::Float(x) => Ok(format!("{}", x)),
+            Value::Ratio(x) => Ok(format!("{}", x)),
+            _ => Err(IntpErrInfo::Type),
+        }
+    }
+}
+
+impl FromValue for i64 {
+    fn from_value(value: Value) -> Result<i64, IntpErrInfo> {
+        match value {
+            Value::Int(x) => Ok(x),
+            _ => Err(IntpErrInfo::Type),
+        }
+    }
+}
+
+impl FromValue for f64 {
+    fn from_value(value: Value) -> Result<f64, IntpErrInfo> {
+        match value {
+            Value::Int(x) => Ok(x as f64),
+            Value::Float(x) => Ok(x),
+            _ => Err(IntpErrInfo::Type),
+        }
+    }
+}
+
+impl FromValue for Rational {
+    fn from_value(value: Value) -> Result<Rational, IntpErrInfo> {
+        match value {
+            Value::Int(x) => Ok(Rational::from_int(x)),
+            Value::Ratio(x) => Ok(x),
+            _ => Err(IntpErrInfo::Type),
+        }
+    }
+}
+
+impl<E: ExtensionValue + Clone> FromValue for E {
+    fn from_value(value: Value) -> Result<Self, IntpErrInfo> {
+        if let Value::Ext(ext) = value {
+            if let Some(e) = ext.0.as_any().downcast_ref::<E>() {
+                return Ok(e.clone());
+            }
+        }
+        Err(IntpErrInfo::Type)
     }
 }
 

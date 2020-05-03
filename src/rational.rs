@@ -208,6 +208,16 @@ impl Ord for Rational {
     }
 }
 
+impl fmt::Display for Rational {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.num)?;
+        if self.denom != 1 {
+            write!(f, "/{}", self.denom)?;
+        }
+        Ok(())
+    }
+}
+
 /// An error which can be returned when parsing a rational.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParseRationalError(RationalErrorKind);

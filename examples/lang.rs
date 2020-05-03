@@ -5,7 +5,7 @@ use syn_txt::lang::parser::Parser;
 use syn_txt::lang::span::{LineMap, Span};
 
 fn main() {
-    let input = r#"
+    let _input = r#"
         (define lead-synth
             (instruments/the-synth
                 :pan 0.0

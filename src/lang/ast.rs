@@ -6,7 +6,7 @@ use crate::rational::Rational;
 pub struct Ident(pub String);
 
 /// An expression with a source annotation
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct SymExpSrc {
     /// The source code range that the expression originates from.
     pub src: Span,
@@ -15,7 +15,7 @@ pub struct SymExpSrc {
 }
 
 /// Sybolic expression (S-Expression)
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum SymExp {
     /// An abstract expression that cannot be evaluated.
     /// Only used for matching named arguments.

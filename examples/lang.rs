@@ -1,4 +1,4 @@
-use syn_txt::lang::interp::Interpreter;
+use syn_txt::lang::interpreter::Interpreter;
 use syn_txt::lang::lexer::Lexer;
 use syn_txt::lang::parser::Parser;
 use syn_txt::lang::span::{LineMap, Span};

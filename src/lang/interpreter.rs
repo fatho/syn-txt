@@ -165,7 +165,7 @@ impl Interpreter {
     }
 }
 
-struct ArgParser<'a> {
+pub struct ArgParser<'a> {
     /// The span of the whole list whose arguments are parsed.
     list_span: Span,
     args: &'a [ast::SymExpSrc],

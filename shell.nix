@@ -29,4 +29,7 @@ nixpkgs.mkShell {
     git
     nix
   ];
+
+  # Always enable rust backtraces in development shell
+  RUST_BACKTRACE = "1";
 }

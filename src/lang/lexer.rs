@@ -25,6 +25,8 @@ impl LexerError {
 pub enum LexerErrorKind {
     UnrecognizedChar,
     UnterminatedString,
+    MalformedNumber,
+    MalformedIdentifier,
     IllegalOperator,
 }
 
@@ -34,6 +36,8 @@ impl fmt::Display for LexerErrorKind {
             LexerErrorKind::UnrecognizedChar => write!(f, "unrecognized character"),
             LexerErrorKind::UnterminatedString => write!(f, "unterminated string literal"),
             LexerErrorKind::IllegalOperator => write!(f, "illegal multi-character operator"),
+            LexerErrorKind::MalformedNumber => write!(f, "malformed number"),
+            LexerErrorKind::MalformedIdentifier => write!(f, "malformed identifier"),
         }
     }
 }
@@ -70,52 +74,9 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    pub fn input(&self) -> &'a str {
-        self.input
-    }
-
-    pub fn eof(&self) -> bool {
-        self.peek_char().is_none()
-    }
-
-    /// Return the byte-offset of the next character that would be read.
-    pub fn current_offset(&self) -> usize {
-        self.peek_char().map_or(self.input.len(), |(pos, _)| pos)
-    }
-
-    fn peek_char(&self) -> Option<(usize, char)> {
-        self.stream.clone().next()
-    }
-
-    fn peek_char_skip(&self, skip: usize) -> Option<(usize, char)> {
-        self.stream.clone().skip(skip).next()
-    }
-
-    fn next_char(&mut self) -> Option<(usize, char)> {
-        self.stream.next()
-    }
-
-    fn skip_to_next_line(&mut self) {
-        while let Some((_, ch)) = self.next_char() {
-            if ch == '\n' {
-                break;
-            }
-        }
-    }
-
-    fn skip_while<P: Fn(char) -> bool>(&mut self, predicate: P) {
-        while let Some((_, ch)) = self.peek_char() {
-            if predicate(ch) {
-                self.next_char();
-            } else {
-                break;
-            }
-        }
-    }
-
     /// Indentify the next token
     pub fn next_token(&mut self) -> Option<Result<(Span, Token), LexerError>> {
-        while let Some((pos, ch)) = self.next_char() {
+        while let Some((pos, ch)) = self.next_char_offset() {
             self.token_start = pos;
             let token_or_error = match ch {
                 // Single-character tokens
@@ -125,22 +86,26 @@ impl<'a> Lexer<'a> {
                 // Multi-character tokens
 
                 // Identifiers
-                _ if charsets::is_ident_start(ch) => Ok(self.lex_ident()),
-                _ if charsets::is_ident_op(ch) => self.lex_op(),
+                _ if charsets::is_ident_start(ch) => self.lex_ident(),
 
                 // Strings
                 '"' => self.lex_string(),
 
                 // Numbers
-                _ if ch.is_ascii_digit() => Ok(self.lex_number()),
+                _ if ch.is_ascii_digit() => self.lex_number(),
+                // HACK: If a sign is followed by a digit, lex as number
                 '+' | '-'
                     if self
                         .peek_char()
-                        .map(|(_, ch)| ch.is_ascii_digit())
+                        .map(|ch| ch.is_ascii_digit())
                         .unwrap_or(false) =>
                 {
-                    Ok(self.lex_number())
+                    self.lex_number()
                 }
+                // Otherwise, lex as single-letter identifier
+                '+' | '-' => self
+                    .lookahead_atom_separator(LexerErrorKind::IllegalOperator)
+                    .and_then(|_| Ok(self.pack_token(Token::Ident))),
 
                 // Line comments
                 ';' => {
@@ -160,10 +125,84 @@ impl<'a> Lexer<'a> {
         None
     }
 
+    /// Return the next character that would be read and its byte offset.
+    fn peek_char_offset(&self) -> Option<(usize, char)> {
+        self.stream.clone().next()
+    }
+
+    /// Return the byte-offset of the next character that would be read,
+    /// or the byte-offset one past the last character if the end of input was reached.
+    fn current_offset(&self) -> usize {
+        self.peek_char_offset()
+            .map_or(self.input.len(), |(pos, _)| pos)
+    }
+
+    /// Return the next character that would be read.
+    fn peek_char(&self) -> Option<char> {
+        self.peek_char_offset().map(|(_, ch)| ch)
+    }
+
+    /// Read the next character and also return its byte-offset. Advances the read cursor.
+    fn next_char_offset(&mut self) -> Option<(usize, char)> {
+        self.stream.next()
+    }
+
+    /// Read the next character, advances the read cursor.
+    fn next_char(&mut self) -> Option<char> {
+        self.next_char_offset().map(|(_, ch)| ch)
+    }
+
+    /// Skip all characters up to and including the next `\n`, or to the end of the input.
+    fn skip_to_next_line(&mut self) {
+        while let Some(ch) = self.next_char() {
+            if ch == '\n' {
+                break;
+            }
+        }
+    }
+
+    fn skip_while<P: Fn(char) -> bool>(&mut self, predicate: P) {
+        while let Some(ch) = self.peek_char() {
+            if predicate(ch) {
+                self.next_char_offset();
+            } else {
+                break;
+            }
+        }
+    }
+
+    /// Read the next char, and fail with the given error if the end of the input was reached,
+    /// or the char does not fulfil the predicate.
+    fn expect_char<P: Fn(char) -> bool>(
+        &mut self,
+        error: LexerErrorKind,
+        predicate: P,
+    ) -> Result<(), LexerError> {
+        if self.next_char().map_or(true, |ch| !predicate(ch)) {
+            Err(self.pack_error(error))
+        } else {
+            Ok(())
+        }
+    }
+
+    /// If there is a next char, it must be one that can separate atoms.
+    /// If not, it consumes all non-separating characters
+    fn lookahead_atom_separator(&mut self, error: LexerErrorKind) -> Result<(), LexerError> {
+        if self
+            .peek_char()
+            .map_or(false, |ch| !charsets::is_atom_separator(ch))
+        {
+            self.skip_while(|ch| !charsets::is_atom_separator(ch));
+            Err(self.pack_error(error))
+        } else {
+            Ok(())
+        }
+    }
+
     fn lex_string(&mut self) -> Result<(Span, Token), LexerError> {
         let mut escaped = false;
         let mut terminated = false;
-        while let Some((_, ch)) = self.peek_char() {
+        while let Some(ch) = self.peek_char() {
             if ch == '\n' {
                 // Multi-line strings are disallowed
                 break;
@@ -188,57 +227,44 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    fn lex_ident(&mut self) -> (Span, Token) {
+    fn lex_ident(&mut self) -> Result<(Span, Token), LexerError> {
         self.skip_while(charsets::is_ident_cont);
-        self.pack_token(Token::Ident)
-    }
-
-    /// An operator must be followed by whitespace
-    fn lex_op(&mut self) -> Result<(Span, Token), LexerError> {
-        if let Some((_, ch)) = self.peek_char() {
-            if !ch.is_whitespace() {
-                return Err(self.pack_error(LexerErrorKind::IllegalOperator));
-            }
-        }
+        self.lookahead_atom_separator(LexerErrorKind::MalformedIdentifier)?;
         Ok(self.pack_token(Token::Ident))
     }
 
-    fn lex_number(&mut self) -> (Span, Token) {
-        while let Some((_, ch)) = self.peek_char() {
-            if ch.is_ascii_digit() {
+    fn lex_number(&mut self) -> Result<(Span, Token), LexerError> {
+        self.skip_while(|c| c.is_ascii_digit());
+        match self.peek_char() {
+            Some('/') => {
                 self.next_char();
-            } else if ch == '/' {
-                // Only consume the '/' if followed by a digit again
-                if let Some((_, after)) = self.peek_char_skip(1) {
-                    if after.is_ascii_digit() {
-                        self.next_char();
-                        return self.lex_rational_denominator();
-                    }
-                }
-                break;
-            } else if ch == '.' {
+                return self.lex_rational_denominator();
+            }
+            Some('.') => {
                 self.next_char();
                 return self.lex_float_fractional();
-            } else {
-                break;
+            }
+            _ => {
+                self.lookahead_atom_separator(LexerErrorKind::MalformedNumber)?;
+                Ok(self.pack_token(Token::Int))
             }
         }
-        // If we made it out, it's an int
-        self.pack_token(Token::Int)
     }
 
-    fn lex_rational_denominator(&mut self) -> (Span, Token) {
+    /// Lex the denominator of a rational, must consist of at least one ascii digit.
+    fn lex_rational_denominator(&mut self) -> Result<(Span, Token), LexerError> {
+        self.expect_char(LexerErrorKind::MalformedNumber, |ch| ch.is_ascii_digit())?;
         self.skip_while(|c| c.is_ascii_digit());
-        self.pack_token(Token::Rational)
+        self.lookahead_atom_separator(LexerErrorKind::MalformedNumber)?;
+        Ok(self.pack_token(Token::Rational))
     }
 
-    /// Lex the part of a float after the dot.
-    /// `start` refers to the start of the number itself,
-    /// not to the start of the fractional part.
+    /// Lex the part of a float after the dot, which may be empty, i.e. `1.` is a valid float literal.
     /// TODO: add support for scientific notation.
-    fn lex_float_fractional(&mut self) -> (Span, Token) {
+    fn lex_float_fractional(&mut self) -> Result<(Span, Token), LexerError> {
         self.skip_while(|c| c.is_ascii_digit());
-        self.pack_token(Token::Float)
+        self.lookahead_atom_separator(LexerErrorKind::MalformedNumber)?;
+        Ok(self.pack_token(Token::Float))
     }
 
     fn pack_token(&self, token: Token) -> (Span, Token) {
@@ -262,22 +288,162 @@ impl<'a> Lexer<'a> {
     }
 }
 
+impl<'a> Iterator for Lexer<'a> {
+    type Item = Result<(Span, Token), LexerError>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.next_token()
+    }
+}
+
 /// Defines the charsets of various things that can be lexed
 mod charsets {
-
+    /// Characters that are allowed as the first character of an identifier.
     pub fn is_ident_start(ch: char) -> bool {
         let extra = "!$%&*/:<=>?~_^";
         ch.is_alphabetic() || extra.chars().any(|c| c == ch)
     }
 
+    /// Characters that are allowed as the second or later character of an identifier.
     pub fn is_ident_cont(ch: char) -> bool {
         let extra = ".+-";
         is_ident_start(ch) || ch.is_ascii_digit() || extra.chars().any(|c| c == ch)
     }
 
-    /// Allowed characters if the identifier consists of a single character operator
-    pub fn is_ident_op(ch: char) -> bool {
-        let extra = "+-"; // * and / are handled as regular identifiers
-        extra.chars().any(|c| c == ch)
+    /// Two atoms must be separated by one of these characters to be counted as separate.
+    pub fn is_atom_separator(ch: char) -> bool {
+        ch == '(' || ch == ')' || ch.is_whitespace()
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    fn expect_single_token(input: &str, span: Span, token: Token) {
+        let mut l = Lexer::new(input);
+        if let Some(token_or_error) = l.next_token() {
+            assert_eq!(token_or_error, Ok((span, token)));
+            assert_eq!(l.next_token(), None);
+        } else {
+            panic!("input did not result in a token");
+        }
+    }
+
+    fn expect_single_failure(input: &str, location: Span, kind: LexerErrorKind) {
+        let mut l = Lexer::new(input);
+        if let Some(token_or_error) = l.next_token() {
+            assert_eq!(token_or_error, Err(LexerError { location, kind }));
+            assert_eq!(l.next_token(), None);
+        } else {
+            panic!("input did not result in a token");
+        }
+    }
+
+    fn expect_token_sequence(input: &str, tokens: &[Result<Token, LexerErrorKind>]) {
+        let mut l = Lexer::new(input);
+        let mut actual = Vec::new();
+        while let Some(token_or_error) = l.next_token() {
+            actual.push(token_or_error.map(|x| x.1).map_err(|e| e.kind))
+        }
+        assert_eq!(&actual[..], tokens)
+    }
+
+    #[test]
+    fn test_string() {
+        expect_single_token(r#""hello""#, Span { begin: 0, end: 7 }, Token::String);
+        expect_single_token(
+            r#""hello\"world""#,
+            Span { begin: 0, end: 14 },
+            Token::String,
+        );
+        expect_single_token(
+            r#"  "hello\"world"  "#,
+            Span { begin: 2, end: 16 },
+            Token::String,
+        );
+
+        expect_single_failure(
+            r#""hello\"world  "#,
+            Span { begin: 0, end: 15 },
+            LexerErrorKind::UnterminatedString,
+        );
+    }
+
+    #[test]
+    fn test_int() {
+        expect_single_token("123", Span { begin: 0, end: 3 }, Token::Int);
+        expect_single_token("+123", Span { begin: 0, end: 4 }, Token::Int);
+        expect_single_token("-123", Span { begin: 0, end: 4 }, Token::Int);
+
+        expect_single_failure(
+            "123x ",
+            Span { begin: 0, end: 4 },
+            LexerErrorKind::MalformedNumber,
+        );
+
+        expect_token_sequence(
+            "123)(",
+            &[Ok(Token::Int), Ok(Token::ParenClose), Ok(Token::ParenOpen)],
+        )
+    }
+
+    #[test]
+    fn test_float() {
+        expect_single_token("123.", Span { begin: 0, end: 4 }, Token::Float);
+        expect_single_token("+123.412", Span { begin: 0, end: 8 }, Token::Float);
+        expect_single_token("-123.4 ", Span { begin: 0, end: 6 }, Token::Float);
+
+        expect_single_failure(
+            "123.1xy",
+            Span { begin: 0, end: 7 },
+            LexerErrorKind::MalformedNumber,
+        );
+    }
+
+    #[test]
+    fn test_rational() {
+        expect_single_token("123/31", Span { begin: 0, end: 6 }, Token::Rational);
+        expect_single_token("+1/3 ", Span { begin: 0, end: 4 }, Token::Rational);
+        expect_single_token("-5/2", Span { begin: 0, end: 4 }, Token::Rational);
+
+        expect_single_failure(
+            "-11/",
+            Span { begin: 0, end: 4 },
+            LexerErrorKind::MalformedNumber,
+        );
+        expect_single_failure(
+            "-11/24-42/4",
+            Span { begin: 0, end: 11 },
+            LexerErrorKind::MalformedNumber,
+        );
+    }
+
+    #[test]
+    fn test_ident() {
+        expect_single_token("-", Span { begin: 0, end: 1 }, Token::Ident);
+        expect_single_token("+", Span { begin: 0, end: 1 }, Token::Ident);
+        expect_single_token(
+            " prim/float-int! ",
+            Span { begin: 1, end: 16 },
+            Token::Ident,
+        );
+        expect_single_token("foo-αβγ!", Span { begin: 0, end: 11 }, Token::Ident);
+        expect_single_token("bar", Span { begin: 0, end: 3 }, Token::Ident);
+
+        expect_single_failure(
+            "-/",
+            Span { begin: 0, end: 2 },
+            LexerErrorKind::IllegalOperator,
+        );
+
+        expect_token_sequence(
+            "(foo-αβγ!)",
+            &[
+                Ok(Token::ParenOpen),
+                Ok(Token::Ident),
+                Ok(Token::ParenClose),
+            ],
+        )
     }
 }

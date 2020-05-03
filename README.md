@@ -1,4 +1,6 @@
-# syn.txt
+<h1 align="center">
+  <a href="https://github.com/fatho/syn-txt"><img src="doc/logo.png" alt="syn.txt" width="256"></a>
+</h1>
 
 The goal is for this to be a declarative, text-based synthesizer/audio workstation.
 At the moment, it is very much work in progress. See the [roadmap](/planning/roadmap.md)

@@ -103,9 +103,12 @@ impl Interpreter {
         }
     }
 
-    pub fn register_stateful_primop(&mut self, name: &str, op: PrimOpExt) {
+    pub fn register_primop_ext<F>(&mut self, name: &str, op: F)
+    where
+        F: Fn(&mut Interpreter, ArgParser) -> InterpreterResult<Value> + 'static,
+    {
         self.builtins
-            .set_var(ast::Ident((*name).to_owned()), Value::FnExt(op));
+            .set_var(ast::Ident((*name).to_owned()), Value::ext_closure(op));
     }
 
     /// Read a variable from the topmost scope that defines it.
@@ -164,7 +167,6 @@ impl Interpreter {
 
         match head {
             Value::FnPrim(PrimOp(prim_fn)) => prim_fn(self, args),
-            Value::FnExt(PrimOpExt(prim_fn_ext)) => prim_fn_ext(self, args),
             Value::Ext(val) => val.0.call(self, args),
             _ => Err(IntpErr::new(head_exp.src, IntpErrInfo::Uncallable)),
         }
@@ -286,42 +288,6 @@ impl PartialEq for PrimOp {
 }
 impl Eq for PrimOp {}
 
-/// A primitive operation exposed to the interpreted language by an extension.
-/// It has access to user-defined state, but the cost is that it is a closure
-/// behind a shared reference, instead of being a pure function pointer.
-#[derive(Clone)]
-pub struct PrimOpExt(
-    pub Rc<dyn for<'a> Fn(&mut Interpreter, ArgParser<'a>) -> InterpreterResult<Value>>,
-);
-
-impl fmt::Debug for PrimOpExt {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let ptr = &(*self.0) as *const _;
-        write!(f, "PrimOpExt({:p})", ptr)
-    }
-}
-
-impl PartialEq for PrimOpExt {
-    fn eq(&self, other: &Self) -> bool {
-        Rc::ptr_eq(&self.0, &other.0)
-    }
-}
-impl Eq for PrimOpExt {}
-
-impl PrimOpExt {
-    /// Boundle a primop with its corresponding state
-    pub fn with_shared_state<S, F>(state: Rc<RefCell<S>>, fun: F) -> PrimOpExt
-    where
-        S: 'static,
-        F: Fn(&mut S, &mut Interpreter, ArgParser) -> InterpreterResult<Value> + 'static,
-    {
-        PrimOpExt(Rc::new(move |intp, args| {
-            let mut state_mut = state.borrow_mut();
-            fun(&mut *state_mut, intp, args)
-        }))
-    }
-}
-
 /// Evaluating expressions results in values.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
@@ -337,19 +303,26 @@ pub enum Value {
     Unit,
     /// A primitive operation
     FnPrim(PrimOp),
-    /// A primitive operation provided by an extension
-    FnExt(PrimOpExt),
     /// A value provided by an interpreter extension.
     /// Interpretation of it is up to the extension.
     Ext(ExtVal),
 }
 
 impl Value {
-    pub fn from_extension<T: ExtensionValue>(val: T) -> Self {
+    /// Smart constructor for `Self::Ext` that performs the wrapping.
+    pub fn ext<T: ExtensionValue>(val: T) -> Self {
         Self::Ext(ExtVal::new(val))
+    }
+
+    pub fn ext_closure<F>(fun: F) -> Self
+    where
+        F: Fn(&mut Interpreter, ArgParser) -> InterpreterResult<Value> + 'static,
+    {
+        Value::ext(ExtClosure(fun))
     }
 }
 
+/// Wrapper for extension values that relays the `PartialEq` implementation to `partial_eq`.
 #[derive(Debug, Clone)]
 pub struct ExtVal(Rc<dyn ExtensionValue>);
 
@@ -367,7 +340,7 @@ impl PartialEq for ExtVal {
 
 /// Trait to be implemented by values that are provided by interpreter extensions.
 pub trait ExtensionValue: std::any::Any + fmt::Debug {
-    /// Dynamically typed version of the PartialEq trait
+    /// Dynamically typed version of the PartialEq trait.
     fn partial_eq(&self, other: &dyn ExtensionValue) -> bool;
 
     /// Workaround for the lack of trait-upcasting in Rust.
@@ -377,6 +350,40 @@ pub trait ExtensionValue: std::any::Any + fmt::Debug {
     /// Allows external values to be callable. The default implementation returns an error.
     fn call(&self, _intp: &mut Interpreter, args: ArgParser) -> InterpreterResult<Value> {
         Err(IntpErr::new(args.list_span, IntpErrInfo::Uncallable))
+    }
+}
+
+/// An extern callable closure.
+pub struct ExtClosure<F>(F);
+
+impl<F> fmt::Debug for ExtClosure<F> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let ptr = &self.0 as *const _;
+        write!(f, "ExtClosure({:p})", ptr)
+    }
+}
+
+impl<F> ExtensionValue for ExtClosure<F>
+where
+    F: Fn(&mut Interpreter, ArgParser) -> InterpreterResult<Value> + 'static,
+{
+    /// Dynamically typed version of the PartialEq trait.
+    fn partial_eq(&self, other: &dyn ExtensionValue) -> bool {
+        if let Some(other) = other.as_any().downcast_ref::<Self>() {
+            std::ptr::eq(self as *const _, other as *const _)
+        } else {
+            false
+        }
+    }
+
+    /// Workaround for the lack of trait-upcasting in Rust.
+    /// This method allows the self in `partial_eq` to downcast the `other`.
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn call(&self, intp: &mut Interpreter, args: ArgParser) -> InterpreterResult<Value> {
+        self.0(intp, args)
     }
 }
 

@@ -1,4 +1,5 @@
-use syn_txt::lang::interpreter::{Interpreter, Extension};
+use std::{cell::RefCell, rc::Rc};
+use syn_txt::lang::interpreter::{self, Interpreter, PrimOpExt};
 use syn_txt::lang::lexer::Lexer;
 use syn_txt::lang::parser::Parser;
 use syn_txt::lang::span::{LineMap, Span};
@@ -62,7 +63,9 @@ fn main() {
                 result
             ))
         (print area)
-        (print r pi)
+        (define f1 (foo/new))
+        (define f2 (foo/new))
+        (print f1 f2)
     "#;
 
     run_test(input)
@@ -96,6 +99,9 @@ fn run_test(input: &str) {
 
     println!("Evaluating...");
     let mut int = Interpreter::new();
+    let extension_state = Rc::new(RefCell::new(0));
+    int.register_stateful_primop("foo/new", PrimOpExt::with_shared_state(extension_state, foo_ext_foo_new));
+
     for s in ast {
         println!("{}", &input[s.src.begin..s.src.end]);
         match int.eval(&s) {
@@ -115,21 +121,30 @@ fn print_error<E: std::fmt::Display>(lines: &LineMap, location: Span, message: E
     println!("{}", lines.highlight(start, end, true));
 }
 
-struct Test;
-
-impl Extension for Test {
-    type State = ();
-
-    fn primops(&self) -> &[(String, syn_txt::lang::interpreter::PrimOpExt<Self::State>)] {
-        &[]
-    }
+fn foo_ext_foo_new(
+    state: &mut usize,
+    _intp: &mut Interpreter,
+    args: interpreter::ArgParser,
+) -> interpreter::InterpreterResult<interpreter::Value> {
+    args.done()?;
+    let foo = FooVal(*state);
+    *state += 1;
+    Ok(interpreter::Value::from_extension(foo))
 }
 
+#[derive(Debug, PartialEq, Clone)]
+struct FooVal(usize);
 
-fn experiment() {
-    use std::rc::Rc;
-    use std::cell::RefCell;
+impl interpreter::ExtensionValue for FooVal {
+    fn partial_eq(&self, other: &dyn interpreter::ExtensionValue) -> bool {
+        if let Some(foo) = other.as_any().downcast_ref::<Self>() {
+            self == foo
+        } else {
+            false
+        }
+    }
 
-    let foo: Rc<RefCell<dyn Extension>> = Rc::new(RefCell::new(Test));
-    foo.borrow().primops()
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
 }

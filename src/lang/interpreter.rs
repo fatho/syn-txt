@@ -1,5 +1,6 @@
 use std::collections::HashMap;
-use std::fmt;
+use std::{fmt, rc::Rc};
+use std::cell::RefCell;
 
 use super::ast;
 use super::primops;
@@ -68,6 +69,9 @@ impl fmt::Display for IntpErrInfo {
 }
 
 pub struct Interpreter {
+    /// Read-only scope (from the perspective of the language)
+    /// providing all the built-in primops.
+    builtins: Scope,
     scopes: Vec<Scope>,
 }
 
@@ -94,8 +98,14 @@ impl Interpreter {
         }
 
         Self {
-            scopes: vec![builtin_scope, Scope::new()],
+            builtins: builtin_scope,
+            scopes: vec![Scope::new()],
         }
+    }
+
+    pub fn register_stateful_primop(&mut self, name: &str, op: PrimOpExt) {
+        self.builtins
+            .set_var(ast::Ident((*name).to_owned()), Value::FnExt(op));
     }
 
     /// Read a variable from the topmost scope that defines it.
@@ -105,7 +115,7 @@ impl Interpreter {
                 return Some(val);
             }
         }
-        None
+        self.builtins.lookup_var(var)
     }
 
     pub fn scopes_mut(&mut self) -> &mut [Scope] {
@@ -120,7 +130,7 @@ impl Interpreter {
 
     /// Remove the topmost scope and all its bindings.
     pub fn pop_scope(&mut self) {
-        debug_assert!(self.scopes.len() > 1, "cannot pop the built-in scope");
+        debug_assert!(self.scopes.len() > 1, "cannot pop the last scope");
         self.scopes.pop();
     }
 
@@ -154,6 +164,7 @@ impl Interpreter {
 
         match head {
             Value::FnPrim(PrimOp(prim_fn)) => prim_fn(self, args),
+            Value::FnExt(PrimOpExt(prim_fn_ext)) => prim_fn_ext(self, args),
             _ => Err(IntpErr::new(head_exp.src, IntpErrInfo::Uncallable)),
         }
     }
@@ -168,10 +179,7 @@ pub struct ArgParser<'a> {
 
 impl<'a> ArgParser<'a> {
     pub fn new(list_span: Span, args: &'a [ast::SymExpSrc]) -> Self {
-        Self {
-            list_span,
-            args,
-        }
+        Self { list_span, args }
     }
 
     /// Return the number of unparsed arguments
@@ -195,7 +203,10 @@ impl<'a> ArgParser<'a> {
             self.args = &self.args[1..];
             Ok(sym)
         } else {
-            Err(IntpErr::new(self.list_span, IntpErrInfo::NotEnoughArguments))
+            Err(IntpErr::new(
+                self.list_span,
+                IntpErrInfo::NotEnoughArguments,
+            ))
         }
     }
 
@@ -205,7 +216,10 @@ impl<'a> ArgParser<'a> {
         if let ast::SymExp::Variable(ident) = &arg.exp {
             Ok(ident)
         } else {
-            Err(IntpErr::new(self.list_span, IntpErrInfo::IncompatibleArguments))
+            Err(IntpErr::new(
+                self.list_span,
+                IntpErrInfo::IncompatibleArguments,
+            ))
         }
     }
 
@@ -272,24 +286,45 @@ impl PartialEq for PrimOp {
 impl Eq for PrimOp {}
 
 /// A primitive operation exposed to the interpreted language by an extension.
-#[derive(Copy, Clone)]
-pub struct PrimOpExt<E>(pub for<'a> fn(&mut Interpreter, &mut E, ArgParser<'a>) -> InterpreterResult<Value>);
+/// It has access to user-defined state, but the cost is that it is a closure
+/// behind a shared reference, instead of being a pure function pointer.
+#[derive(Clone)]
+pub struct PrimOpExt(
+    pub Rc<dyn for<'a> Fn(&mut Interpreter, ArgParser<'a>) -> InterpreterResult<Value>>,
+);
 
-impl<E> fmt::Debug for PrimOpExt<E> {
+impl fmt::Debug for PrimOpExt {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let ptr = self.0 as *const ();
-        write!(f, "PrimOpExt<E>({:p})", ptr)
+        let ptr = &(*self.0) as *const _;
+        write!(f, "PrimOpExt({:p})", ptr)
     }
 }
 
-impl<E> PartialEq for PrimOpExt<E> {
+impl PartialEq for PrimOpExt {
     fn eq(&self, other: &Self) -> bool {
-        let self_ptr = self.0 as *const ();
-        let other_ptr = other.0 as *const ();
-        self_ptr == other_ptr
+        Rc::ptr_eq(&self.0, &other.0)
     }
 }
-impl<E> Eq for PrimOpExt<E> {}
+impl Eq for PrimOpExt {}
+
+impl PrimOpExt {
+    /// Boundle a primop with its corresponding state
+    pub fn with_shared_state<S, F>(state: Rc<RefCell<S>>, fun: F) -> PrimOpExt
+    where
+        S: 'static,
+        F: Fn(
+                &mut S,
+                &mut Interpreter,
+                ArgParser,
+            ) -> InterpreterResult<Value>
+            + 'static,
+    {
+        PrimOpExt(Rc::new(move |intp, args| {
+            let mut state_mut = state.borrow_mut();
+            fun(&mut *state_mut, intp, args)
+        }))
+    }
+}
 
 /// Evaluating expressions results in values.
 #[derive(Debug, Clone, PartialEq)]
@@ -306,18 +341,43 @@ pub enum Value {
     Unit,
     /// A primitive operation
     FnPrim(PrimOp),
+    /// A primitive operation provided by an extension
+    FnExt(PrimOpExt),
     /// A value provided by an interpreter extension.
     /// Interpretation of it is up to the extension.
-    Ext(usize),
+    Ext(ExtVal),
 }
 
-
-pub trait Extension {
-    type State: Sized;
-
-    fn primops(&self) -> &[(String, PrimOpExt<Self::State>)];
+impl Value {
+    pub fn from_extension<T: ExtensionValue>(val: T) -> Self {
+        Self::Ext(ExtVal::new(val))
+    }
 }
 
+#[derive(Debug, Clone)]
+pub struct ExtVal(Rc<dyn ExtensionValue>);
+
+impl ExtVal {
+    pub fn new<T: ExtensionValue>(val: T) -> Self {
+        Self(Rc::new(val))
+    }
+}
+
+impl PartialEq for ExtVal {
+    fn eq(&self, other: &ExtVal) -> bool {
+        self.0.partial_eq(&*other.0)
+    }
+}
+
+/// Trait to be implemented by values that are provided by interpreter extensions.
+pub trait ExtensionValue: std::any::Any + fmt::Debug {
+    /// Dynamically typed version of the PartialEq trait
+    fn partial_eq(&self, other: &dyn ExtensionValue) -> bool;
+
+    /// Workaround for the lack of trait-upcasting in Rust.
+    /// This method allows the self in `partial_eq` to downcast the `other`.
+    fn as_any(&self) -> &dyn std::any::Any;
+}
 
 #[cfg(test)]
 mod test {

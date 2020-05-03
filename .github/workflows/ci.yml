@@ -1,0 +1,28 @@
+name: Build and test
+# This workflow is triggered on pushes to the repository.
+on: [push]
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: nix
+        run: |
+          curl https://nixos.org/nix/install | sh
+          . $HOME/.nix-profile/etc/profile.d/nix.sh
+      - name: devenv
+        run: |
+          . $HOME/.nix-profile/etc/profile.d/nix.sh
+          LOCALE_ARCHIVE=$(nix-build --no-out-link nix/nixpkgs-pinned.nix -A glibcLocales)/lib/locale/locale-archive
+          export LOCALE_ARCHIVE
+          echo "::set-env name=LOCALE_ARCHIVE::$LOCALE_ARCHIVE"
+      - name: build
+        run: |
+          . $HOME/.nix-profile/etc/profile.d/nix.sh
+          cargo build
+      - name: test
+        run: |
+          . $HOME/.nix-profile/etc/profile.d/nix.sh
+          cargo test

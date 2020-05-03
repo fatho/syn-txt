@@ -53,13 +53,17 @@ fn main() {
     "#;
 
     let input = r#"
-        (define u 1/13)
-        (define x 1/4)
-        (define y (* -2 x))
-        (define z (/ 1
-                     1))
-        (define a (+ x y z))
-        a"#;
+        (define r 5)
+        (define area
+            (begin
+                (define pi 3.14)
+                (define result (* pi (* r r)))
+                (set! r (+ r 1))
+                result
+            ))
+        (print area)
+        (print r pi)
+    "#;
 
     run_test(input)
 }

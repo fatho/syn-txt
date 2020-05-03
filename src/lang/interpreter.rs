@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::fmt;
 
 use super::ast;
+use super::primops;
 use super::span::Span;
 use crate::rational::Rational;
 
@@ -36,10 +37,17 @@ pub enum IntpErrInfo {
     /// Tried to call something that cannot be called, such as the int in `(1 a b)`.
     Uncallable,
     /// There was a problem with the arguments in a call
-    Arguments,
+    IncompatibleArguments,
+    NotEnoughArguments,
+    TooManyArguments,
     DivisionByZero,
     /// Type error (e.g. trying to add two incompatible types).
     Type,
+    /// Tried to redefine a variable in the scope it was originally defined.
+    /// (Shadowing variables in a new scope is fine).
+    Redefinition(ast::Ident),
+    /// Miscellaneous errors that shouldn't happen, but might.
+    Other(String),
 }
 
 impl fmt::Display for IntpErrInfo {
@@ -48,9 +56,13 @@ impl fmt::Display for IntpErrInfo {
             IntpErrInfo::Unevaluatable => write!(f, "unevaluatable"),
             IntpErrInfo::NoSuchVariable(var) => write!(f, "no such variable `{}`", &var.0),
             IntpErrInfo::Uncallable => write!(f, "uncallable"),
-            IntpErrInfo::Arguments => write!(f, "incompatible arguments"),
+            IntpErrInfo::IncompatibleArguments => write!(f, "incompatible arguments"),
+            IntpErrInfo::NotEnoughArguments => write!(f, "not enough arguments in function call"),
+            IntpErrInfo::TooManyArguments => write!(f, "too many arguments in function call"),
             IntpErrInfo::DivisionByZero => write!(f, "division by zero"),
+            IntpErrInfo::Redefinition(var) => write!(f, "redefined variable `{}`", &var.0),
             IntpErrInfo::Type => write!(f, "type error"),
+            IntpErrInfo::Other(msg) => write!(f, "{}", msg),
         }
     }
 }
@@ -61,11 +73,32 @@ pub struct Interpreter {
 
 impl Interpreter {
     pub fn new() -> Self {
+        let mut builtin_scope = Scope::new();
+
+        let prim = vec![
+            // syntax
+            ("begin", PrimOp(primops::begin)),
+            ("define", PrimOp(primops::define)),
+            ("set!", PrimOp(primops::set)),
+            // operators
+            ("+", PrimOp(primops::add)),
+            ("-", PrimOp(primops::sub)),
+            ("*", PrimOp(primops::mul)),
+            ("/", PrimOp(primops::div)),
+            // util
+            ("print", PrimOp(primops::print)),
+        ];
+
+        for (name, fun) in prim {
+            builtin_scope.set_var(ast::Ident(name.to_owned()), Value::FnPrim(fun));
+        }
+
         Self {
-            scopes: vec![Scope::new()],
+            scopes: vec![builtin_scope, Scope::new()],
         }
     }
 
+    /// Read a variable from the topmost scope that defines it.
     pub fn lookup_var(&self, var: &ast::Ident) -> Option<&Value> {
         for scope in self.scopes.iter().rev() {
             if let Some(val) = scope.lookup_var(var) {
@@ -73,6 +106,22 @@ impl Interpreter {
             }
         }
         None
+    }
+
+    pub fn scopes_mut(&mut self) -> &mut [Scope] {
+        &mut self.scopes
+    }
+
+    /// Create a new topmost scope for bindings.
+    /// Any `define`s and `set!`s will target the top-most scope.
+    pub fn push_scope(&mut self) {
+        self.scopes.push(Scope::new())
+    }
+
+    /// Remove the topmost scope and all its bindings.
+    pub fn pop_scope(&mut self) {
+        debug_assert!(self.scopes.len() > 1, "cannot pop the built-in scope");
+        self.scopes.pop();
     }
 
     pub fn eval(&mut self, sym: &ast::SymExpSrc) -> InterpreterResult<Value> {
@@ -100,76 +149,21 @@ impl Interpreter {
         let head_exp = list
             .first()
             .ok_or(IntpErr::new(span, IntpErrInfo::Uncallable))?;
-        let mut args = ArgParser::new(span, &list[1..]);
+        let head = self.eval(head_exp)?;
+        let args = ArgParser::new(span, &list[1..]);
 
-        // TODO: allow arbitrary expression as head and evaluate it
-        match &head_exp.exp {
-            ast::SymExp::Variable(fun) => match fun.0.as_str() {
-                "define" | "set!" => {
-                    let var = args.variable()?;
-                    let value = args.value(self)?;
-                    args.done()?;
-
-                    // TODO: disallow defining defined variables
-                    // TODO: disallow setting undefined variables
-                    self.scopes.last_mut().unwrap().set_var(var.clone(), value);
-                    Ok(Value::Unit)
-                }
-                "+" => {
-                    let mut v1 = args.value(self)?;
-                    while !args.is_empty() {
-                        v1 = v1
-                            .add(&args.value(self)?)
-                            .map_err(|e| IntpErr::new(span, e))?;
-                    }
-                    drop(args);
-                    Ok(v1)
-                }
-                "-" => {
-                    let mut v1 = args.value(self)?;
-                    while !args.is_empty() {
-                        v1 = v1
-                            .sub(&args.value(self)?)
-                            .map_err(|e| IntpErr::new(span, e))?;
-                    }
-                    drop(args);
-                    Ok(v1)
-                }
-                "*" => {
-                    let mut v1 = args.value(self)?;
-                    while !args.is_empty() {
-                        v1 = v1
-                            .mul(&args.value(self)?)
-                            .map_err(|e| IntpErr::new(span, e))?;
-                    }
-                    drop(args);
-                    Ok(v1)
-                }
-                "/" => {
-                    let mut v1 = args.value(self)?;
-                    while !args.is_empty() {
-                        v1 = v1
-                            .div(&args.value(self)?)
-                            .map_err(|e| IntpErr::new(span, e))?;
-                    }
-                    drop(args);
-                    Ok(v1)
-                }
-                _ => Err(IntpErr::new(
-                    head_exp.src,
-                    IntpErrInfo::NoSuchVariable(fun.clone()),
-                )),
-            },
+        match head {
+            Value::FnPrim(PrimOp(prim_fn)) => prim_fn(self, args),
             _ => Err(IntpErr::new(head_exp.src, IntpErrInfo::Uncallable)),
         }
     }
 }
 
+/// Helper for parsing the arguments of a call.
 pub struct ArgParser<'a> {
     /// The span of the whole list whose arguments are parsed.
     list_span: Span,
     args: &'a [ast::SymExpSrc],
-    expected: usize,
 }
 
 impl<'a> ArgParser<'a> {
@@ -177,8 +171,17 @@ impl<'a> ArgParser<'a> {
         Self {
             list_span,
             args,
-            expected: 0,
         }
+    }
+
+    /// Return the number of unparsed arguments
+    pub fn remaining(&self) -> usize {
+        self.args.len()
+    }
+
+    /// The source location of the whole list.
+    pub fn list_span(&self) -> Span {
+        self.list_span
     }
 
     /// Returns if there are no more arguments.
@@ -190,11 +193,9 @@ impl<'a> ArgParser<'a> {
     pub fn symbolic<'b>(&'b mut self) -> InterpreterResult<&'a ast::SymExpSrc> {
         if let Some(sym) = self.args.first() {
             self.args = &self.args[1..];
-            self.expected += 1;
             Ok(sym)
         } else {
-            // TODO: more specific error
-            Err(IntpErr::new(self.list_span, IntpErrInfo::Arguments))
+            Err(IntpErr::new(self.list_span, IntpErrInfo::NotEnoughArguments))
         }
     }
 
@@ -204,8 +205,7 @@ impl<'a> ArgParser<'a> {
         if let ast::SymExp::Variable(ident) = &arg.exp {
             Ok(ident)
         } else {
-            // TODO: more specific error
-            Err(IntpErr::new(self.list_span, IntpErrInfo::Arguments))
+            Err(IntpErr::new(self.list_span, IntpErrInfo::IncompatibleArguments))
         }
     }
 
@@ -215,23 +215,19 @@ impl<'a> ArgParser<'a> {
         interp.eval(arg)
     }
 
-    pub fn done(self) -> InterpreterResult<()> {
+    /// End the argument parsing process. There must not be any more arguments remaining.
+    pub fn done(&self) -> InterpreterResult<()> {
         if self.args.is_empty() {
             Ok(())
         } else {
-            Err(IntpErr::new(self.list_span, IntpErrInfo::Arguments))
-            // TODO: more specific error
-            // Err(format!(
-            //     "{} arguments expected, but {} given at {:?}",
-            //     self.expected,
-            //     self.args.len() + self.expected,
-            //     self.list_span
-            // ))
+            Err(IntpErr::new(self.list_span, IntpErrInfo::TooManyArguments))
         }
     }
 }
 
-struct Scope {
+/// A binding scope for variables.
+/// Scopes are lexially nested, and inner scopes have precedence before outer scopes.
+pub struct Scope {
     bindings: HashMap<ast::Ident, Value>,
 }
 
@@ -242,14 +238,38 @@ impl Scope {
         }
     }
 
-    pub fn set_var(&mut self, var: ast::Ident, value: Value) {
-        self.bindings.insert(var, value);
+    /// Set a variable in this scope and return its previous value, if there was one.
+    pub fn set_var(&mut self, var: ast::Ident, value: Value) -> Option<Value> {
+        self.bindings.insert(var, value)
     }
 
     pub fn lookup_var(&self, var: &ast::Ident) -> Option<&Value> {
         self.bindings.get(var)
     }
+
+    pub fn lookup_var_mut(&mut self, var: &ast::Ident) -> Option<&mut Value> {
+        self.bindings.get_mut(var)
+    }
 }
+/// A primitive operation exposed to the interpreted language.
+#[derive(Copy, Clone)]
+pub struct PrimOp(pub for<'a> fn(&mut Interpreter, ArgParser<'a>) -> InterpreterResult<Value>);
+
+impl fmt::Debug for PrimOp {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let ptr = self.0 as *const ();
+        write!(f, "PrimOp({:p})", ptr)
+    }
+}
+
+impl PartialEq for PrimOp {
+    fn eq(&self, other: &Self) -> bool {
+        let self_ptr = self.0 as *const ();
+        let other_ptr = other.0 as *const ();
+        self_ptr == other_ptr
+    }
+}
+impl Eq for PrimOp {}
 
 /// Evaluating expressions results in values.
 #[derive(Debug, Clone, PartialEq)]
@@ -264,6 +284,8 @@ pub enum Value {
     Int(i64),
     /// The unit value
     Unit,
+    /// A primitive operation
+    FnPrim(PrimOp),
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
@@ -273,6 +295,7 @@ pub enum Type {
     Ratio,
     Int,
     Unit,
+    Callable,
 }
 
 impl Value {
@@ -283,109 +306,7 @@ impl Value {
             Value::Ratio(_) => Type::Ratio,
             Value::Int(_) => Type::Int,
             Value::Unit => Type::Unit,
-        }
-    }
-
-    // Extracting values
-
-    pub fn as_float(&self) -> Result<f64, IntpErrInfo> {
-        match self {
-            Value::Float(f) => Ok(*f),
-            Value::Int(i) => Ok(*i as f64),
-            Value::Ratio(r) => Ok(r.numerator() as f64 / r.denominator() as f64),
-            _ => Err(IntpErrInfo::Type),
-        }
-    }
-
-    pub fn as_ratio(&self) -> Result<Rational, IntpErrInfo> {
-        match self {
-            Value::Int(i) => Ok(Rational::from_int(*i)),
-            Value::Ratio(r) => Ok(*r),
-            _ => Err(IntpErrInfo::Type),
-        }
-    }
-
-    pub fn as_int(&self) -> Result<i64, IntpErrInfo> {
-        match self {
-            Value::Int(i) => Ok(*i),
-            _ => Err(IntpErrInfo::Type),
-        }
-    }
-
-    // Operations
-
-    pub fn add(&self, other: &Value) -> Result<Value, IntpErrInfo> {
-        let result = self.get_type().merge_coercible(other.get_type())?;
-        match result {
-            Type::Float => Ok(Value::Float(self.as_float()? + other.as_float()?)),
-            Type::Int => Ok(Value::Int(self.as_int()? + other.as_int()?)),
-            Type::Ratio => Ok(Value::Ratio(self.as_ratio()? + other.as_ratio()?)),
-            _ => Err(IntpErrInfo::Type),
-        }
-    }
-
-    pub fn sub(&self, other: &Value) -> Result<Value, IntpErrInfo> {
-        let result = self.get_type().merge_coercible(other.get_type())?;
-        match result {
-            Type::Float => Ok(Value::Float(self.as_float()? - other.as_float()?)),
-            Type::Int => Ok(Value::Int(self.as_int()? - other.as_int()?)),
-            Type::Ratio => Ok(Value::Ratio(self.as_ratio()? - other.as_ratio()?)),
-            _ => Err(IntpErrInfo::Type),
-        }
-    }
-
-    pub fn mul(&self, other: &Value) -> Result<Value, IntpErrInfo> {
-        let result = self.get_type().merge_coercible(other.get_type())?;
-        match result {
-            Type::Float => Ok(Value::Float(self.as_float()? * other.as_float()?)),
-            Type::Int => Ok(Value::Int(self.as_int()? * other.as_int()?)),
-            Type::Ratio => Ok(Value::Ratio(self.as_ratio()? * other.as_ratio()?)),
-            _ => Err(IntpErrInfo::Type),
-        }
-    }
-
-    pub fn div(&self, other: &Value) -> Result<Value, IntpErrInfo> {
-        let result = self.get_type().merge_coercible(other.get_type())?;
-        match result {
-            Type::Float => Ok(Value::Float(self.as_float()? / other.as_float()?)),
-            // NOTE: dividing two ints always results in a rational
-            Type::Int => {
-                let denom = other.as_int()?;
-                if denom == 0 {
-                    return Err(IntpErrInfo::DivisionByZero);
-                }
-                Ok(Value::Ratio(Rational::new(self.as_int()?, denom)))
-            }
-            Type::Ratio => {
-                let denom = other.as_ratio()?;
-                if denom.is_zero() {
-                    return Err(IntpErrInfo::DivisionByZero);
-                }
-                Ok(Value::Ratio(self.as_ratio()? / denom))
-            }
-            _ => Err(IntpErrInfo::Type),
-        }
-    }
-}
-
-impl Type {
-    /// Return the type, if any exists, to which both types can be coerced.
-    pub fn merge_coercible(self, other: Type) -> Result<Type, IntpErrInfo> {
-        match (self, other) {
-            // Operations involving one float always become all-float
-            (Type::Float, Type::Ratio) => Ok(Type::Float),
-            (Type::Ratio, Type::Float) => Ok(Type::Float),
-            (Type::Float, Type::Int) => Ok(Type::Float),
-            (Type::Int, Type::Float) => Ok(Type::Float),
-
-            // Operations involving one rational always become all-rational
-            (Type::Ratio, Type::Int) => Ok(Type::Ratio),
-            (Type::Int, Type::Ratio) => Ok(Type::Ratio),
-
-            // Reflexivity
-            _ if self == other => Ok(self),
-
-            _ => Err(IntpErrInfo::Type),
+            Value::FnPrim(_) => Type::Callable,
         }
     }
 }
@@ -408,6 +329,19 @@ mod test {
         }
     }
 
+    fn expect_values_or_errors(input: &str, expected: &[Result<Value, IntpErrInfo>]) {
+        let tokens = Lexer::new(input)
+            .collect::<Result<Vec<(Span, Token)>, _>>()
+            .unwrap();
+        let expressions = Parser::new(input, &tokens).parse().unwrap();
+        let mut interp = Interpreter::new();
+
+        for (i, (e, expected_result)) in expressions.iter().zip(expected).enumerate() {
+            let result = interp.eval(e).map_err(|e| e.info);
+            assert_eq!(&result, expected_result, "\nmismatch in result {}", i);
+        }
+    }
+
     #[test]
     fn test_arithmetic() {
         expect_values("(+ 1 2)", &[Value::Int(3)]);
@@ -424,7 +358,7 @@ mod test {
         expect_values(
             r#"
             (define pi 3.14)
-            (define r (/ 5 2))
+            (define r (/ 5. 2))
             (define result
                 (* r (* 2 pi)))
             result
@@ -440,5 +374,40 @@ mod test {
                 Value::Float(19.625),
             ],
         );
+    }
+
+    #[test]
+    fn test_scopes() {
+        expect_values_or_errors(
+            r#"
+            (define pi 3.14)
+            (define val 5)
+            val
+            (define area
+                (begin
+                    (define r 1.0)
+                    (set! val (* pi (* r r)))
+                    val
+                ))
+            r
+            val
+            ; ensure that an error inside a nested scope pops that scope
+            (begin
+                (define foo 1) ; we expect this definition to be cleaned up
+                (set! bar 1) ; the error occurs here
+            )
+            foo
+            "#,
+            &[
+                Ok(Value::Unit),
+                Ok(Value::Unit),
+                Ok(Value::Int(5)),
+                Ok(Value::Unit),
+                Err(IntpErrInfo::NoSuchVariable(ast::Ident("r".to_owned()))),
+                Ok(Value::Float(3.14)),
+                Err(IntpErrInfo::NoSuchVariable(ast::Ident("bar".to_owned()))),
+                Err(IntpErrInfo::NoSuchVariable(ast::Ident("foo".to_owned()))),
+            ],
+        )
     }
 }

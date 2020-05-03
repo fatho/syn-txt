@@ -36,4 +36,3 @@ def update_upstream(user: str, repo: str, branch: str, output_name: str) -> None
 
 if __name__ == '__main__':
     update_upstream('NixOS', 'nixpkgs', 'nixpkgs-unstable', 'nixpkgs')
-    update_upstream('mozilla', 'nixpkgs-mozilla', 'master', 'nixpkgs-mozilla')

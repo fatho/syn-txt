@@ -108,6 +108,28 @@
          stdDeviation="2.1837638"
          id="feGaussianBlur2465" />
     </filter>
+    <clipPath
+       clipPathUnits="userSpaceOnUse"
+       id="clipPath893">
+      <rect
+         style="fill:none;fill-opacity:1;stroke:#8b8b8b;stroke-width:1.1686281;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
+         id="rect895"
+         width="46.655956"
+         height="25.879536"
+         x="68.306366"
+         y="259.04474" />
+    </clipPath>
+    <clipPath
+       clipPathUnits="userSpaceOnUse"
+       id="clipPath902">
+      <rect
+         style="fill:none;fill-opacity:1;stroke:#000000;stroke-width:0.35277778;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
+         id="rect904"
+         width="50"
+         height="50"
+         x="63.888889"
+         y="246.19524" />
+    </clipPath>
   </defs>
   <sodipodi:namedview
      id="base"
@@ -116,9 +138,9 @@
      borderopacity="1.0"
      inkscape:pageopacity="0.0"
      inkscape:pageshadow="2"
-     inkscape:zoom="2.5955624"
-     inkscape:cx="118.72363"
-     inkscape:cy="164.11508"
+     inkscape:zoom="5.1911248"
+     inkscape:cx="80.843644"
+     inkscape:cy="101.84801"
      inkscape:document-units="mm"
      inkscape:current-layer="layer1"
      showgrid="false"
@@ -153,7 +175,8 @@
        y="259.04474" />
     <g
        id="g2543"
-       transform="translate(-66.539847)">
+       transform="translate(-66.539847)"
+       clip-path="url(#clipPath893)">
       <g
          transform="translate(0,1.7584106)"
          style="stroke:#062a0f;stroke-opacity:1;filter:url(#filter2463)"
@@ -269,7 +292,8 @@
        style="fill:none;fill-opacity:1;stroke:#8b8b8b;stroke-width:1.1686281;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1" />
     <g
        id="g1557"
-       transform="translate(-63.888888)">
+       transform="translate(-63.888888,0.80474533)"
+       clip-path="url(#clipPath902)">
       <path
          inkscape:connector-curvature="0"
          id="text986-6-3"

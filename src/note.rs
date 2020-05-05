@@ -41,11 +41,11 @@ impl Note {
     /// ```
     /// use syn_txt::note::*;
     ///
-    /// assert_eq!(Note::named_checked(NoteName::A, NoteOffset::Base, 4), Some(Note::from_midi(69)));
-    /// assert_eq!(Note::named_checked(NoteName::C, NoteOffset::Sharp, 6), Some(Note::from_midi(85)));
-    /// assert_eq!(Note::named_checked(NoteName::G, NoteOffset::Flat, 2), Some(Note::from_midi(42)));
+    /// assert_eq!(Note::try_named(NoteName::A, NoteOffset::Base, 4), Some(Note::from_midi(69)));
+    /// assert_eq!(Note::try_named(NoteName::C, NoteOffset::Sharp, 6), Some(Note::from_midi(85)));
+    /// assert_eq!(Note::try_named(NoteName::G, NoteOffset::Flat, 2), Some(Note::from_midi(42)));
     /// ```
-    pub fn named_checked(name: NoteName, offset: NoteOffset, octave: i32) -> Option<Note> {
+    pub fn try_named(name: NoteName, offset: NoteOffset, octave: i32) -> Option<Note> {
         let name_index = match name {
             NoteName::C => 0,
             NoteName::D => 2,
@@ -87,7 +87,7 @@ impl Note {
     /// assert_eq!(Note::named(NoteName::G, NoteOffset::Flat, 2), Note::from_midi(42));
     /// ```
     pub fn named(name: NoteName, offset: NoteOffset, octave: i32) -> Note {
-        Note::named_checked(name, offset, octave).expect("Note not representable in MIDI system.")
+        Note::try_named(name, offset, octave).expect("Note not representable in MIDI system.")
     }
 
     /// Parse a name string of the format `<letter><offset><octave>`.
@@ -129,12 +129,20 @@ impl Note {
 
         let octave_str = &name_chars.as_str()[offset_str.len()..];
         let octave = octave_str.parse().ok()?;
-        Note::named_checked(name, offset, octave)
+        Note::try_named(name, offset, octave)
     }
 
     pub fn from_midi(midi_note: u8) -> Note {
         assert!(midi_note < 128, "MIDI only has notes 0 - 127");
         Note(midi_note)
+    }
+
+    pub fn try_from_midi(midi_note: i64) -> Option<Note> {
+        if midi_note >= 0 && midi_note < 128 {
+            Some(Note(midi_note as u8))
+        } else {
+            None
+        }
     }
 
     pub fn to_midi(self) -> u8 {

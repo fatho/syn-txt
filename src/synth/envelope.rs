@@ -14,15 +14,33 @@
 ///     sustain: 0.75,
 ///     release: 1.0,
 /// };
-/// assert_eq!(e.eval(EnvelopeTime::SincePress(0.0)), 0.0);
-/// assert_eq!(e.eval(EnvelopeTime::SincePress(0.25)), 1.0);
-/// assert_eq!(e.eval(EnvelopeTime::SincePress(0.5)), 0.875);
-/// assert_eq!(e.eval(EnvelopeTime::SincePress(0.75)), 0.75);
-/// assert_eq!(e.eval(EnvelopeTime::SincePress(20.0)), 0.75);
+/// let mut eval = e.instantiate(4.0); // 4 samples per second
+/// assert_eq!(eval.step(), 0.0);
+/// assert_eq!(eval.step(), 1.0);
+/// assert_eq!(eval.step(), 0.875);
+/// assert_eq!(eval.step(), 0.75);
+/// assert_eq!(eval.step(), 0.75);
+/// assert_eq!(eval.step(), 0.75);
+/// assert_eq!(eval.step(), 0.75);
+/// eval.release();
+/// assert!(! eval.faded());
 ///
-/// assert_eq!(e.eval(EnvelopeTime::SinceRelease(0.0)), 0.75);
-/// assert_eq!(e.eval(EnvelopeTime::SinceRelease(0.5)), 0.375);
-/// assert_eq!(e.eval(EnvelopeTime::SinceRelease(1.0)), 0.0);
+/// assert_eq!(eval.step(), 0.75);
+/// assert_eq!(eval.step(), 0.5625);
+/// assert_eq!(eval.step(), 0.375);
+/// assert_eq!(eval.step(), 0.1875);
+/// assert_eq!(eval.step(), 0.0);
+/// assert!(eval.faded());
+///
+/// // This time with an early release
+/// let mut eval = e.instantiate(4.0); // 4 samples per second
+/// assert_eq!(eval.step(), 0.0);
+/// eval.release();
+/// assert_eq!(eval.step(), 1.0);
+/// assert_eq!(eval.step(), 0.75);
+/// assert_eq!(eval.step(), 0.5);
+/// assert_eq!(eval.step(), 0.25);
+/// assert_eq!(eval.step(), 0.0);
 /// ```
 #[derive(Debug, Clone)]
 pub struct ADSR {
@@ -36,51 +54,85 @@ pub struct ADSR {
     pub release: f64,
 }
 
-#[derive(Debug, Clone, Copy)]
-pub enum EnvelopeTime {
-    /// Time elapsed since the key was pressed but not yet released.
-    SincePress(f64),
-    /// Time elapsed since the key was released.
-    SinceRelease(f64),
-}
-
-impl EnvelopeTime {
-    pub fn press() -> Self {
-        EnvelopeTime::SincePress(0.0)
-    }
-
-    pub fn release() -> Self {
-        EnvelopeTime::SinceRelease(0.0)
-    }
-
-    pub fn advance(&mut self, dt: f64) {
-        match self {
-            EnvelopeTime::SincePress(t) => *t += dt,
-            EnvelopeTime::SinceRelease(t) => *t += dt,
-        }
-    }
-}
-
 impl ADSR {
-    /// Evaluate the envelope curve at this point in time.
-    pub fn eval(&self, time: EnvelopeTime) -> f64 {
-        match time {
-            EnvelopeTime::SincePress(t) => {
-                if t < self.attack {
-                    t / self.attack
-                } else if t < self.attack + self.decay {
-                    self.sustain + (1.0 - self.sustain) * (1.0 - (t - self.attack) / self.decay)
-                } else {
-                    self.sustain
-                }
+    pub fn instantiate(&self, sample_rate: f64) -> EvalADSR {
+        // TODO: what happens if result is not representable as usize?
+        EvalADSR {
+            attack_samples: (self.attack * sample_rate).round() as usize,
+            decay_samples: (self.decay * sample_rate).round() as usize,
+            release_samples: (self.release * sample_rate).round() as usize,
+            sustain_level: self.sustain,
+            release_level: self.sustain,
+            current_sample: 0,
+            released: false,
+        }
+    }
+}
+
+pub struct EvalADSR {
+    attack_samples: usize,
+    decay_samples: usize,
+    release_samples: usize,
+    sustain_level: f64,
+    current_sample: usize,
+    release_level: f64,
+    released: bool,
+}
+
+impl EvalADSR {
+    /// Called for every sample, returning the envelope gain at that sample.
+    pub fn step(&mut self) -> f64 {
+        let gain = self.compute_gain();
+        if self.released {
+            if self.current_sample < self.attack_samples + self.decay_samples + self.release_samples {
+                self.current_sample += 1;
             }
-            EnvelopeTime::SinceRelease(t) => {
-                if t < self.release {
-                    self.sustain * (1.0 - t / self.release)
-                } else {
-                    0.0
-                }
+        } else {
+            if self.current_sample < self.attack_samples + self.decay_samples {
+                self.current_sample += 1;
             }
         }
+        gain
+    }
+
+    fn compute_gain(&self) -> f64 {
+        if self.current_sample < self.attack_samples {
+            // Rise from 0.0 to 1.0
+            let volume = self.current_sample as f64 / self.attack_samples as f64;
+            volume
+        } else if self.current_sample < self.attack_samples + self.decay_samples {
+            // Drop from 1.0 to `sustain_level`
+            let progress = (self.current_sample - self.attack_samples) as f64 / self.decay_samples as f64;
+            let volume = 1.0 - progress * (1.0 - self.sustain_level);
+            volume
+        } else if !self.released && self.current_sample == self.attack_samples + self.decay_samples {
+            // Hold at `sustain_level` while not released
+            self.sustain_level
+        } else if self.current_sample < self.attack_samples + self.decay_samples + self.release_samples {
+            // Drop from `sustain_level` to 0.0
+            let progress = (self.current_sample - self.attack_samples - self.decay_samples) as f64 / self.release_samples as f64;
+            let volume = (1.0 - progress) * self.release_level;
+            volume
+        } else {
+            0.0
+        }
+    }
+
+    pub fn released(&self) -> bool {
+        self.released
+    }
+
+    /// Called when the note is released.
+    pub fn release(&mut self) {
+        if ! self.released {
+            self.release_level = self.compute_gain();
+            self.current_sample = self.attack_samples + self.decay_samples;
+            self.released = true;
+        }
+    }
+
+    /// When the note has been released and the envelope reached zero volume.
+    pub fn faded(&self) -> bool {
+        self.current_sample == self.attack_samples + self.decay_samples + self.release_samples
     }
 }

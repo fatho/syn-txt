@@ -19,6 +19,8 @@ pub fn with_sox_player<R, F: FnOnce(&mut dyn io::Write) -> io::Result<R>>(
         .arg("-y")
         .arg("513")
         .stdin(Stdio::piped())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
         .spawn()?;
 
     let mut audio_stream = player.stdin.take().expect("Used stdin(Stdio::piped())");

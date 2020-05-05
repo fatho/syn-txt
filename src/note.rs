@@ -179,10 +179,3 @@ impl Velocity {
         Velocity((velocity * std::u16::MAX as f64).round() as u16)
     }
 }
-
-/// Notes can be pressed down, and released.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum NoteAction {
-    Play { note: Note, velocity: Velocity },
-    Release { note: Note },
-}

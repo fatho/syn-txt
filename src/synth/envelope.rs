@@ -69,6 +69,7 @@ impl ADSR {
     }
 }
 
+/// Sample-exact evaluator for an ADSR envelope.
 pub struct EvalADSR {
     attack_samples: usize,
     decay_samples: usize,
@@ -83,14 +84,13 @@ impl EvalADSR {
     /// Called for every sample, returning the envelope gain at that sample.
     pub fn step(&mut self) -> f64 {
         let gain = self.compute_gain();
-        if self.released {
-            if self.current_sample < self.attack_samples + self.decay_samples + self.release_samples {
-                self.current_sample += 1;
-            }
-        } else {
-            if self.current_sample < self.attack_samples + self.decay_samples {
-                self.current_sample += 1;
-            }
+        let advance_to_sustain =
+            !self.released && self.current_sample < self.attack_samples + self.decay_samples;
+        let advance_to_release = self.released
+            && self.current_sample
+                < self.attack_samples + self.decay_samples + self.release_samples;
+        if advance_to_release || advance_to_sustain {
+            self.current_sample += 1;
         }
         gain
     }
@@ -98,21 +98,23 @@ impl EvalADSR {
     fn compute_gain(&self) -> f64 {
         if self.current_sample < self.attack_samples {
             // Rise from 0.0 to 1.0
-            let volume = self.current_sample as f64 / self.attack_samples as f64;
-            volume
+            self.current_sample as f64 / self.attack_samples as f64
         } else if self.current_sample < self.attack_samples + self.decay_samples {
             // Drop from 1.0 to `sustain_level`
-            let progress = (self.current_sample - self.attack_samples) as f64 / self.decay_samples as f64;
-            let volume = 1.0 - progress * (1.0 - self.sustain_level);
-            volume
-        } else if !self.released && self.current_sample == self.attack_samples + self.decay_samples {
+            let progress =
+                (self.current_sample - self.attack_samples) as f64 / self.decay_samples as f64;
+            1.0 - progress * (1.0 - self.sustain_level)
+        } else if !self.released && self.current_sample == self.attack_samples + self.decay_samples
+        {
             // Hold at `sustain_level` while not released
             self.sustain_level
-        } else if self.current_sample < self.attack_samples + self.decay_samples + self.release_samples {
-            // Drop from `sustain_level` to 0.0
-            let progress = (self.current_sample - self.attack_samples - self.decay_samples) as f64 / self.release_samples as f64;
-            let volume = (1.0 - progress) * self.release_level;
-            volume
+        } else if self.current_sample
+            < self.attack_samples + self.decay_samples + self.release_samples
+        {
+            // Drop from `release_level` to 0.0
+            let progress = (self.current_sample - self.attack_samples - self.decay_samples) as f64
+                / self.release_samples as f64;
+            (1.0 - progress) * self.release_level
         } else {
             0.0
         }
@@ -124,15 +126,20 @@ impl EvalADSR {
 
     /// Called when the note is released.
     pub fn release(&mut self) {
-        if ! self.released {
+        if !self.released {
             self.release_level = self.compute_gain();
             self.current_sample = self.attack_samples + self.decay_samples;
             self.released = true;
         }
     }
 
-    /// When the note has been released and the envelope reached zero volume.
+    /// The envelope has faded when all subsequent `step` calls would return zero.
+    /// This is the case when
+    /// - the note has been released and the envelope reached zero volume
+    /// - the sustain_level is zero and the note has decayed.
     pub fn faded(&self) -> bool {
-        self.current_sample == self.attack_samples + self.decay_samples + self.release_samples
+        let end_decay = self.attack_samples + self.decay_samples;
+        self.current_sample == end_decay + self.release_samples
+            || (self.sustain_level == 0.0 && self.current_sample >= end_decay)
     }
 }

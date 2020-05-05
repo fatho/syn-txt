@@ -26,8 +26,8 @@ pub struct TestSynth {
     unison: usize,
     /// Maximum detune factor the outermost unison voices.
     unison_detune_cents: f64,
-    /// Stereo spread of the outermost unison voices.
-    unison_stereo_spread: f64,
+    /// Gain falloff exponent for the more detuned noises.
+    unison_falloff: f64,
 
     /// Monotoneously increasing id used for identifying playing notes.
     next_play_handle: usize,
@@ -45,7 +45,7 @@ impl TestSynth {
             pan: 0.0,
             unison: 3,
             unison_detune_cents: 5.0,
-            unison_stereo_spread: 0.1,
+            unison_falloff: 0.5,
             tuning: Tuning::default(),
             // volume
             envelope: ADSR {
@@ -86,19 +86,20 @@ impl TestSynth {
             } else {
                 0.0
             };
-            let detune = crate::util::from_cents(offset.abs() * self.unison_detune_cents);
-            let pan = offset * self.unison_stereo_spread + self.pan;
+            let detune = crate::util::from_cents(offset * self.unison_detune_cents);
+            let pan = self.pan;
             Voice {
                 // normalized in the next step
-                gain: 1.0,
+                gain: (-self.unison_falloff * offset.powi(2)).exp(),
                 pan,
                 oscillator: Oscillator::new(WaveShape::Saw, self.sample_rate, frequency * detune),
             }
         }).collect::<Vec<Voice>>();
         let total_gain: Stereo<f64> = voices.iter().map(|v| Stereo::panned_mono(v.gain, v.pan)).sum();
         let normalized_gain = 1.0 / total_gain.left.max(total_gain.right);
+        log::trace!("total unnormalized unison gain {:?}", total_gain);
         for voice in voices.iter_mut() {
-            voice.gain = velocity.as_f64() * normalized_gain;
+            voice.gain *= velocity.as_f64() * normalized_gain;
         }
 
         log::trace!("note voices: {:?}", voices);

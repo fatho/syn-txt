@@ -1,4 +1,4 @@
-//! Parsing etc. for the syn.txt language
+//! Implementation of the underlying scheme-like language of syn.txt.
 
 pub mod ast;
 pub mod interpreter;

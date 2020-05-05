@@ -45,6 +45,10 @@ impl<'a> LineMap<'a> {
         }
     }
 
+    pub fn source(&self) -> &'a str {
+        self.source
+    }
+
     /// # Examples
     ///
     /// ```

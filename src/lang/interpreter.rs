@@ -756,15 +756,12 @@ mod test {
         expect_values_or_errors(
             r#"
             (define global-state 0)
-            (define get-global
-                (lambda ()
-                    (begin
-                        (define ret global-state)
-                        (set! global-state (+ ret 1))
-                        ret
-                    )
-                )
-            )
+            (define (get-global)
+                (begin
+                    (define ret global-state)
+                    (set! global-state (+ ret 1))
+                    ret
+                ))
             (get-global)
             (get-global)
             (set! global-state 10)

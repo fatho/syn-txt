@@ -35,46 +35,75 @@ pub fn begin(intp: &mut Interpreter, mut args: ArgParser) -> InterpreterResult<V
 pub fn lambda(intp: &mut Interpreter, mut args: ArgParser) -> InterpreterResult<Value> {
     // Parse the parameter list
     let arg_parameters = args.symbolic()?;
-    let mut parameters = Vec::new();
-    if let ast::SymExp::List(arg_list) = &arg_parameters.exp {
-        for e in arg_list {
-            if let ast::SymExp::Variable(ident) = &e.exp {
-                if parameters.contains(ident) {
-                    return Err(IntpErr::new(
-                        e.src,
-                        IntpErrInfo::Redefinition(ident.clone()),
-                    ));
-                } else {
-                    parameters.push(ident.clone());
-                }
-            } else {
-                return Err(IntpErr::new(e.src, IntpErrInfo::IncompatibleArguments));
-            }
+
+    let param_parser = match &arg_parameters.exp {
+        ast::SymExp::List(arg_list) => ArgParser::new(args.last_span(), &arg_list),
+        _ => {
+            return Err(IntpErr::new(
+                args.last_span(),
+                IntpErrInfo::IncompatibleArguments,
+            ))
         }
-    } else {
-        return Err(IntpErr::new(
-            args.last_span(),
-            IntpErrInfo::IncompatibleArguments,
-        ));
-    }
+    };
 
     // Parse the lambda expression
     let lambda_expr = args.symbolic()?;
 
-    // Build the closure
+    lambda_impl(intp, param_parser, lambda_expr)
+}
+
+pub fn lambda_impl(
+    intp: &mut Interpreter,
+    mut params: ArgParser,
+    expr: &ast::SymExpSrc,
+) -> InterpreterResult<Value> {
+    let mut parameters = Vec::new();
+    while !params.is_empty() {
+        let ident = params.variable()?;
+        if parameters.contains(ident) {
+            return Err(IntpErr::new(
+                params.last_span(),
+                IntpErrInfo::Redefinition(ident.clone()),
+            ));
+        } else {
+            parameters.push(ident.clone());
+        }
+    }
     let closure = Closure {
         captured_scope: intp.scope_stack().clone(),
         parameters,
-        code: lambda_expr.clone(),
+        code: expr.clone(),
     };
     Ok(Value::Closure(Rc::new(closure)))
 }
 
 /// Define a variable in the current top-most scope.
 pub fn define(intp: &mut Interpreter, mut args: ArgParser) -> InterpreterResult<Value> {
-    let var = args.variable()?;
-    let value = args.value(intp)?;
-    args.done()?;
+    // The thing being defined
+    let defined = args.symbolic()?;
+
+    // Transform `(define (f ...) v)` into `(define f (lambda (...) v))`
+    let (var, value) = match &defined.exp {
+        ast::SymExp::List(elems) => {
+            let mut lambda_args = ArgParser::new(defined.src, &elems);
+            let lambda_name = lambda_args.variable()?;
+            let lambda_expr = args.symbolic()?;
+            let closure_value = lambda_impl(intp, lambda_args, lambda_expr)?;
+
+            (lambda_name, closure_value)
+        }
+        ast::SymExp::Variable(var) => {
+            let value = args.value(intp)?;
+            args.done()?;
+            (var, value)
+        }
+        _ => {
+            return Err(IntpErr::new(
+                args.last_span(),
+                IntpErrInfo::IncompatibleArguments,
+            ))
+        }
+    };
 
     if let Some((var, _)) = intp.scope_stack().borrow_mut().define(var.clone(), value) {
         Err(IntpErr::new(

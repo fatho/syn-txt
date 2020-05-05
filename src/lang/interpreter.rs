@@ -1,5 +1,6 @@
 use std::collections::HashMap;
-use std::{fmt, rc::Rc};
+use std::{fmt, rc::Rc, cell::RefCell};
+use log::warn;
 
 use super::ast;
 use super::primops;
@@ -73,8 +74,9 @@ impl fmt::Display for IntpErrInfo {
 pub struct Interpreter {
     /// Read-only scope (from the perspective of the language)
     /// providing all the built-in primops.
-    builtins: Scope,
-    scopes: Vec<Scope>,
+    builtins: ScopeRef,
+    /// Points to the current innermost scope
+    scope_stack: ScopeRef,
 }
 
 impl Default for Interpreter {
@@ -102,12 +104,15 @@ impl Interpreter {
         ];
 
         for (name, fun) in prim {
-            builtin_scope.set_var(ast::Ident(name.to_owned()), Value::FnPrim(fun));
+            builtin_scope.define(ast::Ident(name.to_owned()), Value::FnPrim(fun));
         }
 
+        let builtins = builtin_scope.into_ref();
+        let top_scope = Scope::nest(builtins.clone()).into_ref();
+
         Self {
-            builtins: builtin_scope,
-            scopes: vec![Scope::new()],
+            builtins,
+            scope_stack: top_scope,
         }
     }
 
@@ -115,43 +120,50 @@ impl Interpreter {
         &mut self,
         name: &str,
         op: fn(&mut Interpreter, ArgParser) -> InterpreterResult<Value>,
-    ) {
-        self.builtins
-            .set_var(ast::Ident((*name).to_owned()), Value::FnPrim(PrimOp(op)));
+    ) -> InterpreterResult<()> {
+        let var = ast::Ident((*name).to_owned());
+        let val = Value::FnPrim(PrimOp(op));
+        if let Some((var, _val)) = self.builtins.borrow_mut().define(var, val) {
+            // TODO: allow None as location
+            Err(IntpErr::new(Span { begin: 0, end: 0 }, IntpErrInfo::Redefinition(var)))
+        } else {
+            Ok(())
+        }
     }
 
-    pub fn register_primop_ext<F>(&mut self, name: &str, op: F)
+    pub fn register_primop_ext<F>(&mut self, name: &str, op: F) -> InterpreterResult<()>
     where
         F: Fn(&mut Interpreter, ArgParser) -> InterpreterResult<Value> + 'static,
     {
-        self.builtins
-            .set_var(ast::Ident((*name).to_owned()), Value::ext_closure(op));
-    }
-
-    /// Read a variable from the topmost scope that defines it.
-    pub fn lookup_var(&self, var: &ast::Ident) -> Option<&Value> {
-        for scope in self.scopes.iter().rev() {
-            if let Some(val) = scope.lookup_var(var) {
-                return Some(val);
-            }
+        let var = ast::Ident((*name).to_owned());
+        let val = Value::ext_closure(op);
+        if let Some((var, _val)) = self.builtins.borrow_mut().define(var, val) {
+            // TODO: allow None as location
+            Err(IntpErr::new(Span { begin: 0, end: 0 }, IntpErrInfo::Redefinition(var)))
+        } else {
+            Ok(())
         }
-        self.builtins.lookup_var(var)
     }
 
-    pub fn scopes_mut(&mut self) -> &mut [Scope] {
-        &mut self.scopes
+    pub fn scope_stack(&mut self) -> &ScopeRef {
+        &self.scope_stack
     }
 
     /// Create a new topmost scope for bindings.
     /// Any `define`s and `set!`s will target the top-most scope.
     pub fn push_scope(&mut self) {
-        self.scopes.push(Scope::new())
+        let new_scope = Scope::nest(self.scope_stack.clone()).into_ref();
+        self.scope_stack = new_scope;
     }
 
     /// Remove the topmost scope and all its bindings.
     pub fn pop_scope(&mut self) {
-        debug_assert!(self.scopes.len() > 1, "cannot pop the last scope");
-        self.scopes.pop();
+        let outer = self.scope_stack.borrow().outer();
+        if let Some(outer) = outer {
+            self.scope_stack = outer;
+        } else {
+            warn!("trying to pop outermost scope")
+        }
     }
 
     pub fn eval(&mut self, sym: &ast::SymExpSrc) -> InterpreterResult<Value> {
@@ -163,8 +175,8 @@ impl Interpreter {
             ast::SymExp::Ratio(v) => Ok(Value::Ratio(*v)),
             ast::SymExp::Int(v) => Ok(Value::Int(*v)),
             ast::SymExp::Variable(var) => {
-                if let Some(value) = self.lookup_var(var) {
-                    Ok(value.clone())
+                if let Some(value) = self.scope_stack.borrow().lookup(var) {
+                    Ok(value)
                 } else {
                     Err(IntpErr::new(
                         sym.src,
@@ -292,10 +304,14 @@ impl<'a> ArgParser<'a> {
     }
 }
 
+/// A reference to a shared scope.
+pub type ScopeRef = Rc<RefCell<Scope>>;
+
 /// A binding scope for variables.
 /// Scopes are lexially nested, and inner scopes have precedence before outer scopes.
 pub struct Scope {
     bindings: HashMap<ast::Ident, Value>,
+    outer: Option<ScopeRef>,
 }
 
 impl Default for Scope {
@@ -308,20 +324,62 @@ impl Scope {
     pub fn new() -> Self {
         Self {
             bindings: HashMap::new(),
+            outer: None,
         }
     }
 
-    /// Set a variable in this scope and return its previous value, if there was one.
-    pub fn set_var(&mut self, var: ast::Ident, value: Value) -> Option<Value> {
-        self.bindings.insert(var, value)
+    /// Wrap this scope into a `ScopeRef`.
+    pub fn into_ref(self) -> ScopeRef {
+        Rc::new(RefCell::new(self))
     }
 
-    pub fn lookup_var(&self, var: &ast::Ident) -> Option<&Value> {
-        self.bindings.get(var)
+    /// Create a nested scope inside the given outer scope.
+    pub fn nest(outer: ScopeRef) -> Self {
+        Self {
+            bindings: HashMap::new(),
+            outer: Some(outer),
+        }
     }
 
-    pub fn lookup_var_mut(&mut self, var: &ast::Ident) -> Option<&mut Value> {
-        self.bindings.get_mut(var)
+    /// Return a reference to the lexically outer scope, if this scope is not the outermost.
+    pub fn outer(&self) -> Option<ScopeRef> {
+        self.outer.clone()
+    }
+
+    /// Define a variable in this scope, if possible.
+    /// On success, it returns `None`, otherwise it gives the arguments back to the caller.
+    /// NOTE: `define`, unlike set, does not operate recursively on outer scopes.
+    pub fn define(&mut self, var: ast::Ident, value: Value) -> Option<(ast::Ident, Value)> {
+        if self.bindings.get(&var).is_none() {
+            self.bindings.insert(var, value);
+            None
+        } else {
+            Some((var, value))
+        }
+    }
+
+    /// Set a variable in the scope where it was defined.
+    /// If the variable was not defined, the `value` argument is returned as `Err`,
+    /// otherwise, the previous value is returned as `Ok`.
+    pub fn set(&mut self, var: &ast::Ident, value: Value) -> Result<Value, Value> {
+        if let Some(slot) = self.bindings.get_mut(var) {
+            Ok(std::mem::replace(slot, value))
+        } else if let Some(outer) = self.outer.as_ref() {
+            outer.borrow_mut().set(var, value)
+        } else {
+            Err(value)
+        }
+    }
+
+    /// Return a copy of the value of the given variable, or `None` if it was not defined.
+    pub fn lookup(&self, var: &ast::Ident) -> Option<Value> {
+        if let Some(value) = self.bindings.get(var) {
+            Some(value.clone())
+        } else if let Some(outer) = self.outer.as_ref() {
+            outer.borrow().lookup(var)
+        } else {
+            None
+        }
     }
 }
 
@@ -346,6 +404,9 @@ impl PartialEq for PrimOp {
 impl Eq for PrimOp {}
 
 /// Evaluating expressions results in values.
+
+/// Values should be small enough so that they can be cloned without a big performance hit.
+/// Any big values (such as `ExtClosure`) should be packaged behind `Rc`.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
     /// A string

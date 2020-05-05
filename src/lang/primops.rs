@@ -34,19 +34,10 @@ pub fn define(intp: &mut Interpreter, mut args: ArgParser) -> InterpreterResult<
     let value = args.value(intp)?;
     args.done()?;
 
-    let defining_scope = intp.scopes_mut().last_mut().ok_or_else(|| {
-        IntpErr::new(
-            args.list_span(),
-            IntpErrInfo::Other("interpreter has no scope".to_owned()),
-        )
-    })?;
-
-    if let Some(previous) = defining_scope.set_var(var.clone(), value) {
-        // There was already a variable, restore the scope and error out
-        defining_scope.set_var(var.clone(), previous);
+    if let Some((var, _)) = intp.scope_stack().borrow_mut().define(var.clone(), value) {
         Err(IntpErr::new(
             args.list_span(),
-            IntpErrInfo::Redefinition(var.clone()),
+            IntpErrInfo::Redefinition(var),
         ))
     } else {
         Ok(Value::Unit)
@@ -60,16 +51,13 @@ pub fn set(intp: &mut Interpreter, mut args: ArgParser) -> InterpreterResult<Val
     args.done()?;
 
     // Traverse the scopes from top to bottom
-    for scope in intp.scopes_mut().iter_mut().rev() {
-        if let Some(current_value) = scope.lookup_var_mut(var) {
-            std::mem::replace(current_value, value);
-            return Ok(Value::Unit);
-        }
+    match intp.scope_stack().borrow_mut().set(var, value) {
+        Ok(_) => Ok(Value::Unit),
+        Err(_) => Err(IntpErr::new(
+            args.list_span(),
+            IntpErrInfo::NoSuchVariable(var.clone()),
+        ))
     }
-    Err(IntpErr::new(
-        args.list_span(),
-        IntpErrInfo::NoSuchVariable(var.clone()),
-    ))
 }
 
 /// Add all the arguments. If no arguments are passed, a zero int is returned.

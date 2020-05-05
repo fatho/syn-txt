@@ -64,8 +64,8 @@ fn compile(input: &str) -> io::Result<PianoRoll> {
 
     println!("Evaluating...");
     let mut int = Interpreter::new();
-    int.register_primop("note", NoteValue::prim_new);
-    int.register_primop("piano-roll", PianoRollValue::prim_new);
+    int.register_primop("note", NoteValue::prim_new).unwrap();
+    int.register_primop("piano-roll", PianoRollValue::prim_new).unwrap();
 
     let mut final_value = Value::Unit;
     for s in ast {

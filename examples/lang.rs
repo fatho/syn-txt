@@ -105,7 +105,7 @@ fn run_test(input: &str) {
     let extension_state = Rc::new(RefCell::new(0));
     int.register_primop_ext("foo/new", move |intp, args| {
         foo_ext_foo_new(&mut *extension_state.borrow_mut(), intp, args)
-    });
+    }).unwrap();
 
     for s in ast {
         println!("{}", &input[s.src.begin..s.src.end]);

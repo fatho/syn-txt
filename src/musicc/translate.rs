@@ -4,17 +4,17 @@ use std::io;
 
 use log::info;
 
+use crate::musicc::langext::SongValue;
 use crate::note::NoteAction;
 use crate::output;
-use crate::pianoroll::{PianoRoll, Time};
+use crate::pianoroll::Time;
 use crate::render;
 use crate::synth;
 use crate::wave;
 
-/// Play a piano roll on the default speakers.
-pub fn play(roll: PianoRoll) -> io::Result<()> {
-    // TODO: make bpm configurable
-    let bpm = 120;
+/// Play a song on the default speakers.
+pub fn play(song: SongValue) -> io::Result<()> {
+    let bpm = song.bpm;
 
     // hard-coded denominator of measures (for now)
     // One `1 / measure_denom` counts as one beat for the bpm.
@@ -25,11 +25,12 @@ pub fn play(roll: PianoRoll) -> io::Result<()> {
         (time.numerator() * measure_denom * 60 * sample_rate / time.denominator() / bpm) as usize
     };
     let time_to_seconds = |time: Time| {
-        time.numerator() as f64 / time.denominator() as f64 * measure_denom as f64 * 60.0 as f64 / bpm as f64
+        time.numerator() as f64 / time.denominator() as f64 * measure_denom as f64 * 60.0 as f64
+            / bpm as f64
     };
 
     let mut events = Vec::new();
-
+    let roll = &song.notes.0;
     for pn in roll.iter() {
         let note = pn.note;
         let velocity = pn.velocity;
@@ -50,8 +51,17 @@ pub fn play(roll: PianoRoll) -> io::Result<()> {
 
     let max_samples = time_to_sample(roll.length()) + sample_rate as usize;
 
-    info!("playing {} events at {} bpm at {} Hz", events.len(), bpm, sample_rate);
-    info!("total length {} samples ({:.2} seconds)", max_samples, time_to_seconds(roll.length()) + 1.0);
+    info!(
+        "playing {} events at {} bpm at {} Hz",
+        events.len(),
+        bpm,
+        sample_rate
+    );
+    info!(
+        "total length {} samples ({:.2} seconds)",
+        max_samples,
+        time_to_seconds(roll.length()) + 1.0
+    );
 
     // 10 ms buffer at 44100 Hz
     let buffer_size = 441;

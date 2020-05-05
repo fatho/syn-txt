@@ -71,5 +71,5 @@
     )
 )
 
-; The final expression in a file must currently evaluate to a piano roll
-part1
+; The final expression in a file must evaluate to a song value
+(song :bpm 90 :notes part1)

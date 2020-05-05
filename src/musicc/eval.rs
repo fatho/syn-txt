@@ -8,14 +8,13 @@ use crate::lang::interpreter::{FromValue, Interpreter, Value};
 use crate::lang::lexer::{Lexer, Token};
 use crate::lang::parser::Parser;
 use crate::lang::span::{LineMap, Span};
-use crate::pianoroll::PianoRoll;
 
 use super::langext;
 
 /// Evaluate syn.txt source code into a song description.
 ///
 /// TODO: allow including other files.
-pub fn eval(input_name: &str, input: &str) -> io::Result<PianoRoll> {
+pub fn eval(input_name: &str, input: &str) -> io::Result<langext::SongValue> {
     let lines = LineMap::new(input);
 
     info!("lexing {}", input_name);
@@ -39,9 +38,8 @@ pub fn eval(input_name: &str, input: &str) -> io::Result<PianoRoll> {
         }
     }
 
-    langext::PianoRollValue::from_value(final_value)
-        .map(|val| val.0)
-        .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "not a piano roll"))
+    langext::SongValue::from_value(final_value)
+        .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "not a song"))
 }
 
 pub fn lex(input_name: &str, lines: &LineMap) -> io::Result<Vec<(Span, Token)>> {

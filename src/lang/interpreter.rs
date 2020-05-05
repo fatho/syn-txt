@@ -1,6 +1,6 @@
 use log::warn;
 use std::collections::HashMap;
-use std::{cell::RefCell, fmt, rc::Rc};
+use std::{any::TypeId, cell::RefCell, fmt, rc::Rc};
 
 use super::ast;
 use super::primops;
@@ -522,6 +522,22 @@ pub trait ExtensionValue: std::any::Any + fmt::Debug {
     }
 }
 
+/// Allow downcasting extension values behind `Rc`s,
+/// simlar to how Any itself is implemented.
+impl dyn ExtensionValue {
+    pub fn is<T: 'static>(&self) -> bool {
+        TypeId::of::<T>() == self.type_id()
+    }
+
+    pub fn downcast<T: 'static>(self: Rc<Self>) -> Result<Rc<T>, Rc<Self>> {
+        if self.is::<T>() {
+            unsafe { Ok(Rc::from_raw(Rc::into_raw(self) as _)) }
+        } else {
+            Err(self)
+        }
+    }
+}
+
 /// An extern callable closure.
 pub struct ExtClosure<F>(F);
 
@@ -627,6 +643,21 @@ impl<E: ExtensionValue + Clone> FromValue for E {
             Value::Ext(ref ext) => {
                 if let Some(e) = ext.0.as_any().downcast_ref::<E>() {
                     Ok(e.clone())
+                } else {
+                    Err(value)
+                }
+            }
+            value => Err(value),
+        }
+    }
+}
+
+impl<E: ExtensionValue> FromValue for Rc<E> {
+    fn from_value(value: Value) -> Result<Self, Value> {
+        match value {
+            Value::Ext(ref ext) => {
+                if let Ok(e) = ext.0.clone().downcast::<E>() {
+                    Ok(e)
                 } else {
                     Err(value)
                 }

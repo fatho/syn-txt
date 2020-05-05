@@ -22,10 +22,14 @@ struct Opt {
 fn main() -> io::Result<()> {
     let opt = Opt::from_args();
 
-    let level = if opt.verbose { log::Level::Trace } else { log::Level::Info };
+    let level = if opt.verbose {
+        log::Level::Trace
+    } else {
+        log::Level::Info
+    };
     simple_logger::init_with_level(level).unwrap();
 
     let source = std::fs::read_to_string(&opt.source)?;
-    let roll = musicc::eval::eval(&opt.source.to_string_lossy(), &source)?;
-    musicc::translate::play(roll)
+    let song = musicc::eval::eval(&opt.source.to_string_lossy(), &source)?;
+    musicc::translate::play(song)
 }

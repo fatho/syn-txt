@@ -11,6 +11,9 @@ use syn_txt::musicc;
 #[derive(Debug, StructOpt)]
 #[structopt(name = "musicc", about = "Compiling code into music")]
 struct Opt {
+    #[structopt(short = "v", long = "verbose")]
+    verbose: bool,
+
     /// The source code of the music.
     #[structopt(parse(from_os_str))]
     source: PathBuf,
@@ -19,7 +22,8 @@ struct Opt {
 fn main() -> io::Result<()> {
     let opt = Opt::from_args();
 
-    simple_logger::init().unwrap();
+    let level = if opt.verbose { log::Level::Trace } else { log::Level::Info };
+    simple_logger::init_with_level(level).unwrap();
 
     let source = std::fs::read_to_string(&opt.source)?;
     let roll = musicc::eval::eval(&opt.source.to_string_lossy(), &source)?;

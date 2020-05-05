@@ -2,6 +2,8 @@
 
 use std::io;
 
+use log::info;
+
 use crate::note::NoteAction;
 use crate::output;
 use crate::pianoroll::{PianoRoll, Time};
@@ -11,13 +13,19 @@ use crate::wave;
 
 /// Play a piano roll on the default speakers.
 pub fn play(roll: PianoRoll) -> io::Result<()> {
-    // TODO: make bpm and measure configurable
+    // TODO: make bpm configurable
     let bpm = 120;
-    let measure = 4;
+
+    // hard-coded denominator of measures (for now)
+    // One `1 / measure_denom` counts as one beat for the bpm.
+    let measure_denom = 4;
 
     let sample_rate = 44100;
     let time_to_sample = |time: Time| {
-        (time.numerator() * measure * 60 * sample_rate / time.denominator() / bpm) as usize
+        (time.numerator() * measure_denom * 60 * sample_rate / time.denominator() / bpm) as usize
+    };
+    let time_to_seconds = |time: Time| {
+        time.numerator() as f64 / time.denominator() as f64 * measure_denom as f64 * 60.0 as f64 / bpm as f64
     };
 
     let mut events = Vec::new();
@@ -42,6 +50,10 @@ pub fn play(roll: PianoRoll) -> io::Result<()> {
 
     let max_samples = time_to_sample(roll.length()) + sample_rate as usize;
 
+    info!("playing {} events at {} bpm at {} Hz", events.len(), bpm, sample_rate);
+    info!("total length {} samples ({:.2} seconds)", max_samples, time_to_seconds(roll.length()) + 1.0);
+
+    // 10 ms buffer at 44100 Hz
     let buffer_size = 441;
 
     let synth = synth::test::TestSynth::new(0, sample_rate as f64);
@@ -68,6 +80,7 @@ pub fn play(roll: PianoRoll) -> io::Result<()> {
             audio_stream.write_all(&byte_buffer)?;
             samples_total += audio_buffer.len();
         }
+
         Ok(())
     })
 }

@@ -3,6 +3,7 @@
 use super::envelope::*;
 use super::oscillator::*;
 use super::tuning::*;
+use super::filter;
 
 use crate::note::*;
 use crate::wave::*;
@@ -29,6 +30,10 @@ pub struct TestSynth {
     /// Gain falloff exponent for the more detuned noises.
     unison_falloff: f64,
 
+    // low-pass filter
+    filter_coefficients: filter::BiquadCoefficients,
+    biquad: Stereo<filter::Biquad>,
+
     /// Monotoneously increasing id used for identifying playing notes.
     next_play_handle: usize,
     active_notes: Vec<NoteState>,
@@ -40,21 +45,27 @@ pub struct PlayHandle(usize);
 
 impl TestSynth {
     pub fn new(sample_rate: f64) -> Self {
+        let filter_coefficients = filter::BiquadCoefficients::lowpass(sample_rate, 2000.0, 0.7071);
         TestSynth {
             // voice settings
             pan: 0.0,
             unison: 3,
-            unison_detune_cents: 5.0,
-            unison_falloff: 0.5,
+            unison_detune_cents: 10.0,
+            unison_falloff: 0.0,
             tuning: Tuning::default(),
             // volume
             envelope: ADSR {
                 attack: 0.05,
-                decay: 1.0,
-                sustain: 0.5,
-                release: 0.25,
+                decay: 0.0,
+                sustain: 1.0,
+                release: 0.1,
             },
             gain: 0.5,
+            filter_coefficients,
+            biquad: Stereo {
+                left: filter::Biquad::new(),
+                right: filter::Biquad::new(),
+            },
             // audio settings
             sample_rate,
             // internal state
@@ -111,8 +122,6 @@ impl TestSynth {
             voice.gain *= velocity.as_f64() * normalized_gain;
         }
 
-        log::trace!("note voices: {:?}", voices);
-
         self.active_notes.push(NoteState {
             handle: PlayHandle(handle.0),
             // state
@@ -155,8 +164,13 @@ impl TestSynth {
                     self.active_notes.swap_remove(voice_index);
                 }
             }
+            wave *= self.gain;
+            wave = Stereo {
+                left: self.biquad.left.step(&self.filter_coefficients, wave.left),
+                right: self.biquad.right.step(&self.filter_coefficients, wave.right),
+            };
 
-            *out_sample += wave * self.gain;
+            *out_sample += wave;
         }
     }
 }

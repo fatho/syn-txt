@@ -32,8 +32,9 @@ impl Oscillator {
             self.phase_offset -= 1.0;
         }
         // Compute wave
+        use std::f64::consts::PI;
         match self.shape {
-            WaveShape::Sine => (phase * 2.0 * std::f64::consts::PI).sin(),
+            WaveShape::Sine => (phase * 2.0 * PI).sin(),
             WaveShape::Saw => 2.0 * phase - 1.0,
         }
     }

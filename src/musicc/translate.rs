@@ -40,13 +40,13 @@ pub fn play(song: SongValue) -> io::Result<()> {
         })
         .peekable();
 
-    let max_samples = time_to_sample(roll.length()) + 5 * sample_rate as usize;
+    let max_samples = time_to_sample(roll.length()) + 2 * sample_rate as usize;
 
     info!("playing at {} bpm at {} Hz", bpm, sample_rate);
     info!(
         "total length {} samples ({:.2} seconds)",
         max_samples,
-        time_to_seconds(roll.length()) + 1.0
+        time_to_seconds(roll.length()) + 2.0
     );
 
     // 10 ms buffer at 44100 Hz

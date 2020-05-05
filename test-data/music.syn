@@ -59,14 +59,6 @@
                 part1-2
                 (left-basic "b2" "b3")
             )
-
-            (note :pitch "e3" :length 3/4 :velocity 0.5)
-            ; These three notes don't start *after* the previous note ended,
-            ; but together with it, as denoted by the zero `offset`.
-            ; The offset can be any non-negative integer or rational.
-            (note :pitch "a3" :length 3/4 :velocity 0.5 :offset 0)
-            (note :pitch "c4" :length 3/4 :velocity 0.5 :offset 0)
-            (note :pitch "e4" :length 3/4 :velocity 0.5 :offset 0)
         )
     )
 )

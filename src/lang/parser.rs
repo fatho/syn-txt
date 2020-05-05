@@ -217,7 +217,7 @@ impl<'a> Parser<'a> {
         let mut terminated = false;
         let mut escape_start: usize = 0;
 
-        while let Some((pos, ch)) = chars.next() {
+        for (pos, ch) in chars {
             if escaped {
                 escaped = false;
                 match ch {
@@ -281,13 +281,15 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_token(&mut self) -> ParseResult<(Span, Token)> {
-        self.pop_token().ok_or(ParseError::new(
-            Span {
-                begin: self.source.len(),
-                end: self.source.len(),
-            },
-            ParseErrorInfo::EOF,
-        ))
+        self.pop_token().ok_or_else(|| {
+            ParseError::new(
+                Span {
+                    begin: self.source.len(),
+                    end: self.source.len(),
+                },
+                ParseErrorInfo::EOF,
+            )
+        })
     }
 
     fn expect_token(&mut self, expected: Token) -> ParseResult<Span> {

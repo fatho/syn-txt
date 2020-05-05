@@ -41,7 +41,7 @@ impl TestSynth {
 
 impl super::Synthesizer for TestSynth {
     fn play(&mut self, mut events: &[Event], output: &mut [Stereo<f64>]) {
-        for (i, out_sample) in output.into_iter().enumerate() {
+        for (i, out_sample) in output.iter_mut().enumerate() {
             let t = self.current_time + i;
             // Process starting and stopping notes before or at this sample
             while let Some(event) = events.first() {

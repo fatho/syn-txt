@@ -10,7 +10,7 @@ use crate::wave::Stereo;
 /// Might be less than the number of input samples if the output buffer was not large enough.
 pub fn copy_f64_bytes(audio: &[Stereo<f64>], bytes: &mut [u8]) -> usize {
     let mut processed = 0;
-    for (sample, target) in audio.into_iter().zip(bytes.chunks_exact_mut(16)) {
+    for (sample, target) in audio.iter().zip(bytes.chunks_exact_mut(16)) {
         target[0..8].copy_from_slice(&sample.left.to_le_bytes());
         target[8..16].copy_from_slice(&sample.left.to_le_bytes());
         processed += 1;

@@ -77,6 +77,12 @@ pub struct Interpreter {
     scopes: Vec<Scope>,
 }
 
+impl Default for Interpreter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Interpreter {
     pub fn new() -> Self {
         let mut builtin_scope = Scope::new();
@@ -172,7 +178,7 @@ impl Interpreter {
     fn eval_list(&mut self, span: Span, list: &[ast::SymExpSrc]) -> InterpreterResult<Value> {
         let head_exp = list
             .first()
-            .ok_or(IntpErr::new(span, IntpErrInfo::Uncallable))?;
+            .ok_or_else(|| IntpErr::new(span, IntpErrInfo::Uncallable))?;
         let head = self.eval(head_exp)?;
         let args = ArgParser::new(span, &list[1..]);
 
@@ -196,7 +202,11 @@ pub struct ArgParser<'a> {
 
 impl<'a> ArgParser<'a> {
     pub fn new(list_span: Span, args: &'a [ast::SymExpSrc]) -> Self {
-        Self { list_span, last_span: list_span, args }
+        Self {
+            list_span,
+            last_span: list_span,
+            args,
+        }
     }
 
     /// Return the number of unparsed arguments
@@ -286,6 +296,12 @@ impl<'a> ArgParser<'a> {
 /// Scopes are lexially nested, and inner scopes have precedence before outer scopes.
 pub struct Scope {
     bindings: HashMap<ast::Ident, Value>,
+}
+
+impl Default for Scope {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Scope {
@@ -433,8 +449,8 @@ macro_rules! declare_extension_value {
     ($value_type: ty) => {
         impl ExtensionValue for $value_type {
             fn partial_eq(&self, other: &dyn ExtensionValue) -> bool {
-                if let Some(foo) = other.as_any().downcast_ref::<Self>() {
-                    self == foo
+                if let Some(real_other) = other.as_any().downcast_ref::<Self>() {
+                    self == real_other
                 } else {
                     false
                 }

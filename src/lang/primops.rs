@@ -165,7 +165,7 @@ mod arithmetic {
             _ => false,
         };
         if is_zero {
-            return Err(IntpErr::new(location, IntpErrInfo::DivisionByZero));
+            Err(IntpErr::new(location, IntpErrInfo::DivisionByZero))
         } else {
             Ok(())
         }

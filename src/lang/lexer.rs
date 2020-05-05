@@ -238,11 +238,11 @@ impl<'a> Lexer<'a> {
         match self.peek_char() {
             Some('/') => {
                 self.next_char();
-                return self.lex_rational_denominator();
+                self.lex_rational_denominator()
             }
             Some('.') => {
                 self.next_char();
-                return self.lex_float_fractional();
+                self.lex_float_fractional()
             }
             _ => {
                 self.lookahead_atom_separator(LexerErrorKind::MalformedNumber)?;

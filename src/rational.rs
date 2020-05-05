@@ -101,6 +101,7 @@ impl Rational {
 impl ops::Add for Rational {
     type Output = Rational;
 
+    #[allow(clippy::suspicious_arithmetic_impl)]
     fn add(self, rhs: Rational) -> Self::Output {
         Rational::new(
             self.num * rhs.denom + self.denom * rhs.num,
@@ -128,6 +129,7 @@ impl ops::Mul for Rational {
 impl ops::Div for Rational {
     type Output = Rational;
 
+    #[allow(clippy::suspicious_arithmetic_impl)]
     fn div(self, rhs: Rational) -> Self::Output {
         self * rhs.recip()
     }
@@ -265,9 +267,9 @@ impl std::str::FromStr for Rational {
                 .parse()
                 .map_err(|_| ParseRationalError(RationalErrorKind::InvalidInt))?;
             if denominator == 0 {
-                return Err(ParseRationalError(RationalErrorKind::Zero));
-            } else if let Some(_) = parts.next() {
-                return Err(ParseRationalError(RationalErrorKind::Malformed));
+                Err(ParseRationalError(RationalErrorKind::Zero))
+            } else if parts.next().is_some() {
+                Err(ParseRationalError(RationalErrorKind::Malformed))
             } else {
                 Ok(Rational::new(numerator, denominator))
             }

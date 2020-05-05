@@ -88,18 +88,30 @@ impl<'a> LineMap<'a> {
         }
     }
 
+    /// # Examples
+    ///
+    /// ```
+    /// # use syn_txt::lang::span::{LineMap,Pos};
+    /// let s = "abc\ndefg\naäb\n";
+    /// let m = LineMap::new(s);
+    /// assert_eq!(m.pos_to_offset(m.offset_to_pos(0)), 0);
+    /// assert_eq!(m.pos_to_offset(m.offset_to_pos(3)), 3);
+    /// assert_eq!(m.pos_to_offset(m.offset_to_pos(4)), 4);
+    /// assert_eq!(m.pos_to_offset(m.offset_to_pos(10)), 10);
+    /// assert_eq!(m.pos_to_offset(m.offset_to_pos(12)), 12);
+    /// assert_eq!(m.pos_to_offset(m.offset_to_pos(13)), 13);
+    /// ```
     pub fn pos_to_offset(&self, pos: Pos) -> usize {
         let line_begin = if pos.line <= 1 {
             0
-        } else if pos.line - 1 >= self.line_offsets.len() {
+        } else if pos.line > self.line_offsets.len() {
             self.source.len()
         } else {
             self.line_offsets[pos.line - 2] + 1
         };
         let offset = self.source[line_begin..]
             .char_indices()
-            .skip(pos.column - 1)
-            .next()
+            .nth(pos.column - 1)
             .map_or(0, |(pos, _)| pos);
         line_begin + offset
     }

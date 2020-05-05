@@ -6,12 +6,13 @@ use std::path::PathBuf;
 
 use syn_txt::declare_extension_value;
 use syn_txt::lang::interpreter::{
-    ArgParser, ExtensionValue, Interpreter, InterpreterResult, IntpErr, IntpErrInfo, Value, FromValue,
+    ArgParser, ExtensionValue, FromValue, Interpreter, InterpreterResult, IntpErr, IntpErrInfo,
+    Value,
 };
 use syn_txt::lang::lexer::Lexer;
 use syn_txt::lang::parser::Parser;
 use syn_txt::lang::span::{LineMap, Span};
-use syn_txt::note::{Note, Velocity, NoteAction};
+use syn_txt::note::{Note, NoteAction, Velocity};
 use syn_txt::output;
 use syn_txt::pianoroll::{PianoRoll, Time};
 use syn_txt::rational::Rational;
@@ -20,7 +21,8 @@ use syn_txt::synth;
 use syn_txt::wave;
 
 fn main() -> io::Result<()> {
-    let filename_os = env::args_os().skip(1).next().expect("Usage: musicc <PATH>");
+    let mut args = env::args_os().skip(1); // skip the program name
+    let filename_os = args.next().expect("Usage: musicc <PATH>");
     let filename = PathBuf::from(filename_os);
 
     println!("Reading {}", filename.display());
@@ -138,7 +140,7 @@ fn play(roll: PianoRoll) -> io::Result<()> {
             player.generate(&mut audio_buffer);
             let n = output::copy_f64_bytes(&audio_buffer, &mut byte_buffer);
             assert_eq!(n, audio_buffer.len());
-            audio_stream.write(&byte_buffer)?;
+            audio_stream.write_all(&byte_buffer)?;
             samples_total += audio_buffer.len();
         }
         Ok(())
@@ -221,7 +223,7 @@ impl PianoRollValue {
             let value = args.value(intp)?;
             // Allow both notes and other piano rolls when constructing new piano rolls
             match NoteValue::from_value(value) {
-                Ok(note) =>
+                Ok(note) => {
                     if let Some(offset) = note.offset {
                         roll.add_stack_offset(
                             note.pitch,
@@ -232,13 +234,12 @@ impl PianoRollValue {
                     } else {
                         roll.add_after(note.pitch, note.length, Velocity::from_f64(note.velocity))
                     }
+                }
                 Err(other) => match PianoRollValue::from_value(other) {
                     Ok(other_roll) => roll.append(&other_roll.0),
-                    Err(_) =>
-                        return Err(IntpErr::new(args.last_span(), IntpErrInfo::Type))
-                }
+                    Err(_) => return Err(IntpErr::new(args.last_span(), IntpErrInfo::Type)),
+                },
             }
-
         }
         Ok(Value::ext(PianoRollValue(roll)))
     }

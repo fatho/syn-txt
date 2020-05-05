@@ -69,6 +69,8 @@ fn main() {
         (f1)
     "#;
 
+    println!("{}", std::mem::size_of::<Value>());
+
     run_test(input)
 }
 

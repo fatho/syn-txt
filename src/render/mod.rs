@@ -33,7 +33,7 @@ impl<'e, S: Synthesizer> SynthPlayer<'e, S> {
             .events
             .iter()
             .position(|e| e.time >= self.current_sample)
-            .unwrap_or(self.events.len());
+            .unwrap_or_else(|| self.events.len());
         self.events = &self.events[skipped..];
     }
 

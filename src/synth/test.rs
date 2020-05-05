@@ -79,7 +79,7 @@ impl TestSynth {
             handle: PlayHandle(handle.0),
             play_delay_samples: sample_delay,
             release_delay_samples: std::usize::MAX,
-            amplitude: velocity.amplitude(),
+            amplitude: velocity.as_f64(),
             sine: Oscillator::new(WaveShape::Sine, self.sample_rate, frequency),
             saw1: Oscillator::new(WaveShape::Saw, self.sample_rate, frequency * 0.5 * detune),
             saw2: Oscillator::new(WaveShape::Saw, self.sample_rate, frequency * 0.5 / detune),

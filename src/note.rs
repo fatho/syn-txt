@@ -148,34 +148,43 @@ impl Note {
 }
 
 /// The velocity of a voice indicates how hard/fast the key was pressed down.
-///
-/// Uses an integral type internally for non-NaN convenience.
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
-pub struct Velocity(u16);
+/// A normalized float between 0.0 and 1.0 inclusive.
+#[derive(Copy, Clone, Debug, PartialEq, PartialOrd)]
+pub struct Velocity(f64);
+
+impl Eq for Velocity {}
+impl Ord for Velocity {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        // we know that velocities can only be constructed as
+        self.partial_cmp(other).unwrap()
+    }
+}
 
 impl Velocity {
-    pub fn amplitude(self) -> f64 {
-        self.0 as f64 / std::u16::MAX as f64
-    }
+    pub const MAX: Velocity = Velocity(1.0);
+    pub const MIN: Velocity = Velocity(0.0);
 
-    pub fn full() -> Velocity {
-        Velocity(std::u16::MAX)
+    pub fn as_f64(self) -> f64 {
+        self.0
     }
 
     /// Convert a floating point value in the interval [0, 1] to a velocity.
+    ///
     /// # Panics
-    /// - if not 0 <= velocity <= 1.
+    ///
+    /// This function panics if `velocity` is not in the inclusive interval [0, 1].
+    ///
     /// # Examples
     ///
     /// ```
     /// use syn_txt::note::*;
     ///
-    /// assert_eq!(Velocity::from_f64(1.0), Velocity::full());
+    /// assert_eq!(Velocity::from_f64(1.0), Velocity::MAX);
     /// ```
     pub fn from_f64(velocity: f64) -> Velocity {
         if velocity.is_nan() || velocity < 0.0 || velocity > 1.0 {
             panic!("{} out of range", velocity);
         }
-        Velocity((velocity * std::u16::MAX as f64).round() as u16)
+        Velocity(velocity)
     }
 }

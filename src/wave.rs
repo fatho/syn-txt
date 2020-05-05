@@ -22,7 +22,10 @@ impl<T> Stereo<T> {
         Self { left, right }
     }
 
-    pub fn mono(mono: T) -> Self where T: Copy {
+    pub fn mono(mono: T) -> Self
+    where
+        T: Copy,
+    {
         Self::new(mono, mono)
     }
 }

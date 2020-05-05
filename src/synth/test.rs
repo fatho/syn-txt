@@ -80,22 +80,31 @@ impl TestSynth {
         let handle = self.next_play_handle();
 
         let midpoint = (self.unison as f64 - 1.0) / 2.0;
-        let mut voices = (0..self.unison).map(|index| {
-            let offset = if self.unison > 1 {
-                (index as f64 - midpoint) / midpoint
-            } else {
-                0.0
-            };
-            let detune = crate::util::from_cents(offset * self.unison_detune_cents);
-            let pan = self.pan;
-            Voice {
-                // normalized in the next step
-                gain: (-self.unison_falloff * offset.powi(2)).exp(),
-                pan,
-                oscillator: Oscillator::new(WaveShape::Saw, self.sample_rate, frequency * detune),
-            }
-        }).collect::<Vec<Voice>>();
-        let total_gain: Stereo<f64> = voices.iter().map(|v| Stereo::panned_mono(v.gain, v.pan)).sum();
+        let mut voices = (0..self.unison)
+            .map(|index| {
+                let offset = if self.unison > 1 {
+                    (index as f64 - midpoint) / midpoint
+                } else {
+                    0.0
+                };
+                let detune = crate::util::from_cents(offset * self.unison_detune_cents);
+                let pan = self.pan;
+                Voice {
+                    // normalized in the next step
+                    gain: (-self.unison_falloff * offset.powi(2)).exp(),
+                    pan,
+                    oscillator: Oscillator::new(
+                        WaveShape::Saw,
+                        self.sample_rate,
+                        frequency * detune,
+                    ),
+                }
+            })
+            .collect::<Vec<Voice>>();
+        let total_gain: Stereo<f64> = voices
+            .iter()
+            .map(|v| Stereo::panned_mono(v.gain, v.pan))
+            .sum();
         let normalized_gain = 1.0 / total_gain.left.max(total_gain.right);
         log::trace!("total unnormalized unison gain {:?}", total_gain);
         for voice in voices.iter_mut() {

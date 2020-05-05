@@ -1,0 +1,26 @@
+(define part1
+    (begin
+        (define (repeat note-name length)
+            (piano-roll
+                (note :pitch note-name :length length)
+                (note :pitch note-name :length length)
+                (note :pitch note-name :length length)
+                (note :pitch note-name :length length)
+                (note :pitch note-name :length length)
+                (note :pitch note-name :length length)
+                (note :pitch note-name :length length)
+                (note :pitch note-name :length length)
+            )
+        )
+
+        (piano-roll
+            (repeat "a4" 1/16)
+
+            (repeat "a4" 1/4)
+
+            (repeat "a4" 1/2)
+        )
+    )
+)
+
+(song :bpm 90 :notes part1)

@@ -1,0 +1,96 @@
+//! Digital filters galore
+
+/// Filter coefficients for a biquadratic filter,
+/// based on https://www.w3.org/2011/audio/audio-eq-cookbook.html.
+#[derive(Debug, Clone)]
+pub struct BiquadCoefficients {
+    pub b0: f64,
+    pub b1: f64,
+    pub b2: f64,
+    pub a1: f64,
+    pub a2: f64,
+}
+
+impl BiquadCoefficients {
+    /// The identity filter that lets the signal pass unchanged.
+    pub fn allpass() -> Self {
+        Self {
+            b0: 1.0,
+            b1: 0.0,
+            b2: 0.0,
+            a1: 0.0,
+            a2: 0.0,
+        }
+    }
+
+    /// Lowpass filter with the given cutoff frequency and Q factor
+    pub fn lowpass(sample_rate: f64, cutoff: f64, q: f64) -> Self {
+        let omega0 = 2.0 * std::f64::consts::PI * cutoff / sample_rate;
+        let (sin_omega, cos_omega) = omega0.sin_cos();
+        let alpha = sin_omega / (2.0 * q);
+        let a0 = 1.0 + alpha;
+        let a0_inv = 1.0 / a0;
+        Self {
+            b0: a0_inv * (1.0 - cos_omega) / 2.0,
+            b1: a0_inv * (1.0 - cos_omega),
+            b2: a0_inv * (1.0 - cos_omega) / 2.0,
+            a1: a0_inv * (-2.0 * cos_omega),
+            a2: a0_inv * (1.0 - alpha),
+        }
+    }
+}
+
+/// Biquadratic filter with four delay gates, based on https://www.w3.org/2011/audio/audio-eq-cookbook.html.
+#[derive(Debug, Clone)]
+pub struct Biquad {
+    x1: f64,
+    x2: f64,
+    y1: f64,
+    y2: f64,
+}
+
+impl Biquad {
+    pub fn new() -> Self {
+        Self {
+            x1: 0.0,
+            x2: 0.0,
+            y1: 0.0,
+            y2: 0.0,
+        }
+    }
+
+    /// Feed the next value through the filter using the given coefficients.
+    pub fn step(&mut self, c: &BiquadCoefficients, input: f64) -> f64 {
+        let output = c.b0 * input +  c.b1 * self.x1 +  c.b2 * self.x2 - c.a1 * self.y1 - c.a2 * self.y2;
+        self.x2 = self.x1;
+        self.x1 = input;
+        self.y2 = self.y1;
+        self.y1 = output;
+        output
+    }
+}
+
+// Alternative form of the biquad filter:
+
+// #[derive(Debug, Clone)]
+// pub struct Biquad {
+//     w1: f64,
+//     w2: f64,
+// }
+
+// impl Biquad {
+//     pub fn new() -> Self {
+//         Self {
+//             w1: 0.0,
+//             w2: 0.0,
+//         }
+//     }
+
+//     pub fn step(&mut self, c: &BiquadCoefficients, input: f64) -> f64 {
+//         let w0 = input - c.a1 * self.w1 - c.a2 * self.w2;
+//         let output = c.b0 * w0 + c.b1 * self.w1 + c.b2 * self.w2;
+//         self.w2 = self.w1;
+//         self.w1 = w0;
+//         output
+//     }
+// }

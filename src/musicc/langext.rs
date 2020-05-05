@@ -11,6 +11,8 @@ use crate::rational::Rational;
 use std::{iter::FromIterator, rc::Rc};
 
 pub static PRIMOPS: &[(&str, PrimOp)] = &[
+    // `NotePitch` type
+    ("transpose", PrimOp(NotePitch::prim_transpose)),
     // `Note` type
     ("note", PrimOp(NoteValue::prim_new)),
     // `PianoRoll` type
@@ -96,11 +98,43 @@ impl From<NotePitch> for Note {
 
 impl FromValue for NotePitch {
     fn from_value(value: Value) -> Result<Self, Value> {
-        let name: String = String::from_value(value)?;
-        if let Some(note) = Note::named_str(&name) {
-            Ok(NotePitch(note))
+        // Allow both names and Midi indexes
+        // Try int first, because otherwise the int gets converted to a string
+        log::trace!("NotePitch::from_value({:?})", value);
+        i64::from_value(value)
+            .and_then(|midi| {
+                Note::try_from_midi(midi)
+                    .map(NotePitch)
+                    .ok_or(Value::Int(midi))
+            })
+            .or_else(|value| {
+                String::from_value(value).and_then(|name| {
+                    log::trace!("NotePitch::from_value({})", name);
+                    if let Some(note) = Note::named_str(&name) {
+                        Ok(NotePitch(note))
+                    } else {
+                        Err(Value::Str(name))
+                    }
+                })
+            })
+    }
+}
+
+impl NotePitch {
+    fn to_value(self) -> Value {
+        Value::Int(self.0.to_midi() as i64)
+    }
+
+    pub fn prim_transpose(intp: &mut Interpreter, mut args: ArgParser) -> InterpreterResult<Value> {
+        let note = args.extract::<NotePitch>(intp)?;
+        let amount = args.extract::<i64>(intp)?;
+        if let Some(new_note) = Note::try_from_midi(note.0.to_midi() as i64 + amount) {
+            Ok(NotePitch(new_note).to_value())
         } else {
-            Err(Value::Str(name))
+            Err(IntpErr::new(
+                args.list_span(),
+                IntpErrInfo::Other(format!("transposed pitch exceeds MIDI range")),
+            ))
         }
     }
 }

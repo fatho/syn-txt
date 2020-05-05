@@ -5,6 +5,7 @@ pub enum WaveShape {
 }
 
 /// An oscillator sampling a wave of some shape at a fixed sample rate.
+#[derive(Debug)]
 pub struct Oscillator {
     shape: WaveShape,
     sample_rate: f64,
@@ -31,8 +32,9 @@ impl Oscillator {
             self.phase_offset -= 1.0;
         }
         // Compute wave
+        use std::f64::consts::PI;
         match self.shape {
-            WaveShape::Sine => (phase * 2.0 * std::f64::consts::PI).sin(),
+            WaveShape::Sine => (phase * 2.0 * PI).sin(),
             WaveShape::Saw => 2.0 * phase - 1.0,
         }
     }

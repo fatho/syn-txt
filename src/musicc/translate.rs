@@ -2,13 +2,12 @@
 
 use std::io;
 
-use log::info;
+use log::{info, trace};
 
 use crate::musicc::langext::SongValue;
-use crate::note::NoteAction;
+use crate::note::{Note, Velocity};
 use crate::output;
 use crate::pianoroll::Time;
-use crate::render;
 use crate::synth;
 use crate::wave;
 
@@ -29,63 +28,77 @@ pub fn play(song: SongValue) -> io::Result<()> {
             / bpm as f64
     };
 
-    let mut events = Vec::new();
     let roll = &song.notes.0;
-    for pn in roll.iter() {
-        let note = pn.note;
-        let velocity = pn.velocity;
-        let play = synth::Event {
-            time: time_to_sample(pn.start),
-            action: NoteAction::Play { note, velocity },
-        };
-        let release = synth::Event {
-            time: time_to_sample(pn.start + pn.duration),
-            action: NoteAction::Release { note },
-        };
+    // iterate the notes in the piano roll in order, and convert timing to samples
+    let mut note_iter: std::iter::Peekable<_> = roll
+        .iter()
+        .map(|note| QueuedPlay {
+            begin_sample: time_to_sample(note.start),
+            end_sample: time_to_sample(note.start + note.duration),
+            note: note.note,
+            velocity: note.velocity,
+        })
+        .peekable();
 
-        events.push(play);
-        events.push(release);
-    }
+    let max_samples = time_to_sample(roll.length()) + 2 * sample_rate as usize;
 
-    events.sort_by_key(|evt| evt.time);
-
-    let max_samples = time_to_sample(roll.length()) + sample_rate as usize;
-
-    info!(
-        "playing {} events at {} bpm at {} Hz",
-        events.len(),
-        bpm,
-        sample_rate
-    );
+    info!("playing at {} bpm at {} Hz", bpm, sample_rate);
     info!(
         "total length {} samples ({:.2} seconds)",
         max_samples,
-        time_to_seconds(roll.length()) + 1.0
+        time_to_seconds(roll.length()) + 2.0
     );
 
     // 10 ms buffer at 44100 Hz
     let buffer_size = 441;
 
-    let synth = synth::test::TestSynth::new(0, sample_rate as f64);
-    let mut player = render::SynthPlayer::new(synth, &events);
+    let mut synth = synth::test::TestSynth::new(sample_rate as f64);
 
-    crate::output::sox::with_sox_player(sample_rate as i32, |audio_stream| {
-        let mut audio_buffer: Vec<wave::Stereo<f64>> = vec![
-            wave::Stereo {
-                left: 0.0,
-                right: 0.0
-            };
-            buffer_size
-        ];
-        let mut byte_buffer = vec![0u8; buffer_size * 2 * 8];
+    output::sox::with_sox_player(sample_rate as i32, |audio_stream| {
+        let mut audio_buffer = AudioBuffer::new(buffer_size);
+        let mut byte_buffer = vec![0u8; audio_buffer.byte_len()];
+
+        // heap to keep track of currently playing notes
+        let mut releases = std::collections::BinaryHeap::new();
 
         let mut samples_total = 0;
         while samples_total < max_samples {
-            audio_buffer
-                .iter_mut()
-                .for_each(|s| *s = wave::Stereo::new(0.0, 0.0));
-            player.generate(&mut audio_buffer);
-            let n = output::copy_f64_bytes(&audio_buffer, &mut byte_buffer);
+            let window_start = samples_total;
+            let window_end = samples_total + audio_buffer.len();
+
+            audio_buffer.fill_zero();
+
+            // process all notes that are due in the current window
+            while let Some(note) = next_if(&mut note_iter, |n| n.begin_sample < window_end) {
+                let handle =
+                    synth.play_note(note.begin_sample - window_start, note.note, note.velocity);
+                trace!(
+                    "{:7}: play {:?} as {:?}",
+                    note.begin_sample,
+                    note.note,
+                    handle
+                );
+                releases.push(QueuedRelease {
+                    time: note.end_sample,
+                    note_handle: handle,
+                });
+            }
+            // process all note releases that are due in the current window
+            // NOTE: must be done after processing the notes to play in order
+            // to catch notes that last shorter than one buffer window.
+            while let Some(release) = releases.peek() {
+                if release.time < window_end {
+                    trace!("{:7}: release {:?}", release.time, release.note_handle);
+                    let release = releases.pop().unwrap();
+                    synth.release_note(release.time - window_start, release.note_handle)
+                } else {
+                    break;
+                }
+            }
+
+            synth.fill_buffer(audio_buffer.samples_mut());
+
+            let n = audio_buffer.copy_bytes_to(&mut byte_buffer);
             assert_eq!(n, audio_buffer.len());
             audio_stream.write_all(&byte_buffer)?;
             samples_total += audio_buffer.len();
@@ -93,4 +106,107 @@ pub fn play(song: SongValue) -> io::Result<()> {
 
         Ok(())
     })
+}
+
+fn next_if<Item, I: Iterator<Item = Item>, F: Fn(&Item) -> bool>(
+    iter: &mut std::iter::Peekable<I>,
+    predicate: F,
+) -> Option<Item> {
+    if let Some(preview) = iter.peek() {
+        if predicate(preview) {
+            return iter.next();
+        }
+    }
+    None
+}
+
+pub struct QueuedPlay {
+    begin_sample: usize,
+    end_sample: usize,
+    note: Note,
+    velocity: Velocity,
+}
+
+pub struct QueuedRelease {
+    time: usize,
+    note_handle: synth::test::PlayHandle,
+}
+
+impl PartialEq for QueuedRelease {
+    fn eq(&self, other: &Self) -> bool {
+        self.time == other.time
+    }
+}
+
+impl Eq for QueuedRelease {}
+
+impl PartialOrd for QueuedRelease {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for QueuedRelease {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        // the smallest release time is the largest queued release for the max heap
+        other.time.cmp(&self.time)
+    }
+}
+
+pub struct AudioBuffer {
+    samples: Vec<wave::Stereo<f64>>,
+}
+
+#[allow(clippy::len_without_is_empty)]
+impl AudioBuffer {
+    pub fn new(sample_count: usize) -> Self {
+        Self {
+            samples: vec![
+                wave::Stereo {
+                    left: 0.0,
+                    right: 0.0
+                };
+                sample_count
+            ],
+        }
+    }
+
+    pub fn fill_zero(&mut self) {
+        self.samples
+            .iter_mut()
+            .for_each(|s| *s = wave::Stereo::new(0.0, 0.0));
+    }
+
+    pub fn len(&self) -> usize {
+        self.samples.len()
+    }
+
+    pub fn byte_len(&self) -> usize {
+        self.len() * 2 * std::mem::size_of::<f64>()
+    }
+
+    pub fn samples(&self) -> &[wave::Stereo<f64>] {
+        &self.samples
+    }
+
+    pub fn samples_mut(&mut self) -> &mut [wave::Stereo<f64>] {
+        &mut self.samples
+    }
+
+    /// Copy the stereo `f64` samples to bytes, interleaving the left and right samples.
+    ///
+    /// Could probably be implemented with some sort of unsafe transmute,
+    /// but copying is safe and likely not the bottleneck.
+    ///
+    /// Returns the number of samples that were actually copied.
+    /// Might be less than the number of input samples if the output buffer was not large enough.
+    pub fn copy_bytes_to(&self, bytes: &mut [u8]) -> usize {
+        let mut processed = 0;
+        for (sample, target) in self.samples.iter().zip(bytes.chunks_exact_mut(16)) {
+            target[0..8].copy_from_slice(&sample.left.to_le_bytes());
+            target[8..16].copy_from_slice(&sample.right.to_le_bytes());
+            processed += 1;
+        }
+        processed
+    }
 }

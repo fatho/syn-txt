@@ -1,11 +1,11 @@
 (define part1
     (begin
         ; Define a function that plays a "de-du", first playing the given note,
-        ; always immediately followed by an "e4"
+        ; always immediately followed by an "e3"
         (define (dedu note-name)
             (piano-roll
                 (note :pitch note-name :length 1/16)
-                (note :pitch "e4" :length 1/16 :velocity 0.3)
+                (note :pitch "e3" :length 1/16 :velocity 0.3)
             )
         )
 
@@ -24,23 +24,23 @@
         ; flats are denoted as `b` or `♭` (e.g. `eb3`).
         (define part1-1
             (piano-roll
-                (dedu "A4")
-                (dedu "B4")
-                (dedu "C5")
-                (dedu "B4")
-                (dedu "A4")
-                (dedu "C5")            
+                (dedu "A3")
+                (dedu "B3")
+                (dedu "C4")
+                (dedu "B3")
+                (dedu "A3")
+                (dedu "C4")            
             )
         )
 
         (define part1-2
             (piano-roll
-                (dedu "B4")
-                (dedu "A4")
-                (dedu "G4")
-                (dedu "A4")
-                (dedu "B4")
-                (dedu "E5")
+                (dedu "B3")
+                (dedu "A3")
+                (dedu "G3")
+                (dedu "A3")
+                (dedu "B3")
+                (dedu "E4")
             )
         )
 
@@ -59,14 +59,6 @@
                 part1-2
                 (left-basic "b2" "b3")
             )
-
-            (note :pitch "e4" :length 3/4 :velocity 0.5)
-            ; These three notes don't start *after* the previous note ended,
-            ; but together with it, as denoted by the zero `offset`.
-            ; The offset can be any non-negative integer or rational.
-            (note :pitch "a4" :length 3/4 :velocity 0.5 :offset 0)
-            (note :pitch "c5" :length 3/4 :velocity 0.5 :offset 0)
-            (note :pitch "e5" :length 3/4 :velocity 0.5 :offset 0)
         )
     )
 )

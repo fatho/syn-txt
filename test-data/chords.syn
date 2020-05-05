@@ -1,0 +1,20 @@
+(define part1
+    (begin
+        (define (chord length a b c)
+            (piano-roll/stack
+                (note :pitch a :length length)
+                (note :pitch b :length length)
+                (note :pitch c :length length)
+            )
+        )
+
+        (piano-roll
+            (chord 1/1 "a2" "c3" "e3")
+            (chord 1/1 "a2" "d3" "f3")
+            (chord 1/1 "g#2" "b3" "e3")
+            (chord 1/1 "a2" "c3" "e3")
+        )
+    )
+)
+
+(song :bpm 90 :notes part1)

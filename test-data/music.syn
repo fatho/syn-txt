@@ -1,55 +1,55 @@
-(define part1-1
-    (piano-roll
-        (note :pitch "A4" :length 1/16)
-        (note :pitch "e4" :length 1/16 :velocity 0.3)
-        (note :pitch "B4" :length 1/16)
-        (note :pitch "e4" :length 1/16 :velocity 0.3)
-        (note :pitch "C5" :length 1/16)
-        (note :pitch "e4" :length 1/16 :velocity 0.3)
-        (note :pitch "B4" :length 1/16)
-        (note :pitch "e4" :length 1/16 :velocity 0.3)
-        (note :pitch "A4" :length 1/16)
-        (note :pitch "e4" :length 1/16 :velocity 0.3)
-        (note :pitch "C5" :length 1/16)
-        (note :pitch "e4" :length 1/16 :velocity 0.3)
-    )
-)
+(define part1
+    (begin
+        ; Define a function that plays a "di-du", first playing the given note,
+        ; always immediately followed by an "e4"
+        (define didu
+            (lambda (note-name)
+                (piano-roll
+                    (note :pitch note-name :length 1/16)
+                    (note :pitch "e4" :length 1/16 :velocity 0.3)
+                )
+            ))
 
-(define part1-2
-    (piano-roll
         ; The note pitch is denoted using the standard 12-tone chromatic scale
         ; Capitalization does not matter, sharps are denoted as `#` or `♯` (e.g `a♯5`),
         ; flats are denoted as `b` or `♭` (e.g. `eb3`).
-        (note :pitch "B4" :length 1/16)
-        (note :pitch "e4" :length 1/16 :velocity 0.3)
-        (note :pitch "A4" :length 1/16)
-        (note :pitch "e4" :length 1/16 :velocity 0.3)
-        (note :pitch "G4" :length 1/16)
-        (note :pitch "e4" :length 1/16 :velocity 0.3)
-        (note :pitch "A4" :length 1/16)
-        (note :pitch "e4" :length 1/16 :velocity 0.3)
-        (note :pitch "B4" :length 1/16)
-        (note :pitch "e4" :length 1/16 :velocity 0.3)
-        (note :pitch "E5" :length 1/16)
-        (note :pitch "e4" :length 1/16 :velocity 0.3)
-    )
-)
+        (define part1-1
+            (piano-roll
+                (didu "A4")
+                (didu "B4")
+                (didu "C5")
+                (didu "B4")
+                (didu "A4")
+                (didu "C5")            
+            )
+        )
 
-(define part1
-    (piano-roll
-        ; Piano rolls can be made from other piano rolls
-        part1-1
-        ; and even the same one multiple times
-        part1-2
-        part1-2
+        (define part1-2
+            (piano-roll
+                (didu "B4")
+                (didu "A4")
+                (didu "G4")
+                (didu "A4")
+                (didu "B4")
+                (didu "E5")
+            )
+        )
 
-        (note :pitch "e4" :length 3/4 :velocity 0.5)
-        ; These three notes don't start *after* the previous note ended,
-        ; but together with it, as denoted by the zero `offset`.
-        ; The offset can be any non-negative integer or rational.
-        (note :pitch "a4" :length 3/4 :velocity 0.5 :offset 0)
-        (note :pitch "c5" :length 3/4 :velocity 0.5 :offset 0)
-        (note :pitch "e5" :length 3/4 :velocity 0.5 :offset 0)
+        (piano-roll
+            ; Piano rolls can be made from other piano rolls
+            part1-1
+            ; and even the same one multiple times
+            part1-2
+            part1-2
+
+            (note :pitch "e4" :length 3/4 :velocity 0.5)
+            ; These three notes don't start *after* the previous note ended,
+            ; but together with it, as denoted by the zero `offset`.
+            ; The offset can be any non-negative integer or rational.
+            (note :pitch "a4" :length 3/4 :velocity 0.5 :offset 0)
+            (note :pitch "c5" :length 3/4 :velocity 0.5 :offset 0)
+            (note :pitch "e5" :length 3/4 :velocity 0.5 :offset 0)
+        )
     )
 )
 

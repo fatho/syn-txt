@@ -1,5 +1,8 @@
 //! Primitive operations exposed in the interpreter.
 
+use std::rc::Rc;
+
+use super::ast;
 use super::interpreter::*;
 use crate::rational::Rational;
 
@@ -26,6 +29,45 @@ pub fn begin(intp: &mut Interpreter, mut args: ArgParser) -> InterpreterResult<V
     // ensure that we always pop the scope, even if the evaluation errored out
     intp.pop_scope();
     result
+}
+
+/// Interprets the `(lambda (args) expr)` construct for creating a closure.
+pub fn lambda(intp: &mut Interpreter, mut args: ArgParser) -> InterpreterResult<Value> {
+    // Parse the parameter list
+    let arg_parameters = args.symbolic()?;
+    let mut parameters = Vec::new();
+    if let ast::SymExp::List(arg_list) = &arg_parameters.exp {
+        for e in arg_list {
+            if let ast::SymExp::Variable(ident) = &e.exp {
+                if parameters.contains(ident) {
+                    return Err(IntpErr::new(
+                        e.src,
+                        IntpErrInfo::Redefinition(ident.clone()),
+                    ));
+                } else {
+                    parameters.push(ident.clone());
+                }
+            } else {
+                return Err(IntpErr::new(e.src, IntpErrInfo::IncompatibleArguments));
+            }
+        }
+    } else {
+        return Err(IntpErr::new(
+            args.last_span(),
+            IntpErrInfo::IncompatibleArguments,
+        ));
+    }
+
+    // Parse the lambda expression
+    let lambda_expr = args.symbolic()?;
+
+    // Build the closure
+    let closure = Closure {
+        captured_scope: intp.scope_stack().clone(),
+        parameters,
+        code: lambda_expr.clone(),
+    };
+    Ok(Value::Closure(Rc::new(closure)))
 }
 
 /// Define a variable in the current top-most scope.
@@ -56,7 +98,7 @@ pub fn set(intp: &mut Interpreter, mut args: ArgParser) -> InterpreterResult<Val
         Err(_) => Err(IntpErr::new(
             args.list_span(),
             IntpErrInfo::NoSuchVariable(var.clone()),
-        ))
+        )),
     }
 }
 

@@ -67,6 +67,25 @@ fn main() {
         (define f2 (foo/new))
         (print f1 f2)
         (f1)
+
+        (define plus-one
+            (lambda (x) (+ x 1)))
+        (plus-one 2)
+
+        (define global-state 0)
+        (define get-global
+            (lambda ()
+                (begin
+                    (define ret global-state)
+                    (set! global-state (+ ret 1))
+                    ret
+                )
+            )
+        )
+        (get-global)
+        (get-global)
+        (get-global)
+        global-state
     "#;
 
     println!("{}", std::mem::size_of::<Value>());
@@ -105,7 +124,8 @@ fn run_test(input: &str) {
     let extension_state = Rc::new(RefCell::new(0));
     int.register_primop_ext("foo/new", move |intp, args| {
         foo_ext_foo_new(&mut *extension_state.borrow_mut(), intp, args)
-    }).unwrap();
+    })
+    .unwrap();
 
     for s in ast {
         println!("{}", &input[s.src.begin..s.src.end]);

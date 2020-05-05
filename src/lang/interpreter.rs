@@ -1,6 +1,6 @@
-use std::collections::HashMap;
-use std::{fmt, rc::Rc, cell::RefCell};
 use log::warn;
+use std::collections::HashMap;
+use std::{cell::RefCell, fmt, rc::Rc};
 
 use super::ast;
 use super::primops;
@@ -93,6 +93,7 @@ impl Interpreter {
             // syntax
             ("begin", PrimOp(primops::begin)),
             ("define", PrimOp(primops::define)),
+            ("lambda", PrimOp(primops::lambda)),
             ("set!", PrimOp(primops::set)),
             // operators
             ("+", PrimOp(primops::add)),
@@ -125,7 +126,10 @@ impl Interpreter {
         let val = Value::FnPrim(PrimOp(op));
         if let Some((var, _val)) = self.builtins.borrow_mut().define(var, val) {
             // TODO: allow None as location
-            Err(IntpErr::new(Span { begin: 0, end: 0 }, IntpErrInfo::Redefinition(var)))
+            Err(IntpErr::new(
+                Span { begin: 0, end: 0 },
+                IntpErrInfo::Redefinition(var),
+            ))
         } else {
             Ok(())
         }
@@ -139,7 +143,10 @@ impl Interpreter {
         let val = Value::ext_closure(op);
         if let Some((var, _val)) = self.builtins.borrow_mut().define(var, val) {
             // TODO: allow None as location
-            Err(IntpErr::new(Span { begin: 0, end: 0 }, IntpErrInfo::Redefinition(var)))
+            Err(IntpErr::new(
+                Span { begin: 0, end: 0 },
+                IntpErrInfo::Redefinition(var),
+            ))
         } else {
             Ok(())
         }
@@ -192,11 +199,39 @@ impl Interpreter {
             .first()
             .ok_or_else(|| IntpErr::new(span, IntpErrInfo::Uncallable))?;
         let head = self.eval(head_exp)?;
-        let args = ArgParser::new(span, &list[1..]);
+        let mut args = ArgParser::new(span, &list[1..]);
 
         match head {
             Value::FnPrim(PrimOp(prim_fn)) => prim_fn(self, args),
             Value::Ext(val) => val.0.call(self, args),
+            Value::Closure(clos) => {
+                // Create a new scope inside the captured scope and define the arguments
+                let mut scope_stack = Scope::nest(clos.captured_scope.clone());
+                for param_var in clos.parameters.iter() {
+                    if let Some((var, _)) = scope_stack.define(param_var.clone(), args.value(self)?)
+                    {
+                        // the `lambda` prim op ensures that the parameter names are unique,
+                        // but the interpreter host might have sneaked in an invalid closure.
+                        // TODO: ensure invariants in `Closure`
+                        return Err(IntpErr::new(
+                            args.last_span(),
+                            IntpErrInfo::Other(format!(
+                                "closure redefined parameter name {}",
+                                var.0
+                            )),
+                        ));
+                    }
+                }
+
+                let mut closure_interpreter = Self {
+                    // the closure has captured the built-ins at creation time,
+                    // this built-in scope is just a dummy value
+                    builtins: Scope::new().into_ref(),
+                    scope_stack: scope_stack.into_ref(),
+                };
+
+                closure_interpreter.eval(&clos.code)
+            }
             _ => Err(IntpErr::new(head_exp.src, IntpErrInfo::Uncallable)),
         }
     }
@@ -309,6 +344,7 @@ pub type ScopeRef = Rc<RefCell<Scope>>;
 
 /// A binding scope for variables.
 /// Scopes are lexially nested, and inner scopes have precedence before outer scopes.
+#[derive(Debug, PartialEq, Clone)]
 pub struct Scope {
     bindings: HashMap<ast::Ident, Value>,
     outer: Option<ScopeRef>,
@@ -424,6 +460,7 @@ pub enum Value {
     /// A value provided by an interpreter extension.
     /// Interpretation of it is up to the extension.
     Ext(ExtVal),
+    Closure(Rc<Closure>),
 }
 
 impl Value {
@@ -438,6 +475,20 @@ impl Value {
     {
         Value::ext(ExtClosure(fun))
     }
+}
+
+/// A closure is a piece of code that has captured its environment and
+/// can be called with arguments.
+#[derive(Debug, PartialEq, Clone)]
+pub struct Closure {
+    /// The current scope stack at the point when the closure was made.
+    /// Note: mutating variables in these scopes affects the closure as well.
+    pub captured_scope: ScopeRef,
+    /// Name of the parameters that must be passed to the closure when calling it.
+    /// The names must be unique.
+    pub parameters: Vec<ast::Ident>,
+    /// The code to execute when calling the closure
+    pub code: ast::SymExpSrc,
 }
 
 /// Wrapper for extension values that relays the `PartialEq` implementation to `partial_eq`.
@@ -681,6 +732,93 @@ mod test {
                 Ok(Value::Float(3.14)),
                 Err(IntpErrInfo::NoSuchVariable(ast::Ident("bar".to_owned()))),
                 Err(IntpErrInfo::NoSuchVariable(ast::Ident("foo".to_owned()))),
+            ],
+        )
+    }
+
+    #[test]
+    fn test_closure_stateless() {
+        expect_values_or_errors(
+            r#"
+            (define plus-one
+                (lambda (x) (+ x 1)))
+            (plus-one 2)
+            (plus-one 3)
+            "#,
+            &[Ok(Value::Unit), Ok(Value::Int(3)), Ok(Value::Int(4))],
+        )
+    }
+
+    /// Test that closures can capture global state and any mutations
+    /// from either inside or outside the closure can be seen elsewhere.
+    #[test]
+    fn test_closure_global_state() {
+        expect_values_or_errors(
+            r#"
+            (define global-state 0)
+            (define get-global
+                (lambda ()
+                    (begin
+                        (define ret global-state)
+                        (set! global-state (+ ret 1))
+                        ret
+                    )
+                )
+            )
+            (get-global)
+            (get-global)
+            (set! global-state 10)
+            (get-global)
+            global-state
+            "#,
+            &[
+                Ok(Value::Unit),
+                Ok(Value::Unit),
+                Ok(Value::Int(0)),
+                Ok(Value::Int(1)),
+                Ok(Value::Unit),
+                Ok(Value::Int(10)),
+                Ok(Value::Int(11)),
+            ],
+        )
+    }
+
+    /// Test that closures can capture scopes that are subsequently popped,
+    /// never to be seen again.
+    #[test]
+    fn test_closure_hidden_state() {
+        expect_values_or_errors(
+            r#"
+            ; A closure that, when called, creates a new fresh closure
+            (define make-counter
+                (lambda (initial-count)
+                    (begin
+                        (define counter initial-count)
+                        (lambda ()
+                            (begin
+                                (define count counter)
+                                (set! counter (+ 1 count))
+                                count
+                            ))
+                    )))
+
+            (define c1 (make-counter 0))
+            (define c2 (make-counter 3))
+            (c1)
+            (c1)
+            (c2)
+            (c2)
+            (c1)
+            "#,
+            &[
+                Ok(Value::Unit),
+                Ok(Value::Unit),
+                Ok(Value::Unit),
+                Ok(Value::Int(0)),
+                Ok(Value::Int(1)),
+                Ok(Value::Int(3)),
+                Ok(Value::Int(4)),
+                Ok(Value::Int(2)),
             ],
         )
     }

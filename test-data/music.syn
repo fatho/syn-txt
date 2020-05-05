@@ -9,6 +9,16 @@
             )
         )
 
+        ; Define a simple melody for the left hand based on two notes
+        (define (left-basic n1 n2)
+            (piano-roll
+                (note :pitch n1 :length 3/4 :velocity 0.3)
+                (note :pitch n2 :length 1/4 :velocity 0.3 :offset 0)
+                (note :pitch n2 :length 1/4 :velocity 0.3 :offset 1/4)
+                (note :pitch n2 :length 1/4 :velocity 0.3 :offset 1/4)
+            )
+        )
+
         ; The note pitch is denoted using the standard 12-tone chromatic scale
         ; Capitalization does not matter, sharps are denoted as `#` or `♯` (e.g `a♯5`),
         ; flats are denoted as `b` or `♭` (e.g. `eb3`).
@@ -36,10 +46,19 @@
 
         (piano-roll
             ; Piano rolls can be made from other piano rolls
-            part1-1
+            (piano-roll/stack
+                part1-1
+                (left-basic "a2" "a3")
+            )
             ; and even the same one multiple times
-            part1-2
-            part1-2
+            (piano-roll/stack
+                part1-2
+                (left-basic "b2" "b3")
+            )
+            (piano-roll/stack
+                part1-2
+                (left-basic "b2" "b3")
+            )
 
             (note :pitch "e4" :length 3/4 :velocity 0.5)
             ; These three notes don't start *after* the previous note ended,

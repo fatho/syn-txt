@@ -6,14 +6,16 @@ use crate::lang::interpreter::{
     PrimOp, Value,
 };
 use crate::note::{Note, Velocity};
-use crate::pianoroll::PianoRoll;
+use crate::pianoroll::{PianoRoll, PlayedNote};
 use crate::rational::Rational;
+use std::iter::FromIterator;
 
-pub static PRIMOPS: &'static [(&'static str, PrimOp)] = &[
+pub static PRIMOPS: &[(&str, PrimOp)] = &[
     // Note type
     ("note", PrimOp(NoteValue::prim_new)),
     // PianoRoll type
     ("piano-roll", PrimOp(PianoRollValue::prim_new)),
+    ("piano-roll/stack", PrimOp(PianoRollValue::prim_stack)),
 ];
 
 #[derive(Debug, Clone, PartialEq)]
@@ -104,5 +106,28 @@ impl PianoRollValue {
             }
         }
         Ok(Value::ext(PianoRollValue(roll)))
+    }
+
+    /// Stack multiple piano rolls on top of each other, resulting in them all playing at once.
+    pub fn prim_stack(intp: &mut Interpreter, mut args: ArgParser) -> InterpreterResult<Value> {
+        let mut notes: Vec<PlayedNote> = Vec::new();
+
+        while !args.is_empty() {
+            let value = args.value(intp)?;
+            // Allow both notes and other piano rolls when constructing new piano rolls
+            match NoteValue::from_value(value) {
+                Ok(note) => notes.push(PlayedNote {
+                    note: note.pitch,
+                    velocity: Velocity::from_f64(note.velocity),
+                    start: note.offset.unwrap_or(Rational::ZERO),
+                    duration: note.length,
+                }),
+                Err(other) => match PianoRollValue::from_value(other) {
+                    Ok(other_roll) => notes.extend(other_roll.0.iter().cloned()),
+                    Err(_) => return Err(IntpErr::new(args.last_span(), IntpErrInfo::Type)),
+                },
+            }
+        }
+        Ok(Value::ext(PianoRollValue(PianoRoll::from_iter(notes))))
     }
 }

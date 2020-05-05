@@ -19,6 +19,8 @@ pub struct Rational {
 }
 
 impl Rational {
+    pub const ZERO: Rational = Rational { num: 0, denom: 1};
+
     // ==================== Constructors ====================
 
     /// Create a new rational from a potentially unnormalized fraction.

@@ -97,6 +97,16 @@ impl PianoRoll {
         self.length += other.length;
     }
 
+    /// Merge the other piano roll into this one without changing note offsets,
+    /// effectively playing both at the same time.
+    pub fn stack_extend(&mut self, other: &PianoRoll) {
+        // NOTE: this can probably be made more efficient than O(n log n)
+        self.notes.extend(other.notes.iter().cloned());
+        self.notes.sort_by_key(|note| note.start);
+
+        self.length = self.length.max(other.length);
+    }
+
     /// Iterate all notes on this piano roll in the order they are played.
     pub fn iter(&self) -> impl Iterator<Item = &PlayedNote> {
         self.notes.iter()
@@ -110,5 +120,17 @@ impl PianoRoll {
 impl Default for PianoRoll {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl std::iter::FromIterator<PlayedNote> for PianoRoll {
+    fn from_iter<T: IntoIterator<Item = PlayedNote>>(iter: T) -> Self {
+        let mut length = Rational::zero();
+        let mut notes: Vec<PlayedNote> = iter
+            .into_iter()
+            .inspect(|p| length = length.max(p.start + p.duration))
+            .collect();
+        notes.sort_by_key(|p| p.start);
+        Self { length, notes }
     }
 }

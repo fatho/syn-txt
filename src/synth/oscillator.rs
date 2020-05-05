@@ -2,6 +2,7 @@
 pub enum WaveShape {
     Sine,
     Saw,
+    SuperSaw,
 }
 
 /// An oscillator sampling a wave of some shape at a fixed sample rate.
@@ -36,6 +37,14 @@ impl Oscillator {
         match self.shape {
             WaveShape::Sine => (phase * 2.0 * PI).sin(),
             WaveShape::Saw => 2.0 * phase - 1.0,
+            WaveShape::SuperSaw => {
+                let slope = 3.0;
+                if phase < 0.5 {
+                    slope * phase - 1.0
+                } else {
+                    1.0 + slope * (phase - 1.0)
+                }
+            }
         }
     }
 }

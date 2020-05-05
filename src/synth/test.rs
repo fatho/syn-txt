@@ -50,12 +50,12 @@ impl TestSynth {
             // voice settings
             pan: 0.0,
             unison: 3,
-            unison_detune_cents: 10.0,
+            unison_detune_cents: 15.0,
             unison_falloff: 0.0,
             tuning: Tuning::default(),
             // volume
             envelope: ADSR {
-                attack: 0.05,
+                attack: 0.01,
                 decay: 0.0,
                 sustain: 1.0,
                 release: 0.1,
@@ -105,7 +105,7 @@ impl TestSynth {
                     gain: (-self.unison_falloff * offset.powi(2)).exp(),
                     pan,
                     oscillator: Oscillator::new(
-                        WaveShape::Saw,
+                        WaveShape::SuperSaw,
                         self.sample_rate,
                         frequency * detune,
                     ),

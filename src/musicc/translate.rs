@@ -204,7 +204,7 @@ impl AudioBuffer {
         let mut processed = 0;
         for (sample, target) in self.samples.iter().zip(bytes.chunks_exact_mut(16)) {
             target[0..8].copy_from_slice(&sample.left.to_le_bytes());
-            target[8..16].copy_from_slice(&sample.left.to_le_bytes());
+            target[8..16].copy_from_slice(&sample.right.to_le_bytes());
             processed += 1;
         }
         processed

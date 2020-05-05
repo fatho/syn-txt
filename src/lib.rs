@@ -7,6 +7,7 @@ pub mod note;
 pub mod pianoroll;
 pub mod synth;
 pub mod wave;
+pub mod util;
 
 // audio I/O
 pub mod output;

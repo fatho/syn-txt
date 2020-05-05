@@ -19,44 +19,47 @@ pub struct TestSynth {
     /// Output gain of the synthesizer
     gain: f64,
 
-    // /// Number of oscillators per voice
-    // unison: usize,
-    // /// Detune offset for each additional unison voice
-    // unison_detune: f64,
-    /// Monotoneously increasing id used for identifying voices.
-    voice_id: usize,
-    active_voices: Vec<TestSynthVoice>,
+    /// Pan of the center unison voice
+    pan: f64,
+
+    /// Number of voices per note
+    unison: usize,
+    /// Maximum detune factor the outermost unison voices.
+    unison_detune_cents: f64,
+    /// Stereo spread of the outermost unison voices.
+    unison_stereo_spread: f64,
+
+    /// Monotoneously increasing id used for identifying playing notes.
+    next_play_handle: usize,
+    active_notes: Vec<NoteState>,
 }
 
 /// Opaque handle indicating a playing voice.
 #[derive(Debug, PartialEq, Eq)]
 pub struct PlayHandle(usize);
 
-struct TestSynthVoice {
-    handle: PlayHandle,
-    play_delay_samples: usize,
-    release_delay_samples: usize,
-    amplitude: f64,
-    sine: Oscillator,
-    saw1: Oscillator,
-    saw2: Oscillator,
-    envelope: EvalADSR,
-}
-
 impl TestSynth {
     pub fn new(sample_rate: f64) -> Self {
         TestSynth {
+            // voice settings
+            pan: 0.0,
+            unison: 3,
+            unison_detune_cents: 5.0,
+            unison_stereo_spread: 0.1,
             tuning: Tuning::default(),
+            // volume
             envelope: ADSR {
                 attack: 0.05,
                 decay: 1.0,
                 sustain: 0.5,
                 release: 0.25,
             },
-            gain: 1.0,
+            gain: 0.5,
+            // audio settings
             sample_rate,
-            voice_id: 0,
-            active_voices: vec![],
+            // internal state
+            next_play_handle: 0,
+            active_notes: vec![],
         }
     }
 }
@@ -73,17 +76,40 @@ impl TestSynth {
     /// Any note with a non-zero sustain level in its envelope will keep playing
     /// indefinitely until released with `release_note`.
     pub fn play_note(&mut self, sample_delay: usize, note: Note, velocity: Velocity) -> PlayHandle {
-        let detune = 2.0f64.powf(5.0 / 1200.0);
         let frequency = self.tuning.frequency(note);
-        let handle = self.next_voice_id();
-        self.active_voices.push(TestSynthVoice {
+        let handle = self.next_play_handle();
+
+        let midpoint = (self.unison as f64 - 1.0) / 2.0;
+        let mut voices = (0..self.unison).map(|index| {
+            let offset = if self.unison > 1 {
+                (index as f64 - midpoint) / midpoint
+            } else {
+                0.0
+            };
+            let detune = crate::util::from_cents(offset.abs() * self.unison_detune_cents);
+            let pan = offset * self.unison_stereo_spread + self.pan;
+            Voice {
+                // normalized in the next step
+                gain: 1.0,
+                pan,
+                oscillator: Oscillator::new(WaveShape::Saw, self.sample_rate, frequency * detune),
+            }
+        }).collect::<Vec<Voice>>();
+        let total_gain: Stereo<f64> = voices.iter().map(|v| Stereo::panned_mono(v.gain, v.pan)).sum();
+        let normalized_gain = 1.0 / total_gain.left.max(total_gain.right);
+        for voice in voices.iter_mut() {
+            voice.gain = velocity.as_f64() * normalized_gain;
+        }
+
+        log::trace!("note voices: {:?}", voices);
+
+        self.active_notes.push(NoteState {
             handle: PlayHandle(handle.0),
+            // state
             play_delay_samples: sample_delay,
             release_delay_samples: std::usize::MAX,
-            amplitude: velocity.as_f64(),
-            sine: Oscillator::new(WaveShape::Sine, self.sample_rate, frequency),
-            saw1: Oscillator::new(WaveShape::Saw, self.sample_rate, frequency * 0.5 * detune),
-            saw2: Oscillator::new(WaveShape::Saw, self.sample_rate, frequency * 0.5 / detune),
+            voices,
+            // volume
             envelope: self.envelope.instantiate(self.sample_rate),
         });
         handle
@@ -93,14 +119,14 @@ impl TestSynth {
     /// If a note has already been released, this has no effect.
     /// If a note has only been marked for release, the shorter release time is used.
     pub fn release_note(&mut self, sample_delay: usize, handle: PlayHandle) {
-        if let Some(voice) = self.active_voices.iter_mut().find(|v| v.handle == handle) {
+        if let Some(voice) = self.active_notes.iter_mut().find(|v| v.handle == handle) {
             voice.release_delay_samples = voice.release_delay_samples.min(sample_delay);
         }
     }
 
-    fn next_voice_id(&mut self) -> PlayHandle {
-        let h = PlayHandle(self.voice_id);
-        self.voice_id += 1;
+    fn next_play_handle(&mut self) -> PlayHandle {
+        let h = PlayHandle(self.next_play_handle);
+        self.next_play_handle += 1;
         h
     }
 
@@ -108,15 +134,15 @@ impl TestSynth {
     pub fn fill_buffer(&mut self, output: &mut [Stereo<f64>]) {
         for out_sample in output.iter_mut() {
             let mut wave = Stereo::mono(0.0);
-            let voice_count = self.active_voices.len();
+            let voice_count = self.active_notes.len();
             for voice_index in (0..voice_count).rev() {
-                wave += self.active_voices[voice_index].sample();
-                if self.active_voices[voice_index].envelope.faded() {
+                wave += self.active_notes[voice_index].sample();
+                if self.active_notes[voice_index].envelope.faded() {
                     log::trace!(
                         "removing faded voice {:?}",
-                        self.active_voices[voice_index].handle
+                        self.active_notes[voice_index].handle
                     );
-                    self.active_voices.swap_remove(voice_index);
+                    self.active_notes.swap_remove(voice_index);
                 }
             }
 
@@ -125,9 +151,39 @@ impl TestSynth {
     }
 }
 
-impl TestSynthVoice {
+/// State needed for a playing note.
+struct NoteState {
+    /// Handle that has been handed out to the host of the synthesizer when
+    /// this note was played, used for releasing it.
+    handle: PlayHandle,
+    /// Number of samples until the note starts
+    play_delay_samples: usize,
+    /// Number of samples until the note ends
+    release_delay_samples: usize,
+    /// The voices producing the sound of the note
+    voices: Vec<Voice>,
+    /// The envelope defining the volume shape of the note
+    envelope: EvalADSR,
+}
+
+#[derive(Debug)]
+struct Voice {
+    pan: f64,
+    gain: f64,
+    oscillator: Oscillator,
+}
+
+impl Voice {
+    fn sample(&mut self) -> Stereo<f64> {
+        let mono = self.oscillator.next_sample() * self.gain;
+        Stereo::panned_mono(mono, self.pan)
+    }
+}
+
+impl NoteState {
     fn sample(&mut self) -> Stereo<f64> {
         if self.play_delay_samples > 0 {
+            // the note has not started yet
             self.play_delay_samples -= 1;
             Stereo::mono(0.0)
         } else {
@@ -137,14 +193,11 @@ impl TestSynthVoice {
                 log::trace!("released {:?}", self.handle);
                 self.envelope.release();
             }
-            let sine = self.sine.next_sample();
-            let saw1 = self.saw1.next_sample();
-            let saw2 = self.saw2.next_sample();
 
-            let shape = sine * 0.5 + saw1 * 0.25 + saw2 * 0.25;
+            let result: Stereo<f64> = self.voices.iter_mut().map(Voice::sample).sum();
             let envelope = self.envelope.step();
 
-            Stereo::mono(shape * envelope * self.amplitude)
+            result * envelope
         }
     }
 }

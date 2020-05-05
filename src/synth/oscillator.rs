@@ -5,6 +5,7 @@ pub enum WaveShape {
 }
 
 /// An oscillator sampling a wave of some shape at a fixed sample rate.
+#[derive(Debug)]
 pub struct Oscillator {
     shape: WaveShape,
     sample_rate: f64,

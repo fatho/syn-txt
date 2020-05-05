@@ -27,6 +27,36 @@ impl<T> Stereo<T> {
     }
 }
 
+impl Stereo<f64> {
+    /// Linearly spread a mono signal onto stereo channels, by keeping
+    /// one channel at 100% while linearly attenuating the other.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use syn_txt::wave::*;
+    ///
+    /// assert_eq!(Stereo::panned_mono(1.0, 0.0), Stereo::new(1.0, 1.0));
+    /// assert_eq!(Stereo::panned_mono(1.0, -1.0), Stereo::new(1.0, 0.0));
+    /// assert_eq!(Stereo::panned_mono(1.0, 1.0), Stereo::new(0.0, 1.0));
+    /// ```
+    pub fn panned_mono(mono: f64, pan: f64) -> Self {
+        let left = mono * 1.0f64.min(1.0 - pan);
+        let right = mono * 1.0f64.min(1.0 + pan);
+        Stereo::new(left, right)
+    }
+}
+
+impl std::iter::Sum for Stereo<f64> {
+    fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
+        let mut out = Stereo::new(0.0, 0.0);
+        for x in iter {
+            out += x;
+        }
+        out
+    }
+}
+
 impl<T: ops::Add> ops::Add for Stereo<T> {
     type Output = Stereo<T::Output>;
 

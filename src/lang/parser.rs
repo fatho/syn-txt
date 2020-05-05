@@ -58,7 +58,7 @@ impl fmt::Display for ParseErrorInfo {
                 &expected[..],
                 actual
             ),
-            ParseErrorInfo::EOF => write!(f, "end of file reached"),
+            ParseErrorInfo::EOF => write!(f, "unexpected end of file"),
         }
     }
 }
@@ -91,16 +91,10 @@ impl<'a> Parser<'a> {
 
     /// Parse only the next self-contained expression from the input.
     pub fn parse_next(&mut self) -> ParseResult<Option<SymExpSrc>> {
-        match self.parse_exp() {
-            Ok(symexpr) => Ok(Some(symexpr)),
-            Err(err) => {
-                if let ParseErrorInfo::EOF = err.info {
-                    Ok(None)
-                } else {
-                    Err(err)
-                }
-            }
+        if self.current_token == self.tokens.len() {
+            return Ok(None);
         }
+        self.parse_exp().map(Some)
     }
 
     // Parser for expressions
@@ -353,6 +347,14 @@ mod test {
         assert_eq!(parser.parse_next(), Ok(None));
     }
 
+    fn expect_error(input: &str, expected: ParseError) {
+        let tokens = Lexer::new(input)
+            .collect::<Result<Vec<(Span, Token)>, _>>()
+            .unwrap();
+        let mut parser = Parser::new(input, &tokens);
+        assert_eq!(parser.parse_next(), Err(expected),);
+    }
+
     #[test]
     fn test_int() {
         expect_single_expression("123", SymExp::Int(123));
@@ -461,5 +463,13 @@ mod test {
                 },
             ]),
         )
+    }
+
+    #[test]
+    fn test_eof() {
+        expect_error(
+            "(foo",
+            ParseError::new(Span { begin: 4, end: 4 }, ParseErrorInfo::EOF),
+        );
     }
 }

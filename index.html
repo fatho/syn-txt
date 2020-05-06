@@ -1,0 +1,135 @@
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8" />
+    <title>A text-based synthesizer &#8212; syn.txt  documentation</title>
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <script type="text/javascript" src="_static/language_data.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <div class="section" id="a-text-based-synthesizer">
+<h1>A text-based synthesizer<a class="headerlink" href="#a-text-based-synthesizer" title="Permalink to this headline">¶</a></h1>
+<div class="toctree-wrapper compound">
+</div>
+<p>The goal is for this to be a declarative, text-based synthesizer/audio workstation.
+At the moment, it is very much work in progress. The repository contains a <a class="reference external" href="https://github.com/fatho/syn-txt/blob/master/planning/roadmap.md">roadmap</a>
+with a rough outline of what is planned for the near future.</p>
+<p>However, there is already a working prototype that includes</p>
+<ul class="simple">
+<li><p>an interpreter for a very small subset of a scheme-like language
+that can be used for defining piano rolls (<a class="reference external" href="https://github.com/fatho/syn-txt/blob/master/test-data/">examples</a>)</p></li>
+<li><p>a synthesizer turning notes into waveforms</p></li>
+<li><p>an interpreter for that language to play piano rolls on the built-in synthesizer</p></li>
+</ul>
+<div class="section" id="build-instructions">
+<h2>Build Instructions<a class="headerlink" href="#build-instructions" title="Permalink to this headline">¶</a></h2>
+<p>The project is written in <a class="reference external" href="https://www.rust-lang.org/">Rust</a> and all tooling is pulled in via <a class="reference external" href="https://nixos.org/nix/">Nix</a>,
+although just having rustc and Cargo available <em>should</em> just work.
+That said, you can simply run <cite>nix-shell</cite> in the repository root to drop
+into a shell where all dependencies are avaiable.
+Then, the normal <a class="reference external" href="https://doc.rust-lang.org/cargo/">Cargo</a> workflow applies.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Play the included example melody</span>
+cargo run --bin musicc test-data/demo.syn
+</pre></div>
+</div>
+<p>At the moment, sound is played by spawning <a class="reference external" href="http://sox.sourceforge.net/">sox</a> in a subprocess and piping the audio data to it.</p>
+</div>
+</div>
+<div class="section" id="indices-and-tables">
+<h1>Indices and tables<a class="headerlink" href="#indices-and-tables" title="Permalink to this headline">¶</a></h1>
+<ul class="simple">
+<li><p><a class="reference internal" href="genindex.html"><span class="std std-ref">Index</span></a></p></li>
+<li><p><a class="reference internal" href="search.html"><span class="std std-ref">Search Page</span></a></p></li>
+</ul>
+</div>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="#">
+              <img class="logo" src="_static/logo.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="#">syn.txt</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="#">Documentation overview</a><ul>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2020, Fabian Thorand.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 2.3.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="_sources/index.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

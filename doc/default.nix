@@ -7,6 +7,12 @@ stdenv.mkDerivation {
     let
       whitelist = builtins.map builtins.toString [
         ./source
+
+        ./source/_static
+        # TODO: generate these file on the fly as part of the build step
+        ./source/_static/chords.ogg
+        ./source/_static/demo.ogg
+
         ./source/conf.py
         ./source/index.rst
 
@@ -26,8 +32,8 @@ stdenv.mkDerivation {
       ]))
     ];
     buildPhase = ''
-      # Sphinx wants these directories, so lets create them
-      mkdir ./source/{_static,_templates}
+      # Sphinx wants this directory, so lets create it
+      mkdir ./source/_templates
 
       # Put the logo where sphinx can find it
       mv ./logo.png ./source/_static

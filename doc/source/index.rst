@@ -17,6 +17,9 @@ However, there is already a working prototype that includes
 - a synthesizer turning notes into waveforms
 - an interpreter for that language to play piano rolls on the built-in synthesizer
 
+Example
+-------
+
 To give you an example, a few simple chords can be generated with the
 following code snippet (chords.syn_):
 
@@ -44,6 +47,15 @@ following code snippet (chords.syn_):
 
   (song :bpm 120 :notes melody)
 
+Compiling this program to a waveform results in this audio:
+
+.. raw:: html
+
+   <audio controls="controls">
+         <source src="_static/chords.ogg" type="audio/ogg">
+         Your browser does not support the <code>audio</code> element. 
+   </audio>
+
 Notes and melodies are first-class entities in syn.txt,
 and can be freely recombined and passed around.
 
@@ -61,7 +73,16 @@ Then, the normal Cargo_ workflow applies.
    # Play the included example melody
    cargo run --bin musicc test-data/demo.syn
 
-At the moment, sound is played by spawning sox_ in a subprocess and piping the audio data to it.
+At the moment, it depends on spawning a sox_ subprocess and piping the audio data to it
+for actually playing sound.
+If everything worked, it should produce something similar to the following audio snippet:
+
+.. raw:: html
+
+   <audio controls="controls">
+         <source src="_static/demo.ogg" type="audio/ogg">
+         Your browser does not support the <code>audio</code> element. 
+   </audio>
 
 .. _chords.syn: https://github.com/fatho/syn-txt/blob/master/test-data/chords.syn
 .. _roadmap: https://github.com/fatho/syn-txt/blob/master/planning/roadmap.md
@@ -70,6 +91,8 @@ At the moment, sound is played by spawning sox_ in a subprocess and piping the a
 .. _Nix: https://nixos.org/nix/
 .. _Cargo: https://doc.rust-lang.org/cargo/
 .. _sox: http://sox.sourceforge.net/
+
+
 
 Indices and tables
 ==================

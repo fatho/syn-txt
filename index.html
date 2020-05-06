@@ -44,6 +44,8 @@ that can be used for defining piano rolls (<a class="reference external" href="h
 <li><p>a synthesizer turning notes into waveforms</p></li>
 <li><p>an interpreter for that language to play piano rolls on the built-in synthesizer</p></li>
 </ul>
+<div class="section" id="example">
+<h2>Example<a class="headerlink" href="#example" title="Permalink to this headline">¶</a></h2>
 <p>To give you an example, a few simple chords can be generated with the
 following code snippet (<a class="reference external" href="https://github.com/fatho/syn-txt/blob/master/test-data/chords.syn">chords.syn</a>):</p>
 <div class="highlight-scheme notranslate"><div class="highlight"><pre><span></span><span class="p">(</span><span class="k">define </span><span class="nv">melody</span>
@@ -69,8 +71,13 @@ following code snippet (<a class="reference external" href="https://github.com/f
 <span class="p">(</span><span class="nf">song</span> <span class="nv">:bpm</span> <span class="mi">120</span> <span class="nv">:notes</span> <span class="nv">melody</span><span class="p">)</span>
 </pre></div>
 </div>
-<p>Notes and melodies are first-class entities in syn.txt,
+<p>Compiling this program to a waveform results in this audio:</p>
+<audio controls="controls">
+      <source src="_static/chords.ogg" type="audio/ogg">
+      Your browser does not support the <code>audio</code> element.
+</audio><p>Notes and melodies are first-class entities in syn.txt,
 and can be freely recombined and passed around.</p>
+</div>
 <div class="section" id="build-instructions">
 <h2>Build Instructions<a class="headerlink" href="#build-instructions" title="Permalink to this headline">¶</a></h2>
 <p>The project is written in <a class="reference external" href="https://www.rust-lang.org/">Rust</a> and all tooling is pulled in via <a class="reference external" href="https://nixos.org/nix/">Nix</a>,
@@ -82,8 +89,13 @@ Then, the normal <a class="reference external" href="https://doc.rust-lang.org/c
 cargo run --bin musicc test-data/demo.syn
 </pre></div>
 </div>
-<p>At the moment, sound is played by spawning <a class="reference external" href="http://sox.sourceforge.net/">sox</a> in a subprocess and piping the audio data to it.</p>
-</div>
+<p>At the moment, it depends on spawning a <a class="reference external" href="http://sox.sourceforge.net/">sox</a> subprocess and piping the audio data to it
+for actually playing sound.
+If everything worked, it should produce something similar to the following audio snippet:</p>
+<audio controls="controls">
+      <source src="_static/demo.ogg" type="audio/ogg">
+      Your browser does not support the <code>audio</code> element.
+</audio></div>
 </div>
 <div class="section" id="indices-and-tables">
 <h1>Indices and tables<a class="headerlink" href="#indices-and-tables" title="Permalink to this headline">¶</a></h1>

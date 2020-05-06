@@ -44,6 +44,33 @@ that can be used for defining piano rolls (<a class="reference external" href="h
 <li><p>a synthesizer turning notes into waveforms</p></li>
 <li><p>an interpreter for that language to play piano rolls on the built-in synthesizer</p></li>
 </ul>
+<p>To give you an example, a few simple chords can be generated with the
+following code snippet (<a class="reference external" href="https://github.com/fatho/syn-txt/blob/master/test-data/chords.syn">chords.syn</a>):</p>
+<div class="highlight-scheme notranslate"><div class="highlight"><pre><span></span><span class="p">(</span><span class="k">define </span><span class="nv">melody</span>
+    <span class="p">(</span><span class="nf">begin</span>
+        <span class="p">(</span><span class="k">define </span><span class="p">(</span><span class="nf">chord</span> <span class="nv">length</span> <span class="nv">a</span> <span class="nv">b</span> <span class="nv">c</span><span class="p">)</span>
+            <span class="p">(</span><span class="nf">piano-roll/stack</span>
+                <span class="p">(</span><span class="nf">note</span> <span class="nv">:pitch</span> <span class="nv">a</span> <span class="nv">:length</span> <span class="nv">length</span> <span class="nv">:velocity</span> <span class="p">(</span><span class="nb">/ </span><span class="mf">1.0</span> <span class="mi">3</span><span class="p">))</span>
+                <span class="p">(</span><span class="nf">note</span> <span class="nv">:pitch</span> <span class="nv">b</span> <span class="nv">:length</span> <span class="nv">length</span> <span class="nv">:velocity</span> <span class="p">(</span><span class="nb">/ </span><span class="mf">1.0</span> <span class="mi">3</span><span class="p">))</span>
+                <span class="p">(</span><span class="nf">note</span> <span class="nv">:pitch</span> <span class="nv">c</span> <span class="nv">:length</span> <span class="nv">length</span> <span class="nv">:velocity</span> <span class="p">(</span><span class="nb">/ </span><span class="mf">1.0</span> <span class="mi">3</span><span class="p">))</span>
+            <span class="p">)</span>
+        <span class="p">)</span>
+
+        <span class="p">(</span><span class="nf">piano-roll</span>
+            <span class="p">(</span><span class="nf">chord</span> <span class="mi">1</span><span class="nv">/1</span> <span class="s">&quot;a2&quot;</span>  <span class="s">&quot;c3&quot;</span> <span class="s">&quot;e3&quot;</span><span class="p">)</span>
+            <span class="p">(</span><span class="nf">chord</span> <span class="mi">1</span><span class="nv">/1</span> <span class="s">&quot;a2&quot;</span>  <span class="s">&quot;d3&quot;</span> <span class="s">&quot;f3&quot;</span><span class="p">)</span>
+            <span class="p">(</span><span class="nf">chord</span> <span class="mi">1</span><span class="nv">/2</span> <span class="s">&quot;g#2&quot;</span> <span class="s">&quot;b3&quot;</span> <span class="s">&quot;e3&quot;</span><span class="p">)</span>
+            <span class="p">(</span><span class="nf">chord</span> <span class="mi">1</span><span class="nv">/2</span> <span class="s">&quot;g#2&quot;</span> <span class="s">&quot;b3&quot;</span> <span class="s">&quot;d3&quot;</span><span class="p">)</span>
+            <span class="p">(</span><span class="nf">chord</span> <span class="mi">1</span><span class="nv">/1</span> <span class="s">&quot;a2&quot;</span>  <span class="s">&quot;c3&quot;</span> <span class="s">&quot;e3&quot;</span><span class="p">)</span>
+        <span class="p">)</span>
+    <span class="p">)</span>
+<span class="p">)</span>
+
+<span class="p">(</span><span class="nf">song</span> <span class="nv">:bpm</span> <span class="mi">120</span> <span class="nv">:notes</span> <span class="nv">melody</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Notes and melodies are first-class entities in syn.txt,
+and can be freely recombined and passed around.</p>
 <div class="section" id="build-instructions">
 <h2>Build Instructions<a class="headerlink" href="#build-instructions" title="Permalink to this headline">¶</a></h2>
 <p>The project is written in <a class="reference external" href="https://www.rust-lang.org/">Rust</a> and all tooling is pulled in via <a class="reference external" href="https://nixos.org/nix/">Nix</a>,

@@ -17,6 +17,36 @@ However, there is already a working prototype that includes
 - a synthesizer turning notes into waveforms
 - an interpreter for that language to play piano rolls on the built-in synthesizer
 
+To give you an example, a few simple chords can be generated with the
+following code snippet (chords.syn_):
+
+.. code-block:: scheme
+
+  (define melody
+      (begin
+          (define (chord length a b c)
+              (piano-roll/stack
+                  (note :pitch a :length length :velocity (/ 1.0 3))
+                  (note :pitch b :length length :velocity (/ 1.0 3))
+                  (note :pitch c :length length :velocity (/ 1.0 3))
+              )
+          )
+
+          (piano-roll
+              (chord 1/1 "a2"  "c3" "e3")
+              (chord 1/1 "a2"  "d3" "f3")
+              (chord 1/2 "g#2" "b3" "e3")
+              (chord 1/2 "g#2" "b3" "d3")
+              (chord 1/1 "a2"  "c3" "e3")
+          )
+      )
+  )
+
+  (song :bpm 120 :notes melody)
+
+Notes and melodies are first-class entities in syn.txt,
+and can be freely recombined and passed around.
+
 Build Instructions
 ------------------
 
@@ -33,6 +63,7 @@ Then, the normal Cargo_ workflow applies.
 
 At the moment, sound is played by spawning sox_ in a subprocess and piping the audio data to it.
 
+.. _chords.syn: https://github.com/fatho/syn-txt/blob/master/test-data/chords.syn
 .. _roadmap: https://github.com/fatho/syn-txt/blob/master/planning/roadmap.md
 .. _examples: https://github.com/fatho/syn-txt/blob/master/test-data/
 .. _Rust: https://www.rust-lang.org/

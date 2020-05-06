@@ -3,6 +3,8 @@ pub enum WaveShape {
     Sine,
     Saw,
     SuperSaw,
+    TwoSidedSaw,
+    AlternatingSaw,
 }
 
 /// An oscillator sampling a wave of some shape at a fixed sample rate.
@@ -44,6 +46,20 @@ impl Oscillator {
                 } else {
                     1.0 + slope * (phase - 1.0)
                 }
+            }
+            WaveShape::TwoSidedSaw => {
+                if phase < 0.5 {
+                    2.0 * phase
+                } else {
+                    -2.0 * (phase - 0.5)
+                }
+            }
+            WaveShape::AlternatingSaw => {
+                let upsaw= 2.0 * phase - 1.0;
+                let downsaw = - upsaw;
+                let breaks = 5;
+                let piece = (phase * (breaks + 1) as f64).trunc() as i32;
+                if piece % 2 == 0 { upsaw } else { downsaw }
             }
         }
     }

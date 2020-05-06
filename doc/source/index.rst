@@ -29,7 +29,7 @@ Then, the normal Cargo_ workflow applies.
 .. code-block:: bash
 
    # Play the included example melody
-   cargo run --bin musicc test-data/music.syn
+   cargo run --bin musicc test-data/demo.syn
 
 At the moment, sound is played by spawning sox_ in a subprocess and piping the audio data to it.
 

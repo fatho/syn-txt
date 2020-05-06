@@ -11,7 +11,7 @@ At the moment, it is very much work in progress. See the [roadmap](/planning/roa
 for a rough outline of what is planned for the near future.
 
 However, there is already a working prototype that includes
-- an interpreter for a very small subset of a scheme-like language that can be used for defining piano rolls (see [`test-data/music.syn`](test-data/music.syn) for an example)
+- an interpreter for a very small subset of a scheme-like language that can be used for defining piano rolls (see [`test-data/demo.syn`](test-data/demo.syn) for an example)
 - a synthesizer turning notes into waveforms
 - the `musicc` (music compiler) to play piano rolls on the built-in test synthesizer
 
@@ -24,7 +24,7 @@ Then, the normal [`cargo`](https://doc.rust-lang.org/cargo/) workflow applies.
 
 ```
 # Play the included example melody
-cargo run --bin musicc test-data/music.syn
+cargo run --bin musicc test-data/demo.syn
 ```
 
 

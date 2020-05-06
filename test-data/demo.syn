@@ -1,0 +1,88 @@
+; A demo song to demonstrate the capabilities of syn.txt
+
+; This function takes a note pitch (e.g "c3" below) and builds
+; a maj7 arpeggio sequence from it.
+(define (arpeggio base-note)
+    (begin
+        ; Notes pitches can be transposed in semitones
+        (define n1 (transpose base-note 4))
+        (define n2 (transpose base-note 7))
+        (define n3 (transpose base-note 11))
+        (define n4 (transpose base-note 12))
+        ; Makes it easy to change these settings for all notes
+        (define len 1/16)
+        (define vel 0.5)
+
+        ; A piano roll is a set of notes that are played in sequence
+        (piano-roll
+            (note :pitch base-note :length len :velocity vel)
+            (note :pitch n1 :length len :velocity vel)
+            (note :pitch n2 :length len :velocity vel)
+            (note :pitch n3 :length len :velocity vel)
+            (note :pitch n4 :length len :velocity vel)
+            (note :pitch n3 :length len :velocity vel)
+            (note :pitch n2 :length len :velocity vel)
+            (note :pitch n1 :length len :velocity vel)
+        )
+    )
+)
+
+; Plays `note-1`, `note-2`, `note-1`, `note-3` alternating with `base-note`.
+; Each note is a 1/4.
+(define (alternating-bass base-note note-1 note-2 note-3)
+    (begin
+        (define len 1/4)
+        (define vel 0.5)
+
+        (piano-roll
+            (note :pitch base-note :length len :velocity vel)
+            (note :pitch note-1 :length len :velocity vel)
+            (note :pitch base-note :length len :velocity vel)
+            (note :pitch note-2 :length len :velocity vel)
+            (note :pitch base-note :length len :velocity vel)
+            (note :pitch note-1 :length len :velocity vel)
+            (note :pitch base-note :length len :velocity vel)
+            (note :pitch note-3 :length len :velocity vel)
+        )
+    )
+)
+
+; Define the melody for the (virtual) right hand
+(define right-hand
+    (piano-roll
+        (arpeggio "c3")
+        (arpeggio "c3")
+        (arpeggio "c3")
+        (arpeggio "c3")
+
+        (arpeggio "c4")
+        (arpeggio "c4")
+        (arpeggio "c4")
+        (arpeggio "c4")
+
+        (arpeggio "c3")
+        (arpeggio "c3")
+        (arpeggio "c3")
+        (arpeggio "c3")
+    )
+)
+
+; Define the melody for the (virtual) left hand
+(define left-hand
+    (piano-roll
+        (alternating-bass "c2" "e2" "g2" "g1")
+        (alternating-bass "c2" "e3" "g3" "g2")
+        (alternating-bass "c2" "e2" "g2" "g1")
+    )
+)
+
+; Combine the final melody by playing the two melodies at the same time.
+(define melody
+    (piano-roll/stack
+        right-hand
+        left-hand
+    )
+)
+
+; Synthesize the notes on the default synthesizer at 90 bpm
+(song :bpm 90 :notes melody)

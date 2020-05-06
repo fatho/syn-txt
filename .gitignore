@@ -1,2 +1,8 @@
+# Rust
 /target
+
+# IDE
 /.vscode
+
+# Sphinx
+/doc/_build

@@ -28,9 +28,4 @@ cargo run --bin musicc test-data/demo.syn
 ```
 
 At the moment, it depends on spawning a [sox](http://sox.sourceforge.net/) subprocess and piping the audio data to it for actually playing sound.
-If everything worked, it should produce something similar to the following audio snippet:
-
-<audio controls="controls">
-  <source src="doc/source/_static/demo.ogg" type="audio/ogg">
-  Your browser does not support the <code>audio</code> element. 
-</audio>
+If everything worked, it should produce something similar to [this audio snippet](doc/source/_static/demo.ogg).

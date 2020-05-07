@@ -4,7 +4,6 @@ use crate::lang::interpreter::*;
 use crate::lang::span::*;
 use crate::rational::Rational;
 
-
 /// Add all the arguments. If no arguments are passed, a zero int is returned.
 pub fn add(intp: &mut Interpreter, mut args: ArgParser) -> InterpreterResult<Value> {
     let mut accum = Value::Int(0);
@@ -71,7 +70,6 @@ pub fn div(intp: &mut Interpreter, mut args: ArgParser) -> InterpreterResult<Val
     }
     Ok(accum)
 }
-
 
 /// Widen numeric types if necessary if the values don't have the same type.
 /// The only case where this happens is if one of the values is an integer

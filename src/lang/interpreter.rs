@@ -210,7 +210,12 @@ impl Interpreter {
         }
     }
 
-    pub fn call(&mut self, callee_src: Span, callee: &Value, mut args: ArgParser) -> InterpreterResult<Value> {
+    pub fn call(
+        &mut self,
+        callee_src: Span,
+        callee: &Value,
+        mut args: ArgParser,
+    ) -> InterpreterResult<Value> {
         match callee {
             Value::FnPrim(PrimOp(prim_fn)) => prim_fn(self, args),
             Value::Ext(val) => val.0.call(self, args),
@@ -246,7 +251,12 @@ impl Interpreter {
         }
     }
 
-    pub fn call_values(&mut self, callee_src: Span, callee: &Value, args: &[(Span, &Value)]) -> InterpreterResult<Value> {
+    pub fn call_values(
+        &mut self,
+        callee_src: Span,
+        callee: &Value,
+        args: &[(Span, &Value)],
+    ) -> InterpreterResult<Value> {
         // HACK: we first bind the values to variable in a fake scope, and then
         // call the callable with new symbolic expressions referencing those
         // variables. This is ugly and slow, but quick to implement. Fix later.
@@ -261,7 +271,10 @@ impl Interpreter {
 
         for (idx, (src, val)) in args.iter().enumerate() {
             let arg_ident = ast::Ident(format!("arg-{}", idx).into());
-            assert!(scope.define(arg_ident.clone(), (*val).clone()).is_none(), "variable was generated uniquely");
+            assert!(
+                scope.define(arg_ident.clone(), (*val).clone()).is_none(),
+                "variable was generated uniquely"
+            );
             arg_exprs.push(ast::SymExpSrc {
                 src: *src,
                 exp: ast::SymExp::Variable(arg_ident),
@@ -515,7 +528,6 @@ pub enum Value {
     Ext(ExtVal),
     Closure(Rc<Closure>),
 }
-
 
 impl Value {
     /// Smart constructor for `Self::Ext` that performs the wrapping.
@@ -829,14 +841,14 @@ mod test {
 
     #[test]
     fn test_closure_stateless() {
-        expect_values_or_errors(
+        expect_values(
             r#"
             (define plus-one
                 (lambda (x) (+ x 1)))
             (plus-one 2)
             (plus-one 3)
             "#,
-            &[Ok(Value::Unit), Ok(Value::Int(3)), Ok(Value::Int(4))],
+            &[Value::Unit, Value::Int(3), Value::Int(4)],
         )
     }
 
@@ -844,7 +856,7 @@ mod test {
     /// from either inside or outside the closure can be seen elsewhere.
     #[test]
     fn test_closure_global_state() {
-        expect_values_or_errors(
+        expect_values(
             r#"
             (define global-state 0)
             (define (get-global)
@@ -860,13 +872,13 @@ mod test {
             global-state
             "#,
             &[
-                Ok(Value::Unit),
-                Ok(Value::Unit),
-                Ok(Value::Int(0)),
-                Ok(Value::Int(1)),
-                Ok(Value::Unit),
-                Ok(Value::Int(10)),
-                Ok(Value::Int(11)),
+                Value::Unit,
+                Value::Unit,
+                Value::Int(0),
+                Value::Int(1),
+                Value::Unit,
+                Value::Int(10),
+                Value::Int(11),
             ],
         )
     }
@@ -875,7 +887,7 @@ mod test {
     /// never to be seen again.
     #[test]
     fn test_closure_hidden_state() {
-        expect_values_or_errors(
+        expect_values(
             r#"
             ; A closure that, when called, creates a new fresh closure
             (define make-counter
@@ -899,15 +911,62 @@ mod test {
             (c1)
             "#,
             &[
-                Ok(Value::Unit),
-                Ok(Value::Unit),
-                Ok(Value::Unit),
-                Ok(Value::Int(0)),
-                Ok(Value::Int(1)),
-                Ok(Value::Int(3)),
-                Ok(Value::Int(4)),
-                Ok(Value::Int(2)),
+                Value::Unit,
+                Value::Unit,
+                Value::Unit,
+                Value::Int(0),
+                Value::Int(1),
+                Value::Int(3),
+                Value::Int(4),
+                Value::Int(2),
             ],
         )
+    }
+
+    #[test]
+    fn test_list() {
+        expect_values("(list)", &[Value::List(vec![].into())]);
+        expect_values(
+            "(list 1 2 3)",
+            &[Value::List(
+                vec![Value::Int(1), Value::Int(2), Value::Int(3)].into(),
+            )],
+        );
+        expect_values(
+            "(map (lambda (x) (+ 1 x)) (list 1 2 3))",
+            &[Value::List(
+                vec![Value::Int(2), Value::Int(3), Value::Int(4)].into(),
+            )],
+        );
+        expect_values(
+            "
+            (define sum 0)
+            (for-each
+                (lambda (x) (set! sum (+ sum x)))
+                (list 1 2 3)
+            )
+            sum
+            ",
+            &[Value::Unit, Value::Unit, Value::Int(6)],
+        );
+        expect_values(
+            "(reverse (list 3 2 1))",
+            &[Value::List(
+                vec![Value::Int(1), Value::Int(2), Value::Int(3)].into(),
+            )],
+        );
+        expect_values(
+            "(concat (list 1 2) (list 3) (list) (reverse (list 1 2)))",
+            &[Value::List(
+                vec![
+                    Value::Int(1),
+                    Value::Int(2),
+                    Value::Int(3),
+                    Value::Int(2),
+                    Value::Int(1),
+                ]
+                .into(),
+            )],
+        );
     }
 }

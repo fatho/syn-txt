@@ -65,11 +65,15 @@ impl Oscillator {
                 }
             }
             WaveShape::AlternatingSaw => {
-                let upsaw= 2.0 * phase - 1.0;
-                let downsaw = - upsaw;
+                let upsaw = 2.0 * phase - 1.0;
+                let downsaw = -upsaw;
                 let breaks = 5;
                 let piece = (phase * (breaks + 1) as f64).trunc() as i32;
-                if piece % 2 == 0 { upsaw } else { downsaw }
+                if piece % 2 == 0 {
+                    upsaw
+                } else {
+                    downsaw
+                }
             }
         }
     }

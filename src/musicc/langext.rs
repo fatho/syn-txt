@@ -11,10 +11,13 @@
 //! Music-specific language extensions for the underlying scheme-like language.
 
 use crate::declare_extension_value;
-use crate::lang::{span::Span, interpreter::{
-    ArgParser, ExtensionValue, FromValue, Interpreter, InterpreterResult, IntpErr, IntpErrInfo,
-    PrimOp, Value,
-}};
+use crate::lang::{
+    interpreter::{
+        ArgParser, ExtensionValue, FromValue, Interpreter, InterpreterResult, IntpErr, IntpErrInfo,
+        PrimOp, Value,
+    },
+    span::Span,
+};
 use crate::note::{Note, Velocity};
 use crate::pianoroll::{PianoRoll, PlayedNote};
 use crate::rational::Rational;
@@ -169,8 +172,10 @@ impl PianoRollValue {
 
         fn add_value(roll: &mut PianoRoll, span: Span, value: Value) -> InterpreterResult<()> {
             match Rc::<[Value]>::from_value(value) {
-                Ok(list) => for val in list.iter() {
-                    add_value(roll, span, val.clone())?
+                Ok(list) => {
+                    for val in list.iter() {
+                        add_value(roll, span, val.clone())?
+                    }
                 }
                 Err(no_list) => {
                     // Allow both notes and other piano rolls when constructing new piano rolls
@@ -184,7 +189,11 @@ impl PianoRollValue {
                                     offset,
                                 )
                             } else {
-                                roll.add_after(note.pitch, note.length, Velocity::from_f64(note.velocity))
+                                roll.add_after(
+                                    note.pitch,
+                                    note.length,
+                                    Velocity::from_f64(note.velocity),
+                                )
                             }
                         }
                         Err(other) => match PianoRollValue::from_value(other) {
@@ -192,7 +201,7 @@ impl PianoRollValue {
                             Err(_) => return Err(IntpErr::new(span, IntpErrInfo::Type)),
                         },
                     }
-                },
+                }
             }
             Ok(())
         }

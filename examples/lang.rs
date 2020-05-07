@@ -100,6 +100,7 @@ fn main() {
         (define foo (list 1 2 3 4))
         (define (cat-rev l) (concat l (reverse l)))
         (print (cat-rev foo))
+        (for-each print (map (lambda (x) (+ 1 x)) (cat-rev foo)))
     "#;
 
     println!("{}", std::mem::size_of::<Value>());

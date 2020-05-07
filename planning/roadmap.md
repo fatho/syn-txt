@@ -26,6 +26,7 @@ The goal is to have a DSL based on S-Expressions for
 ## Later
 
 - expose mixer channels, tracks and playlists (what to play when on which track) in DSL
+- make a distinction between value-levl primops (such as addition) and syntax primops (such as `define`).
 
 ## Eventually
 

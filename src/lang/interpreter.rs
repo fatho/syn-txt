@@ -114,6 +114,8 @@ impl Interpreter {
             ("list", PrimOp(primops::list)),
             ("concat", PrimOp(primops::concat)),
             ("reverse", PrimOp(primops::reverse)),
+            ("for-each", PrimOp(primops::for_each)),
+            ("map", PrimOp(primops::map)),
             // util
             ("print", PrimOp(primops::print)),
         ];
@@ -242,6 +244,35 @@ impl Interpreter {
             }
             _ => Err(IntpErr::new(callee_src, IntpErrInfo::Uncallable)),
         }
+    }
+
+    pub fn call_values(&mut self, callee_src: Span, callee: &Value, args: &[(Span, &Value)]) -> InterpreterResult<Value> {
+        // HACK: we first bind the values to variable in a fake scope, and then
+        // call the callable with new symbolic expressions referencing those
+        // variables. This is ugly and slow, but quick to implement. Fix later.
+        // An alternative would be to make a distinction between
+        // 1. syntax primops, such as define, that have access to the AST and
+        // 2. value-level primops, such as (+ ...) that only get values (and keywords)
+
+        self.push_scope();
+        let mut arg_exprs = Vec::new();
+
+        let mut scope = self.scope_stack().borrow_mut();
+
+        for (idx, (src, val)) in args.iter().enumerate() {
+            let arg_ident = ast::Ident(format!("arg-{}", idx).into());
+            assert!(scope.define(arg_ident.clone(), (*val).clone()).is_none(), "variable was generated uniquely");
+            arg_exprs.push(ast::SymExpSrc {
+                src: *src,
+                exp: ast::SymExp::Variable(arg_ident),
+            })
+        }
+        drop(scope);
+        let args = ArgParser::new(callee_src, &arg_exprs);
+
+        let result = self.call(callee_src, callee, args);
+        self.pop_scope();
+        result
     }
 
     fn eval_list(&mut self, span: Span, list: &[ast::SymExpSrc]) -> InterpreterResult<Value> {

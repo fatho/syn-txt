@@ -1,0 +1,3 @@
+# Tell github to highlight syn files as scheme.
+# It might take a while for this to take effect, check again later.
+*.syn linguist-language=Scheme

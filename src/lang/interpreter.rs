@@ -105,11 +105,17 @@ impl Interpreter {
             ("define", PrimOp(primops::define)),
             ("lambda", PrimOp(primops::lambda)),
             ("set!", PrimOp(primops::set)),
-            // operators
+            // arithmetic
             ("+", PrimOp(primops::add)),
             ("-", PrimOp(primops::sub)),
             ("*", PrimOp(primops::mul)),
             ("/", PrimOp(primops::div)),
+            // lists
+            ("list", PrimOp(primops::list)),
+            ("concat", PrimOp(primops::concat)),
+            ("reverse", PrimOp(primops::reverse)),
+            ("for-each", PrimOp(primops::for_each)),
+            ("map", PrimOp(primops::map)),
             // util
             ("print", PrimOp(primops::print)),
         ];
@@ -204,14 +210,13 @@ impl Interpreter {
         }
     }
 
-    fn eval_list(&mut self, span: Span, list: &[ast::SymExpSrc]) -> InterpreterResult<Value> {
-        let head_exp = list
-            .first()
-            .ok_or_else(|| IntpErr::new(span, IntpErrInfo::Uncallable))?;
-        let head = self.eval(head_exp)?;
-        let mut args = ArgParser::new(span, &list[1..]);
-
-        match head {
+    pub fn call(
+        &mut self,
+        callee_src: Span,
+        callee: &Value,
+        mut args: ArgParser,
+    ) -> InterpreterResult<Value> {
+        match callee {
             Value::FnPrim(PrimOp(prim_fn)) => prim_fn(self, args),
             Value::Ext(val) => val.0.call(self, args),
             Value::Closure(clos) => {
@@ -242,8 +247,54 @@ impl Interpreter {
 
                 closure_interpreter.eval(&clos.code)
             }
-            _ => Err(IntpErr::new(head_exp.src, IntpErrInfo::Uncallable)),
+            _ => Err(IntpErr::new(callee_src, IntpErrInfo::Uncallable)),
         }
+    }
+
+    pub fn call_values(
+        &mut self,
+        callee_src: Span,
+        callee: &Value,
+        args: &[(Span, &Value)],
+    ) -> InterpreterResult<Value> {
+        // HACK: we first bind the values to variable in a fake scope, and then
+        // call the callable with new symbolic expressions referencing those
+        // variables. This is ugly and slow, but quick to implement. Fix later.
+        // An alternative would be to make a distinction between
+        // 1. syntax primops, such as define, that have access to the AST and
+        // 2. value-level primops, such as (+ ...) that only get values (and keywords)
+
+        self.push_scope();
+        let mut arg_exprs = Vec::new();
+
+        let mut scope = self.scope_stack().borrow_mut();
+
+        for (idx, (src, val)) in args.iter().enumerate() {
+            let arg_ident = ast::Ident(format!("arg-{}", idx).into());
+            assert!(
+                scope.define(arg_ident.clone(), (*val).clone()).is_none(),
+                "variable was generated uniquely"
+            );
+            arg_exprs.push(ast::SymExpSrc {
+                src: *src,
+                exp: ast::SymExp::Variable(arg_ident),
+            })
+        }
+        drop(scope);
+        let args = ArgParser::new(callee_src, &arg_exprs);
+
+        let result = self.call(callee_src, callee, args);
+        self.pop_scope();
+        result
+    }
+
+    fn eval_list(&mut self, span: Span, list: &[ast::SymExpSrc]) -> InterpreterResult<Value> {
+        let head_exp = list
+            .first()
+            .ok_or_else(|| IntpErr::new(span, IntpErrInfo::Uncallable))?;
+        let head = self.eval(head_exp)?;
+        let args = ArgParser::new(span, &list[1..]);
+        self.call(head_exp.src, &head, args)
     }
 }
 
@@ -467,12 +518,16 @@ pub enum Value {
     Unit,
     /// A primitive operation
     FnPrim(PrimOp),
+    /// A list of fully evaluated values, not to be confused with a SymExp::List,
+    /// which holds unevaluated expressions.
+    /// NOTE: This is a bit of an unconvential approach to lists in a scheme like language,
+    /// which are usually represented in terms of cons lists.
+    List(Rc<[Value]>),
     /// A value provided by an interpreter extension.
     /// Interpretation of it is up to the extension.
     Ext(ExtVal),
     Closure(Rc<Closure>),
 }
-
 
 impl Value {
     /// Smart constructor for `Self::Ext` that performs the wrapping.
@@ -605,6 +660,15 @@ macro_rules! declare_extension_value {
 /// Trait for unmarshalling `Value`.
 pub trait FromValue: Sized {
     fn from_value(value: Value) -> Result<Self, Value>;
+}
+
+impl FromValue for Rc<[Value]> {
+    fn from_value(value: Value) -> Result<Rc<[Value]>, Value> {
+        match value {
+            Value::List(x) => Ok(x),
+            value => Err(value),
+        }
+    }
 }
 
 impl FromValue for Rc<str> {
@@ -777,14 +841,14 @@ mod test {
 
     #[test]
     fn test_closure_stateless() {
-        expect_values_or_errors(
+        expect_values(
             r#"
             (define plus-one
                 (lambda (x) (+ x 1)))
             (plus-one 2)
             (plus-one 3)
             "#,
-            &[Ok(Value::Unit), Ok(Value::Int(3)), Ok(Value::Int(4))],
+            &[Value::Unit, Value::Int(3), Value::Int(4)],
         )
     }
 
@@ -792,7 +856,7 @@ mod test {
     /// from either inside or outside the closure can be seen elsewhere.
     #[test]
     fn test_closure_global_state() {
-        expect_values_or_errors(
+        expect_values(
             r#"
             (define global-state 0)
             (define (get-global)
@@ -808,13 +872,13 @@ mod test {
             global-state
             "#,
             &[
-                Ok(Value::Unit),
-                Ok(Value::Unit),
-                Ok(Value::Int(0)),
-                Ok(Value::Int(1)),
-                Ok(Value::Unit),
-                Ok(Value::Int(10)),
-                Ok(Value::Int(11)),
+                Value::Unit,
+                Value::Unit,
+                Value::Int(0),
+                Value::Int(1),
+                Value::Unit,
+                Value::Int(10),
+                Value::Int(11),
             ],
         )
     }
@@ -823,7 +887,7 @@ mod test {
     /// never to be seen again.
     #[test]
     fn test_closure_hidden_state() {
-        expect_values_or_errors(
+        expect_values(
             r#"
             ; A closure that, when called, creates a new fresh closure
             (define make-counter
@@ -847,15 +911,62 @@ mod test {
             (c1)
             "#,
             &[
-                Ok(Value::Unit),
-                Ok(Value::Unit),
-                Ok(Value::Unit),
-                Ok(Value::Int(0)),
-                Ok(Value::Int(1)),
-                Ok(Value::Int(3)),
-                Ok(Value::Int(4)),
-                Ok(Value::Int(2)),
+                Value::Unit,
+                Value::Unit,
+                Value::Unit,
+                Value::Int(0),
+                Value::Int(1),
+                Value::Int(3),
+                Value::Int(4),
+                Value::Int(2),
             ],
         )
+    }
+
+    #[test]
+    fn test_list() {
+        expect_values("(list)", &[Value::List(vec![].into())]);
+        expect_values(
+            "(list 1 2 3)",
+            &[Value::List(
+                vec![Value::Int(1), Value::Int(2), Value::Int(3)].into(),
+            )],
+        );
+        expect_values(
+            "(map (lambda (x) (+ 1 x)) (list 1 2 3))",
+            &[Value::List(
+                vec![Value::Int(2), Value::Int(3), Value::Int(4)].into(),
+            )],
+        );
+        expect_values(
+            "
+            (define sum 0)
+            (for-each
+                (lambda (x) (set! sum (+ sum x)))
+                (list 1 2 3)
+            )
+            sum
+            ",
+            &[Value::Unit, Value::Unit, Value::Int(6)],
+        );
+        expect_values(
+            "(reverse (list 3 2 1))",
+            &[Value::List(
+                vec![Value::Int(1), Value::Int(2), Value::Int(3)].into(),
+            )],
+        );
+        expect_values(
+            "(concat (list 1 2) (list 3) (list) (reverse (list 1 2)))",
+            &[Value::List(
+                vec![
+                    Value::Int(1),
+                    Value::Int(2),
+                    Value::Int(3),
+                    Value::Int(2),
+                    Value::Int(1),
+                ]
+                .into(),
+            )],
+        );
     }
 }

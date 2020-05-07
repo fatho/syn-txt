@@ -71,7 +71,8 @@ impl Biquad {
 
     /// Feed the next value through the filter using the given coefficients.
     pub fn step(&mut self, c: &BiquadCoefficients, input: f64) -> f64 {
-        let output = c.b0 * input +  c.b1 * self.x1 +  c.b2 * self.x2 - c.a1 * self.y1 - c.a2 * self.y2;
+        let output =
+            c.b0 * input + c.b1 * self.x1 + c.b2 * self.x2 - c.a1 * self.y1 - c.a2 * self.y2;
         self.x2 = self.x1;
         self.x1 = input;
         self.y2 = self.y1;

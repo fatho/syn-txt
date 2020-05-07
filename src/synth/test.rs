@@ -11,9 +11,9 @@
 //! Exemplary implementation of a synthesizer.
 
 use super::envelope::*;
+use super::filter;
 use super::oscillator::*;
 use super::tuning::*;
-use super::filter;
 
 use crate::note::*;
 use crate::wave::*;
@@ -177,7 +177,10 @@ impl TestSynth {
             wave *= self.gain;
             wave = Stereo {
                 left: self.biquad.left.step(&self.filter_coefficients, wave.left),
-                right: self.biquad.right.step(&self.filter_coefficients, wave.right),
+                right: self
+                    .biquad
+                    .right
+                    .step(&self.filter_coefficients, wave.right),
             };
 
             *out_sample += wave;

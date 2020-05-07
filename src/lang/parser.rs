@@ -392,23 +392,14 @@ mod test {
             r#""hello \"world\"""#,
             SymExp::Str("hello \"world\"".into()),
         );
-        expect_single_expression(
-            r#""C:\\Users\\Foo""#,
-            SymExp::Str("C:\\Users\\Foo".into()),
-        );
+        expect_single_expression(r#""C:\\Users\\Foo""#, SymExp::Str("C:\\Users\\Foo".into()));
         expect_single_expression(r#""Line1\nLine2""#, SymExp::Str("Line1\nLine2".into()));
     }
 
     #[test]
     fn test_ident() {
-        expect_single_expression(
-            "a-variable",
-            SymExp::Variable(Ident("a-variable".into())),
-        );
-        expect_single_expression(
-            ":a-keyword",
-            SymExp::Keyword(Ident(":a-keyword".into())),
-        );
+        expect_single_expression("a-variable", SymExp::Variable(Ident("a-variable".into())));
+        expect_single_expression(":a-keyword", SymExp::Keyword(Ident(":a-keyword".into())));
     }
 
     #[test]

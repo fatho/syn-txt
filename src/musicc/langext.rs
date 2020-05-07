@@ -11,9 +11,12 @@
 //! Music-specific language extensions for the underlying scheme-like language.
 
 use crate::declare_extension_value;
-use crate::lang::interpreter::{
-    ArgParser, ExtensionValue, FromValue, Interpreter, InterpreterResult, IntpErr, IntpErrInfo,
-    PrimOp, Value,
+use crate::lang::{
+    interpreter::{
+        ArgParser, ExtensionValue, FromValue, Interpreter, InterpreterResult, IntpErr, IntpErrInfo,
+        PrimOp, Value,
+    },
+    span::Span,
 };
 use crate::note::{Note, Velocity};
 use crate::pianoroll::{PianoRoll, PlayedNote};
@@ -166,27 +169,46 @@ declare_extension_value!(PianoRollValue);
 impl PianoRollValue {
     pub fn prim_new(intp: &mut Interpreter, mut args: ArgParser) -> InterpreterResult<Value> {
         let mut roll = PianoRoll::new();
-        while !args.is_empty() {
-            let value = args.value(intp)?;
-            // Allow both notes and other piano rolls when constructing new piano rolls
-            match NoteValue::from_value(value) {
-                Ok(note) => {
-                    if let Some(offset) = note.offset {
-                        roll.add_stack_offset(
-                            note.pitch,
-                            note.length,
-                            Velocity::from_f64(note.velocity),
-                            offset,
-                        )
-                    } else {
-                        roll.add_after(note.pitch, note.length, Velocity::from_f64(note.velocity))
+
+        fn add_value(roll: &mut PianoRoll, span: Span, value: Value) -> InterpreterResult<()> {
+            match Rc::<[Value]>::from_value(value) {
+                Ok(list) => {
+                    for val in list.iter() {
+                        add_value(roll, span, val.clone())?
                     }
                 }
-                Err(other) => match PianoRollValue::from_value(other) {
-                    Ok(other_roll) => roll.append(&other_roll.0),
-                    Err(_) => return Err(IntpErr::new(args.last_span(), IntpErrInfo::Type)),
-                },
+                Err(no_list) => {
+                    // Allow both notes and other piano rolls when constructing new piano rolls
+                    match NoteValue::from_value(no_list) {
+                        Ok(note) => {
+                            if let Some(offset) = note.offset {
+                                roll.add_stack_offset(
+                                    note.pitch,
+                                    note.length,
+                                    Velocity::from_f64(note.velocity),
+                                    offset,
+                                )
+                            } else {
+                                roll.add_after(
+                                    note.pitch,
+                                    note.length,
+                                    Velocity::from_f64(note.velocity),
+                                )
+                            }
+                        }
+                        Err(other) => match PianoRollValue::from_value(other) {
+                            Ok(other_roll) => roll.append(&other_roll.0),
+                            Err(_) => return Err(IntpErr::new(span, IntpErrInfo::Type)),
+                        },
+                    }
+                }
             }
+            Ok(())
+        }
+
+        while !args.is_empty() {
+            let value = args.value(intp)?;
+            add_value(&mut roll, args.last_span(), value)?;
         }
         Ok(Value::ext(PianoRollValue(roll)))
     }

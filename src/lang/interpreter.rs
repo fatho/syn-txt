@@ -105,11 +105,15 @@ impl Interpreter {
             ("define", PrimOp(primops::define)),
             ("lambda", PrimOp(primops::lambda)),
             ("set!", PrimOp(primops::set)),
-            // operators
+            // arithmetic
             ("+", PrimOp(primops::add)),
             ("-", PrimOp(primops::sub)),
             ("*", PrimOp(primops::mul)),
             ("/", PrimOp(primops::div)),
+            // lists
+            ("list", PrimOp(primops::list)),
+            ("concat", PrimOp(primops::concat)),
+            ("reverse", PrimOp(primops::reverse)),
             // util
             ("print", PrimOp(primops::print)),
         ];
@@ -204,14 +208,8 @@ impl Interpreter {
         }
     }
 
-    fn eval_list(&mut self, span: Span, list: &[ast::SymExpSrc]) -> InterpreterResult<Value> {
-        let head_exp = list
-            .first()
-            .ok_or_else(|| IntpErr::new(span, IntpErrInfo::Uncallable))?;
-        let head = self.eval(head_exp)?;
-        let mut args = ArgParser::new(span, &list[1..]);
-
-        match head {
+    pub fn call(&mut self, callee_src: Span, callee: &Value, mut args: ArgParser) -> InterpreterResult<Value> {
+        match callee {
             Value::FnPrim(PrimOp(prim_fn)) => prim_fn(self, args),
             Value::Ext(val) => val.0.call(self, args),
             Value::Closure(clos) => {
@@ -242,8 +240,17 @@ impl Interpreter {
 
                 closure_interpreter.eval(&clos.code)
             }
-            _ => Err(IntpErr::new(head_exp.src, IntpErrInfo::Uncallable)),
+            _ => Err(IntpErr::new(callee_src, IntpErrInfo::Uncallable)),
         }
+    }
+
+    fn eval_list(&mut self, span: Span, list: &[ast::SymExpSrc]) -> InterpreterResult<Value> {
+        let head_exp = list
+            .first()
+            .ok_or_else(|| IntpErr::new(span, IntpErrInfo::Uncallable))?;
+        let head = self.eval(head_exp)?;
+        let args = ArgParser::new(span, &list[1..]);
+        self.call(head_exp.src, &head, args)
     }
 }
 
@@ -467,6 +474,11 @@ pub enum Value {
     Unit,
     /// A primitive operation
     FnPrim(PrimOp),
+    /// A list of fully evaluated values, not to be confused with a SymExp::List,
+    /// which holds unevaluated expressions.
+    /// NOTE: This is a bit of an unconvential approach to lists in a scheme like language,
+    /// which are usually represented in terms of cons lists.
+    List(Rc<[Value]>),
     /// A value provided by an interpreter extension.
     /// Interpretation of it is up to the extension.
     Ext(ExtVal),
@@ -605,6 +617,15 @@ macro_rules! declare_extension_value {
 /// Trait for unmarshalling `Value`.
 pub trait FromValue: Sized {
     fn from_value(value: Value) -> Result<Self, Value>;
+}
+
+impl FromValue for Rc<[Value]> {
+    fn from_value(value: Value) -> Result<Rc<[Value]>, Value> {
+        match value {
+            Value::List(x) => Ok(x),
+            value => Err(value),
+        }
+    }
 }
 
 impl FromValue for Rc<str> {

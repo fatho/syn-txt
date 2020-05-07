@@ -96,6 +96,10 @@ fn main() {
         (get-global)
         (get-global)
         global-state
+
+        (define foo (list 1 2 3 4))
+        (define (cat-rev l) (concat l (reverse l)))
+        (print (cat-rev foo))
     "#;
 
     println!("{}", std::mem::size_of::<Value>());

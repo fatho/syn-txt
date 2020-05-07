@@ -115,7 +115,7 @@ impl Interpreter {
         ];
 
         for (name, fun) in prim {
-            builtin_scope.define(ast::Ident(name.to_owned()), Value::FnPrim(fun));
+            builtin_scope.define(ast::Ident(name.into()), Value::FnPrim(fun));
         }
 
         let builtins = builtin_scope.into_ref();
@@ -132,7 +132,7 @@ impl Interpreter {
         name: &str,
         op: fn(&mut Interpreter, ArgParser) -> InterpreterResult<Value>,
     ) -> InterpreterResult<()> {
-        let var = ast::Ident((*name).to_owned());
+        let var = ast::Ident((*name).into());
         let val = Value::FnPrim(PrimOp(op));
         if let Some((var, _val)) = self.builtins.borrow_mut().define(var, val) {
             // TODO: allow None as location
@@ -149,7 +149,7 @@ impl Interpreter {
     where
         F: Fn(&mut Interpreter, ArgParser) -> InterpreterResult<Value> + 'static,
     {
-        let var = ast::Ident((*name).to_owned());
+        let var = ast::Ident((*name).into());
         let val = Value::ext_closure(op);
         if let Some((var, _val)) = self.builtins.borrow_mut().define(var, val) {
             // TODO: allow None as location
@@ -187,7 +187,7 @@ impl Interpreter {
         match &sym.exp {
             ast::SymExp::Keyword(_) => Err(IntpErr::new(sym.src, IntpErrInfo::Unevaluatable)),
             ast::SymExp::List(list) => self.eval_list(sym.src, &list),
-            ast::SymExp::Str(v) => Ok(Value::Str(v.clone())),
+            ast::SymExp::Str(v) => Ok(Value::Str(v.clone().into())),
             ast::SymExp::Float(v) => Ok(Value::Float(*v)),
             ast::SymExp::Ratio(v) => Ok(Value::Ratio(*v)),
             ast::SymExp::Int(v) => Ok(Value::Int(*v)),
@@ -456,7 +456,7 @@ impl Eq for PrimOp {}
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
     /// A string
-    Str(String),
+    Str(Rc<str>),
     /// A float
     Float(f64),
     /// A rational number
@@ -472,6 +472,7 @@ pub enum Value {
     Ext(ExtVal),
     Closure(Rc<Closure>),
 }
+
 
 impl Value {
     /// Smart constructor for `Self::Ext` that performs the wrapping.
@@ -609,7 +610,7 @@ pub trait FromValue: Sized {
 impl FromValue for String {
     fn from_value(value: Value) -> Result<String, Value> {
         match value {
-            Value::Str(x) => Ok(x),
+            Value::Str(x) => Ok((&*x).to_owned()),
             Value::Int(x) => Ok(format!("{}", x)),
             Value::Float(x) => Ok(format!("{}", x)),
             Value::Ratio(x) => Ok(format!("{}", x)),
@@ -769,10 +770,10 @@ mod test {
                 Ok(Value::Unit),
                 Ok(Value::Int(5)),
                 Ok(Value::Unit),
-                Err(IntpErrInfo::NoSuchVariable(ast::Ident("r".to_owned()))),
+                Err(IntpErrInfo::NoSuchVariable(ast::Ident("r".into()))),
                 Ok(Value::Float(3.14)),
-                Err(IntpErrInfo::NoSuchVariable(ast::Ident("bar".to_owned()))),
-                Err(IntpErrInfo::NoSuchVariable(ast::Ident("foo".to_owned()))),
+                Err(IntpErrInfo::NoSuchVariable(ast::Ident("bar".into()))),
+                Err(IntpErrInfo::NoSuchVariable(ast::Ident("foo".into()))),
             ],
         )
     }

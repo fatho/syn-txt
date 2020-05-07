@@ -152,7 +152,7 @@ impl<'a> Parser<'a> {
                 let s = self.parse_string(span)?;
                 Ok(SymExpSrc {
                     src: span,
-                    exp: SymExp::Str(s),
+                    exp: SymExp::Str(s.into()),
                 })
             }
             Token::Ident => {
@@ -160,12 +160,12 @@ impl<'a> Parser<'a> {
                 if ident.starts_with(':') {
                     Ok(SymExpSrc {
                         src: span,
-                        exp: SymExp::Keyword(Ident(ident.to_owned())),
+                        exp: SymExp::Keyword(Ident(ident.into())),
                     })
                 } else {
                     Ok(SymExpSrc {
                         src: span,
-                        exp: SymExp::Variable(Ident(ident.to_owned())),
+                        exp: SymExp::Variable(Ident(ident.into())),
                     })
                 }
             }
@@ -386,28 +386,28 @@ mod test {
 
     #[test]
     fn test_string() {
-        expect_single_expression(r#""hello world""#, SymExp::Str("hello world".to_owned()));
-        expect_single_expression(r#""""#, SymExp::Str("".to_owned()));
+        expect_single_expression(r#""hello world""#, SymExp::Str("hello world".into()));
+        expect_single_expression(r#""""#, SymExp::Str("".into()));
         expect_single_expression(
             r#""hello \"world\"""#,
-            SymExp::Str("hello \"world\"".to_owned()),
+            SymExp::Str("hello \"world\"".into()),
         );
         expect_single_expression(
             r#""C:\\Users\\Foo""#,
-            SymExp::Str("C:\\Users\\Foo".to_owned()),
+            SymExp::Str("C:\\Users\\Foo".into()),
         );
-        expect_single_expression(r#""Line1\nLine2""#, SymExp::Str("Line1\nLine2".to_owned()));
+        expect_single_expression(r#""Line1\nLine2""#, SymExp::Str("Line1\nLine2".into()));
     }
 
     #[test]
     fn test_ident() {
         expect_single_expression(
             "a-variable",
-            SymExp::Variable(Ident("a-variable".to_owned())),
+            SymExp::Variable(Ident("a-variable".into())),
         );
         expect_single_expression(
             ":a-keyword",
-            SymExp::Keyword(Ident(":a-keyword".to_owned())),
+            SymExp::Keyword(Ident(":a-keyword".into())),
         );
     }
 
@@ -418,15 +418,15 @@ mod test {
             SymExp::List(vec![
                 SymExpSrc {
                     src: Span { begin: 1, end: 7 },
-                    exp: SymExp::Variable(Ident("a-list".to_owned())),
+                    exp: SymExp::Variable(Ident("a-list".into())),
                 },
                 SymExpSrc {
                     src: Span { begin: 8, end: 25 },
-                    exp: SymExp::Str("that \"really\"".to_owned()),
+                    exp: SymExp::Str("that \"really\"".into()),
                 },
                 SymExpSrc {
                     src: Span { begin: 26, end: 35 },
-                    exp: SymExp::Keyword(Ident(":contains".to_owned())),
+                    exp: SymExp::Keyword(Ident(":contains".into())),
                 },
                 SymExpSrc {
                     src: Span { begin: 36, end: 39 },
@@ -445,11 +445,11 @@ mod test {
                     exp: SymExp::List(vec![
                         SymExpSrc {
                             src: Span { begin: 48, end: 58 },
-                            exp: SymExp::Variable(Ident("everything".to_owned())),
+                            exp: SymExp::Variable(Ident("everything".into())),
                         },
                         SymExpSrc {
                             src: Span { begin: 59, end: 66 },
-                            exp: SymExp::Variable(Ident("at-once".to_owned())),
+                            exp: SymExp::Variable(Ident("at-once".into())),
                         },
                     ]),
                 },
@@ -461,15 +461,15 @@ mod test {
             SymExp::List(vec![
                 SymExpSrc {
                     src: Span { begin: 1, end: 7 },
-                    exp: SymExp::Variable(Ident("define".to_owned())),
+                    exp: SymExp::Variable(Ident("define".into())),
                 },
                 SymExpSrc {
                     src: Span { begin: 10, end: 11 },
-                    exp: SymExp::Variable(Ident("x".to_owned())),
+                    exp: SymExp::Variable(Ident("x".into())),
                 },
                 SymExpSrc {
                     src: Span { begin: 14, end: 29 },
-                    exp: SymExp::Str("on a new line".to_owned()),
+                    exp: SymExp::Str("on a new line".into()),
                 },
             ]),
         )

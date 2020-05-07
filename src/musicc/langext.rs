@@ -53,7 +53,7 @@ macro_rules! parse_primop_args {
 
         while !$args.is_empty() {
             let key = $args.keyword()?;
-            match key.0.as_str() {
+            match key.0.as_ref() {
                 $($key => $field = parse_primop_args!(__make_pat($args, $intp) $key => $field = $def)),* ,
                 _ => {
                     return Err(IntpErr::new(
@@ -123,7 +123,7 @@ impl FromValue for NotePitch {
                     if let Some(note) = Note::named_str(&name) {
                         Ok(NotePitch(note))
                     } else {
-                        Err(Value::Str(name))
+                        Err(Value::Str(name.into()))
                     }
                 })
             })

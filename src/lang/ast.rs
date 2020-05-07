@@ -8,12 +8,14 @@
 // A copy of the license can be found in the LICENSE file in the root of
 // this repository.
 
+use std::rc::Rc;
+
 use super::span::Span;
 use crate::rational::Rational;
 
 /// A non-namespaced identifier.
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
-pub struct Ident(pub String);
+pub struct Ident(pub Rc<str>);
 
 /// An expression with a source annotation
 #[derive(Debug, Clone, PartialEq)]
@@ -33,7 +35,7 @@ pub enum SymExp {
     /// A variable, user defined or built-in
     Variable(Ident),
     /// A string
-    Str(String),
+    Str(Rc<str>),
     /// A float
     Float(f64),
     /// A rational number

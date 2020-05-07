@@ -13,7 +13,7 @@ The current workaround is to define a temporary scope with fresh variables to ho
 and then performing the actual call on these synthesized AST bits.
 This is both ugly and slow.
 
-## The Solution
+## Idea 1
 
 Split up the `PrimOp` type in a `SyntaxExtension` and `PrimFn` type.
 The `SyntaxExtension` interface will work exactly like the `PrimOp` interface works now,
@@ -43,3 +43,23 @@ pub enum ValueOrKeyword {
 
 Calling this in a higher-order function such as map is trivial,
 and does not require any hacks like the current implementation.
+
+## Idea 2
+
+Keep the current `ArgParser` interface, but allow it to either process
+a list of symbolic expressions, or a list of values, whatever is more
+convenient for the caller.
+
+The advantages of this idea vs idea 1 are:
+- the changes are localized in one place and don't need a big overhaul
+- the `ArgParser` interface could use some streamlining anyway
+- there are fewer kinds of values
+
+In contrast to option 1, this would allow expressions like
+
+```scheme
+(map define (list ...))
+```
+
+but thinking further about this, this might actually make sense
+in the presence of quoting and unquoting.

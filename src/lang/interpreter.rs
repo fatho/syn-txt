@@ -607,13 +607,10 @@ pub trait FromValue: Sized {
     fn from_value(value: Value) -> Result<Self, Value>;
 }
 
-impl FromValue for String {
-    fn from_value(value: Value) -> Result<String, Value> {
+impl FromValue for Rc<str> {
+    fn from_value(value: Value) -> Result<Rc<str>, Value> {
         match value {
-            Value::Str(x) => Ok((&*x).to_owned()),
-            Value::Int(x) => Ok(format!("{}", x)),
-            Value::Float(x) => Ok(format!("{}", x)),
-            Value::Ratio(x) => Ok(format!("{}", x)),
+            Value::Str(x) => Ok(x),
             value => Err(value),
         }
     }

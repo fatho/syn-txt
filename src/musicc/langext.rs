@@ -109,7 +109,6 @@ impl From<NotePitch> for Note {
 impl FromValue for NotePitch {
     fn from_value(value: Value) -> Result<Self, Value> {
         // Allow both names and Midi indexes
-        // Try int first, because otherwise the int gets converted to a string
         log::trace!("NotePitch::from_value({:?})", value);
         i64::from_value(value)
             .and_then(|midi| {
@@ -118,12 +117,12 @@ impl FromValue for NotePitch {
                     .ok_or(Value::Int(midi))
             })
             .or_else(|value| {
-                String::from_value(value).and_then(|name| {
+                Rc::<str>::from_value(value).and_then(|name| {
                     log::trace!("NotePitch::from_value({})", name);
                     if let Some(note) = Note::named_str(&name) {
                         Ok(NotePitch(note))
                     } else {
-                        Err(Value::Str(name.into()))
+                        Err(Value::Str(name))
                     }
                 })
             })

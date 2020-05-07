@@ -244,8 +244,14 @@ impl Interpreter {
                     builtins: Scope::new().into_ref(),
                     scope_stack: scope_stack.into_ref(),
                 };
+                
+                let mut return_value = Value::Unit;
 
-                closure_interpreter.eval(&clos.code)
+                for expr in clos.body.iter() {
+                    return_value = closure_interpreter.eval(expr)?;
+                }
+
+                Ok(return_value)
             }
             _ => Err(IntpErr::new(callee_src, IntpErrInfo::Uncallable)),
         }
@@ -554,7 +560,8 @@ pub struct Closure {
     /// The names must be unique.
     pub parameters: Vec<ast::Ident>,
     /// The code to execute when calling the closure
-    pub code: ast::SymExpSrc,
+    /// The value of the last expression becomes the return value.
+    pub body: Vec<ast::SymExpSrc>,
 }
 
 /// Wrapper for extension values that relays the `PartialEq` implementation to `partial_eq`.
@@ -860,11 +867,10 @@ mod test {
             r#"
             (define global-state 0)
             (define (get-global)
-                (begin
-                    (define ret global-state)
-                    (set! global-state (+ ret 1))
-                    ret
-                ))
+                (define ret global-state)
+                (set! global-state (+ ret 1))
+                ret
+            )
             (get-global)
             (get-global)
             (set! global-state 10)

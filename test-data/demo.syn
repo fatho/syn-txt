@@ -3,24 +3,22 @@
 ; This function takes a note pitch (e.g "c3" below) and builds
 ; a maj7 arpeggio sequence from it.
 (define (arpeggio base-note)
-    (begin
-        ; Offsets from base note in semitones
-        (define seq (list 0 4 7 11 12 11 7 4))
-        ; Makes it easy to change these settings for all notes
-        (define len 1/16)
-        (define vel 0.5)
-        ; Compute note pitches by transposing base note
-        (define pitches (map (lambda (off) (transpose base-note off)) seq))
+    ; Offsets from base note in semitones
+    (define seq (list 0 4 7 11 12 11 7 4))
+    ; Makes it easy to change these settings for all notes
+    (define len 1/16)
+    (define vel 0.5)
+    ; Compute note pitches by transposing base note
+    (define pitches (map (lambda (off) (transpose base-note off)) seq))
 
-        ; A piano roll is a set of notes that are played in sequence
-        ; It accepts single notes, other piano rolls and flattens lists recursively
-        (piano-roll
-            (map 
-                (lambda (p)
-                    (note :pitch p :length len :velocity vel)
-                )
-                pitches
+    ; A piano roll is a set of notes that are played in sequence
+    ; It accepts single notes, other piano rolls and flattens lists recursively
+    (piano-roll
+        (map 
+            (lambda (p)
+                (note :pitch p :length len :velocity vel)
             )
+            pitches
         )
     )
 )
@@ -28,20 +26,18 @@
 ; Plays `note-1`, `note-2`, `note-1`, `note-3` alternating with `base-note`.
 ; Each note is a 1/4.
 (define (alternating-bass base-note note-1 note-2 note-3)
-    (begin
-        (define len 1/4)
-        (define vel 0.5)
+    (define len 1/4)
+    (define vel 0.5)
 
-        (piano-roll
-            (note :pitch base-note :length len :velocity vel)
-            (note :pitch note-1 :length len :velocity vel)
-            (note :pitch base-note :length len :velocity vel)
-            (note :pitch note-2 :length len :velocity vel)
-            (note :pitch base-note :length len :velocity vel)
-            (note :pitch note-1 :length len :velocity vel)
-            (note :pitch base-note :length len :velocity vel)
-            (note :pitch note-3 :length len :velocity vel)
-        )
+    (piano-roll
+        (note :pitch base-note :length len :velocity vel)
+        (note :pitch note-1 :length len :velocity vel)
+        (note :pitch base-note :length len :velocity vel)
+        (note :pitch note-2 :length len :velocity vel)
+        (note :pitch base-note :length len :velocity vel)
+        (note :pitch note-1 :length len :velocity vel)
+        (note :pitch base-note :length len :velocity vel)
+        (note :pitch note-3 :length len :velocity vel)
     )
 )
 

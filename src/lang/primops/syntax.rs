@@ -36,16 +36,19 @@ pub fn lambda(intp: &mut Interpreter, mut args: ArgParser) -> InterpreterResult<
         }
     };
 
-    // Parse the lambda expression
-    let lambda_expr = args.symbolic()?;
+    // Parse the lambda body (consisting of one or more expressions)
+    let mut body = vec![args.symbolic()?.clone()];
+    while ! args.is_empty() {
+        body.push(args.symbolic()?.clone());
+    }
 
-    lambda_impl(intp, param_parser, lambda_expr)
+    lambda_impl(intp, param_parser, body)
 }
 
 pub fn lambda_impl(
     intp: &mut Interpreter,
     mut params: ArgParser,
-    expr: &ast::SymExpSrc,
+    body: Vec<ast::SymExpSrc>,
 ) -> InterpreterResult<Value> {
     let mut parameters = Vec::new();
     while !params.is_empty() {
@@ -62,7 +65,7 @@ pub fn lambda_impl(
     let closure = Closure {
         captured_scope: intp.scope_stack().clone(),
         parameters,
-        code: expr.clone(),
+        body,
     };
     Ok(Value::Closure(Rc::new(closure)))
 }
@@ -77,8 +80,11 @@ pub fn define(intp: &mut Interpreter, mut args: ArgParser) -> InterpreterResult<
         ast::SymExp::List(elems) => {
             let mut lambda_args = ArgParser::new(defined.src, &elems);
             let lambda_name = lambda_args.variable()?;
-            let lambda_expr = args.symbolic()?;
-            let closure_value = lambda_impl(intp, lambda_args, lambda_expr)?;
+            let mut lambda_body = vec![args.symbolic()?.clone()];
+            while ! args.is_empty() {
+                lambda_body.push(args.symbolic()?.clone());
+            }
+            let closure_value = lambda_impl(intp, lambda_args, lambda_body)?;
 
             (lambda_name, closure_value)
         }

@@ -117,6 +117,10 @@ impl Interpreter {
             ("for-each", PrimOp(primops::for_each)),
             ("map", PrimOp(primops::map)),
             ("range", PrimOp(primops::range)),
+            // dicts
+            ("dict", PrimOp(primops::dict)),
+            ("update", PrimOp(primops::dict_update)),
+            ("get", PrimOp(primops::dict_get)),
             // util
             ("print", PrimOp(primops::print)),
         ];
@@ -530,6 +534,8 @@ pub enum Value {
     /// NOTE: This is a bit of an unconvential approach to lists in a scheme like language,
     /// which are usually represented in terms of cons lists.
     List(Rc<[Value]>),
+    /// A hash map.
+    Dict(Rc<HashMap<ast::Ident, Value>>),
     /// A value provided by an interpreter extension.
     /// Interpretation of it is up to the extension.
     Ext(ExtVal),
@@ -668,6 +674,15 @@ macro_rules! declare_extension_value {
 /// Trait for unmarshalling `Value`.
 pub trait FromValue: Sized {
     fn from_value(value: Value) -> Result<Self, Value>;
+}
+
+impl FromValue for Rc<HashMap<ast::Ident, Value>> {
+    fn from_value(value: Value) -> Result<Rc<HashMap<ast::Ident, Value>>, Value> {
+        match value {
+            Value::Dict(x) => Ok(x),
+            value => Err(value),
+        }
+    }
 }
 
 impl FromValue for Rc<[Value]> {
@@ -994,5 +1009,46 @@ mod test {
             )],
         );
         expect_values("(range 0)", &[Value::List(vec![].into())]);
+    }
+
+    #[test]
+    fn test_dict() {
+        expect_values("(dict)", &[Value::Dict(Rc::new(HashMap::new()))]);
+        expect_values(
+            "
+            (define d (dict :foo 1 :bar 2))
+            d
+            (get d :foo)
+            (define d2 (update d :foo 4))
+            (get d :foo)
+            (get d2 :foo)
+            (get d2 :bar)
+            (get d2 :baz)
+            ",
+            &[
+                Value::Unit,
+                Value::Dict({
+                    let mut d = HashMap::new();
+                    d.insert(":foo".into(), Value::Int(1));
+                    d.insert(":bar".into(), Value::Int(2));
+                    Rc::new(d)
+                }),
+                Value::Int(1),
+                Value::Unit,
+                Value::Int(1),
+                Value::Int(4),
+                Value::Int(2),
+            ],
+        );
+        expect_values_or_errors(
+            "
+            (define d (dict :foo 1 :bar 2))
+            (get d :baz)
+            ",
+            &[
+                Ok(Value::Unit),
+                Err(IntpErrInfo::UnknownKeyword(":baz".into())),
+            ],
+        );
     }
 }

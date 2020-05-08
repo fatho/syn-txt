@@ -17,6 +17,18 @@ use crate::rational::Rational;
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Ident(pub Rc<str>);
 
+impl From<&str> for Ident {
+    fn from(s: &str) -> Self {
+        Ident(s.into())
+    }
+}
+
+impl From<String> for Ident {
+    fn from(s: String) -> Self {
+        Ident(s.into())
+    }
+}
+
 /// An expression with a source annotation
 #[derive(Debug, Clone, PartialEq)]
 pub struct SymExpSrc {

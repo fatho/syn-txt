@@ -51,4 +51,15 @@ html_theme = 'alabaster'
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ['_static']
 
-html_logo = '_static/logo.png'
+html_theme_options = {
+    'logo': 'logo.png',
+    'github_user': 'fatho',
+    'github_repo': 'syn-txt',
+    'show_powered_by': 'false',
+
+    # Free fonts
+    'caption_font_family': 'Noto Serif, serif',
+    'font_family': 'Noto Serif, serif',
+    'head_font_family': 'Noto Serif, serif',
+    'code_font_family': 'Source Code Pro, monospace',
+}

@@ -9,6 +9,7 @@ stdenv.mkDerivation {
         ./source
 
         ./source/_static
+        ./source/_static/custom.css
         # TODO: generate these file on the fly as part of the build step
         ./source/_static/chords.ogg
         ./source/_static/demo.ogg

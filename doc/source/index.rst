@@ -93,9 +93,16 @@ If everything worked, it should produce something similar to the following audio
 .. _sox: http://sox.sourceforge.net/
 
 
+License
+-------
 
-Indices and tables
-==================
+The project is free software licensed under the `GNU General Public License Version 3`_.
 
-* :ref:`genindex`
-* :ref:`search`
+.. _GNU General Public License Version 3: https://www.gnu.org/licenses/gpl-3.0.en.html
+
+..
+  Indices and tables
+  ==================
+
+  * :ref:`genindex`
+  * :ref:`search`

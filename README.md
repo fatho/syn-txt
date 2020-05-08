@@ -29,3 +29,7 @@ cargo run --bin musicc test-data/demo.syn
 
 At the moment, it depends on spawning a [sox](http://sox.sourceforge.net/) subprocess and piping the audio data to it for actually playing sound.
 If everything worked, it should produce something similar to [this audio snippet](doc/source/_static/demo.ogg).
+
+## License
+
+The project is free software licensed under the [GNU General Public License Version 3](/LICENSE).

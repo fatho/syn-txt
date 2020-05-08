@@ -38,7 +38,7 @@ pub fn lambda(intp: &mut Interpreter, mut args: ArgParser) -> InterpreterResult<
 
     // Parse the lambda body (consisting of one or more expressions)
     let mut body = vec![args.symbolic()?.clone()];
-    while ! args.is_empty() {
+    while !args.is_empty() {
         body.push(args.symbolic()?.clone());
     }
 
@@ -81,7 +81,7 @@ pub fn define(intp: &mut Interpreter, mut args: ArgParser) -> InterpreterResult<
             let mut lambda_args = ArgParser::new(defined.src, &elems);
             let lambda_name = lambda_args.variable()?;
             let mut lambda_body = vec![args.symbolic()?.clone()];
-            while ! args.is_empty() {
+            while !args.is_empty() {
                 lambda_body.push(args.symbolic()?.clone());
             }
             let closure_value = lambda_impl(intp, lambda_args, lambda_body)?;

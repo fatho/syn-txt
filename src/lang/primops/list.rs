@@ -70,3 +70,37 @@ pub fn reverse(intp: &mut Interpreter, mut args: ArgParser) -> InterpreterResult
 
     Ok(Value::List(unique_list))
 }
+
+/// Create a list of a range of integers. Possible forms:
+///  * `(range n)` is equivalent to `(range 0 n 1)`
+///  * `(range m n)` is equivalent to `(range m n 1)`
+///  * `(range m n step)` produces a list starting at `m` and
+///    adding `step` at each step, until it is greater than or equal to `n`.
+pub fn range(intp: &mut Interpreter, mut args: ArgParser) -> InterpreterResult<Value> {
+    let a: i64 = args.extract(intp)?;
+    let b: Option<i64> = if args.is_empty() {
+        None
+    } else {
+        Some(args.extract(intp)?)
+    };
+    let c: Option<i64> = if args.is_empty() {
+        None
+    } else {
+        Some(args.extract(intp)?)
+    };
+    args.done()?;
+
+    let (start, end, step) = match (a, b, c) {
+        (start, Some(end), Some(step)) => (start, end, step),
+        (start, Some(end), None) => (start, end, 1),
+        (end, _, _) => (0, end, 1),
+    };
+
+    let mut values: Vec<Value> = Vec::new();
+    let mut current = start;
+    while (step > 0 && current < end) || (step < 0 && current > end) {
+        values.push(Value::Int(current));
+        current += step;
+    }
+    Ok(Value::List(values.into()))
+}

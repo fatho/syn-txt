@@ -116,6 +116,7 @@ impl Interpreter {
             ("reverse", PrimOp(primops::reverse)),
             ("for-each", PrimOp(primops::for_each)),
             ("map", PrimOp(primops::map)),
+            ("range", PrimOp(primops::range)),
             // util
             ("print", PrimOp(primops::print)),
         ];
@@ -244,7 +245,7 @@ impl Interpreter {
                     builtins: Scope::new().into_ref(),
                     scope_stack: scope_stack.into_ref(),
                 };
-                
+
                 let mut return_value = Value::Unit;
 
                 for expr in clos.body.iter() {
@@ -974,5 +975,24 @@ mod test {
                 .into(),
             )],
         );
+        expect_values(
+            "(range 1 4)",
+            &[Value::List(
+                vec![Value::Int(1), Value::Int(2), Value::Int(3)].into(),
+            )],
+        );
+        expect_values(
+            "(range 1 -2 -1)",
+            &[Value::List(
+                vec![Value::Int(1), Value::Int(0), Value::Int(-1)].into(),
+            )],
+        );
+        expect_values(
+            "(range 3)",
+            &[Value::List(
+                vec![Value::Int(0), Value::Int(1), Value::Int(2)].into(),
+            )],
+        );
+        expect_values("(range 0)", &[Value::List(vec![].into())]);
     }
 }

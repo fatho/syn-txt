@@ -1,8 +1,6 @@
-
-
-use std::{rc::Rc, collections::HashMap};
-use super::span::Span;
 use super::heap;
+use super::span::Span;
+use std::{collections::HashMap, rc::Rc};
 
 /// Location referring to a source file.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -29,5 +27,5 @@ impl DebugTable {
 }
 
 pub struct DebugInfo {
-    pub location: Option<SourceLocation>
+    pub location: Option<SourceLocation>,
 }

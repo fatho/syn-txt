@@ -1,8 +1,8 @@
 //! Primitive operations that define special syntax with deep integration in how evaluation is handled.
 
+use crate::lang2::heap::*;
 use crate::lang2::interpreter::*;
 use crate::lang2::value::*;
-use crate::lang2::heap::*;
 
 /// Interprets the `(begin ...)` construct that creates a new scope and executes a series of expressions,
 /// returning the value of the last one.
@@ -60,7 +60,7 @@ pub fn define(int: &mut Interpreter, mut args: Gc<Value>) -> Result<Gc<Value>> {
 
     // Transform `(define (f ...) v)` into `(define f (lambda (...) v))`
     let (var, value) = match &*defined.pin() {
-        Value::Symbol(sym) =>  {
+        Value::Symbol(sym) => {
             let value = int.pop_argument_eval(&mut args)?;
             int.expect_no_more_arguments(&args)?;
             (sym.clone(), value)

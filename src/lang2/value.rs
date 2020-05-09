@@ -1,8 +1,7 @@
-
-use std::{cell::{RefCell}, collections::HashMap, rc::Rc, fmt};
-use crate::rational::Rational;
-use super::{Gc, Trace, Heap};
 use super::interpreter;
+use super::{Gc, Trace};
+use crate::rational::Rational;
+use std::{cell::RefCell, collections::HashMap, fmt, rc::Rc};
 
 /// A symbolic value.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -35,7 +34,9 @@ impl From<Rc<str>> for Symbol {
 
 /// A primitive operation exposed to the interpreted language.
 #[derive(Copy, Clone)]
-pub struct PrimOp(pub fn(&mut interpreter::Interpreter, Gc<Value>) -> interpreter::Result<Gc<Value>>);
+pub struct PrimOp(
+    pub fn(&mut interpreter::Interpreter, Gc<Value>) -> interpreter::Result<Gc<Value>>,
+);
 
 impl fmt::Debug for PrimOp {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -159,7 +160,7 @@ impl Value {
 impl Trace for Value {
     fn mark(&self) {
         match self {
-            Value::Str(_) =>{},
+            Value::Str(_) => {}
             Value::Float(_) => {}
             Value::Ratio(_) => {}
             Value::Int(_) => {}
@@ -169,7 +170,7 @@ impl Trace for Value {
             Value::Cons(head, tail) => {
                 Gc::mark(head);
                 Gc::mark(tail);
-            },
+            }
             Value::Closure(clos) => clos.mark(),
             Value::Symbol(_) => {}
             Value::Keyword(_) => {}
@@ -278,6 +279,9 @@ impl Scope {
 impl Trace for Scope {
     fn mark(&self) {
         self.outer.iter().for_each(Gc::mark);
-        self.bindings.borrow().iter().for_each(|(_, value)| value.mark());
+        self.bindings
+            .borrow()
+            .iter()
+            .for_each(|(_, value)| value.mark());
     }
 }

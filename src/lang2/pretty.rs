@@ -1,5 +1,5 @@
-use super::value::*;
 use super::heap::Gc;
+use super::value::*;
 use std::fmt::Write;
 
 struct PrettyPrinter {
@@ -51,7 +51,7 @@ impl PrettyPrinter {
             current = tail.pin();
         }
         // Dotted list, but there's no input syntax for this yet
-        if ! current.is_nil() {
+        if !current.is_nil() {
             self.output.push_str(" . ");
             self.print(&current);
         }

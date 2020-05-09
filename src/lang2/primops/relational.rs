@@ -1,6 +1,5 @@
-
-use crate::lang2::interpreter::*;
 use crate::lang2::heap::*;
+use crate::lang2::interpreter::*;
 use crate::lang2::value::*;
 
 use std::cmp::Ordering;
@@ -9,7 +8,9 @@ pub fn gt(int: &mut Interpreter, mut args: Gc<Value>) -> Result<Gc<Value>> {
     let a = int.pop_argument_eval(&mut args)?;
     let b = int.pop_argument_eval(&mut args)?;
     int.expect_no_more_arguments(&args)?;
-    Ok(int.heap_alloc_value(Value::Bool(partial_cmp_impl(a.pin(), b.pin()) == Some(Ordering::Greater))))
+    Ok(int.heap_alloc_value(Value::Bool(
+        partial_cmp_impl(a.pin(), b.pin()) == Some(Ordering::Greater),
+    )))
 }
 
 pub fn geq(int: &mut Interpreter, mut args: Gc<Value>) -> Result<Gc<Value>> {
@@ -17,14 +18,18 @@ pub fn geq(int: &mut Interpreter, mut args: Gc<Value>) -> Result<Gc<Value>> {
     let b = int.pop_argument_eval(&mut args)?;
     int.expect_no_more_arguments(&args)?;
     let order = partial_cmp_impl(a.pin(), b.pin());
-    Ok(int.heap_alloc_value(Value::Bool(order == Some(Ordering::Greater) || order == Some(Ordering::Equal))))
+    Ok(int.heap_alloc_value(Value::Bool(
+        order == Some(Ordering::Greater) || order == Some(Ordering::Equal),
+    )))
 }
 
 pub fn lt(int: &mut Interpreter, mut args: Gc<Value>) -> Result<Gc<Value>> {
     let a = int.pop_argument_eval(&mut args)?;
     let b = int.pop_argument_eval(&mut args)?;
     int.expect_no_more_arguments(&args)?;
-    Ok(int.heap_alloc_value(Value::Bool(partial_cmp_impl(a.pin(), b.pin()) == Some(Ordering::Less))))
+    Ok(int.heap_alloc_value(Value::Bool(
+        partial_cmp_impl(a.pin(), b.pin()) == Some(Ordering::Less),
+    )))
 }
 
 pub fn leq(int: &mut Interpreter, mut args: Gc<Value>) -> Result<Gc<Value>> {
@@ -32,21 +37,27 @@ pub fn leq(int: &mut Interpreter, mut args: Gc<Value>) -> Result<Gc<Value>> {
     let b = int.pop_argument_eval(&mut args)?;
     int.expect_no_more_arguments(&args)?;
     let order = partial_cmp_impl(a.pin(), b.pin());
-    Ok(int.heap_alloc_value(Value::Bool(order == Some(Ordering::Less) || order == Some(Ordering::Equal))))
+    Ok(int.heap_alloc_value(Value::Bool(
+        order == Some(Ordering::Less) || order == Some(Ordering::Equal),
+    )))
 }
 
 pub fn eq(int: &mut Interpreter, mut args: Gc<Value>) -> Result<Gc<Value>> {
     let a = int.pop_argument_eval(&mut args)?;
     let b = int.pop_argument_eval(&mut args)?;
     int.expect_no_more_arguments(&args)?;
-    Ok(int.heap_alloc_value(Value::Bool(partial_cmp_impl(a.pin(), b.pin()) == Some(Ordering::Equal))))
+    Ok(int.heap_alloc_value(Value::Bool(
+        partial_cmp_impl(a.pin(), b.pin()) == Some(Ordering::Equal),
+    )))
 }
 
 pub fn neq(int: &mut Interpreter, mut args: Gc<Value>) -> Result<Gc<Value>> {
     let a = int.pop_argument_eval(&mut args)?;
     let b = int.pop_argument_eval(&mut args)?;
     int.expect_no_more_arguments(&args)?;
-    Ok(int.heap_alloc_value(Value::Bool(partial_cmp_impl(a.pin(), b.pin()) != Some(Ordering::Equal))))
+    Ok(int.heap_alloc_value(Value::Bool(
+        partial_cmp_impl(a.pin(), b.pin()) != Some(Ordering::Equal),
+    )))
 }
 
 pub fn partial_cmp_impl(a: GcPin<Value>, b: GcPin<Value>) -> Option<Ordering> {

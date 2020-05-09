@@ -1,7 +1,7 @@
 //! Arithmetic primitive operations.
 
-use crate::lang2::interpreter::*;
 use crate::lang2::heap::*;
+use crate::lang2::interpreter::*;
 use crate::lang2::value::*;
 use crate::rational::Rational;
 
@@ -32,7 +32,7 @@ pub fn sub(int: &mut Interpreter, mut args: Gc<Value>) -> Result<Gc<Value>> {
             _ => return Err(int.make_error(id, EvalErrorKind::Type)),
         };
     }
-    if ! has_more {
+    if !has_more {
         accum = match accum {
             Number::Float(x) => Number::Float(-x),
             Number::Ratio(x) => Number::from_rational(-x),
@@ -73,7 +73,7 @@ pub fn div(int: &mut Interpreter, mut args: Gc<Value>) -> Result<Gc<Value>> {
             _ => return Err(int.make_error(args.id(), EvalErrorKind::Type)),
         };
     }
-    if ! has_more {
+    if !has_more {
         if accum.is_zero() {
             return Err(int.make_error(initial_id, EvalErrorKind::DivisionByZero));
         }

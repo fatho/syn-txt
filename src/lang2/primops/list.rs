@@ -1,7 +1,7 @@
 //! List operations
 
-use crate::lang2::interpreter::*;
 use crate::lang2::heap::*;
+use crate::lang2::interpreter::*;
 use crate::lang2::value::*;
 
 /// Create a list value from its arguments.
@@ -150,7 +150,10 @@ pub fn reverse(int: &mut Interpreter, mut args: Gc<Value>) -> Result<Gc<Value>> 
 // }
 
 /// Build a list from the reverse order of items in the given iterator.
-fn rev_list_from_iter<I: Iterator<Item=Gc<Value>>>(int: &mut Interpreter, values: I) -> Result<Gc<Value>> {
+fn rev_list_from_iter<I: Iterator<Item = Gc<Value>>>(
+    int: &mut Interpreter,
+    values: I,
+) -> Result<Gc<Value>> {
     let mut result = int.heap_alloc_value(Value::Nil);
     for val in values {
         result = int.heap_alloc_value(Value::Cons(val, result));

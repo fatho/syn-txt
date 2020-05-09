@@ -9,15 +9,15 @@
 // this repository.
 
 use std::{cell::RefCell, rc::Rc};
-use syn_txt::lang2::value::*;
-use syn_txt::lang2::interpreter::*;
 use syn_txt::lang2::compiler;
-use syn_txt::lang2::heap;
 use syn_txt::lang2::debug;
-use syn_txt::lang2::pretty;
+use syn_txt::lang2::heap;
+use syn_txt::lang2::interpreter::*;
 use syn_txt::lang2::lexer::Lexer;
 use syn_txt::lang2::parser::Parser;
+use syn_txt::lang2::pretty;
 use syn_txt::lang2::span::{LineMap, Span};
+use syn_txt::lang2::value::*;
 
 fn main() {
     simple_logger::init_with_level(log::Level::Debug).unwrap();
@@ -93,8 +93,14 @@ fn main() {
 
     println!("{}", std::mem::size_of::<Value>());
     println!("{}", std::mem::size_of::<syn_txt::lang2::Value>());
-    println!("{}", std::mem::size_of::<syn_txt::lang2::Gc<syn_txt::lang2::Value>>());
-    println!("{}", std::mem::size_of::<Option<syn_txt::lang2::Gc<syn_txt::lang2::Value>>>());
+    println!(
+        "{}",
+        std::mem::size_of::<syn_txt::lang2::Gc<syn_txt::lang2::Value>>()
+    );
+    println!(
+        "{}",
+        std::mem::size_of::<Option<syn_txt::lang2::Gc<syn_txt::lang2::Value>>>()
+    );
 
     run_test(input)
 }
@@ -159,7 +165,7 @@ fn run_test(input: &str) {
         match int.eval(v) {
             Ok(val) => {
                 println!("{}", pretty::pretty(&val.pin()));
-            },
+            }
             Err(err) => {
                 print_error(&lines, err.location(), err.info());
                 break;
@@ -177,13 +183,17 @@ fn run_test(input: &str) {
 }
 
 fn mk_loc(span: Span) -> Option<debug::SourceLocation> {
-    Some(debug::SourceLocation{
+    Some(debug::SourceLocation {
         file: "<input>".into(),
         span,
     })
 }
 
-fn print_error<E: std::fmt::Display>(lines: &LineMap, location: Option<&debug::SourceLocation>, message: E) {
+fn print_error<E: std::fmt::Display>(
+    lines: &LineMap,
+    location: Option<&debug::SourceLocation>,
+    message: E,
+) {
     if let Some(location) = location {
         let start = lines.offset_to_pos(location.span.begin);
         let end = lines.offset_to_pos(location.span.end);

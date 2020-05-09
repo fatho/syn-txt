@@ -1,5 +1,8 @@
-use std::cell::{Cell};
-use std::{fmt::Debug, rc::{Rc, Weak}};
+use std::cell::Cell;
+use std::{
+    fmt::Debug,
+    rc::{Rc, Weak},
+};
 
 /// A heap based on `Rc` with cooperative cycle detection bolted
 /// on top in the form of a mark-and-sweep collection scheme.
@@ -40,7 +43,12 @@ impl Heap {
     pub fn gc_non_cycles(&mut self) {
         for i in (0..self.heap.len()).rev() {
             let rc = &self.heap[i];
-            log::trace!("gc_non_cycles: object {:?} weak={} strong={}", rc.header().get().get_id(), Rc::weak_count(rc), Rc::strong_count(rc));
+            log::trace!(
+                "gc_non_cycles: object {:?} weak={} strong={}",
+                rc.header().get().get_id(),
+                Rc::weak_count(rc),
+                Rc::strong_count(rc)
+            );
             if Rc::weak_count(rc) == 0 {
                 // The heap holds the only reference, we can safely drop it
                 // without affecting existing `Gc` references.
@@ -59,7 +67,13 @@ impl Heap {
         for i in (0..self.heap.len()).rev() {
             let rc = &self.heap[i];
             let marked = rc.header().get().get_mark();
-            log::trace!("gc_cycles: object {:?} weak={} strong={} marked={}", rc.header().get().get_id(), Rc::weak_count(rc), Rc::strong_count(rc), marked);
+            log::trace!(
+                "gc_cycles: object {:?} weak={} strong={} marked={}",
+                rc.header().get().get_id(),
+                Rc::weak_count(rc),
+                Rc::strong_count(rc),
+                marked
+            );
             if self.heap[i].header().get().get_mark() {
                 // Unmark in preparation of the next collection
                 let header = self.heap[i].header();
@@ -140,7 +154,6 @@ impl<T: Trace + Debug> HeapObject for HeapCell<T> {
     }
 }
 
-
 /// A reference-counted pointer with additional mark-and-sweep cycle collection.
 pub struct Gc<T>(Weak<HeapCell<T>>);
 
@@ -164,7 +177,7 @@ impl<T: Trace> Gc<T> {
     pub fn mark(&self) {
         if let Some(strong) = self.0.upgrade() {
             // Break cycles by only traversing heap object the first time it is marked
-            if ! strong.header.get().get_mark() {
+            if !strong.header.get().get_mark() {
                 strong.header.set(strong.header.get().with_mark(true));
                 strong.value.mark()
             }
@@ -221,7 +234,6 @@ impl<T> GcPin<T> {
     }
 }
 
-
 /// Trait for cooperative mark-and-sweep garbage collection.
 pub trait Trace {
     /// Should recursively `mark` all `Gc`-references held by this object.
@@ -251,7 +263,7 @@ mod test {
     impl Trace for Graph {
         fn mark(&self) {
             match self {
-                Graph::Leaf(_) => {},
+                Graph::Leaf(_) => {}
                 Graph::Node(children) => {
                     for child in children.borrow().iter() {
                         child.mark();
@@ -265,7 +277,7 @@ mod test {
         fn drop(&mut self) {
             match self {
                 Graph::Leaf(drop_var) => drop_var.set(true),
-                _ => {},
+                _ => {}
             }
         }
     }
@@ -281,7 +293,7 @@ mod test {
 
         heap.gc_non_cycles();
 
-        assert!(! drop_notifier.get());
+        assert!(!drop_notifier.get());
 
         drop(leaf);
         drop(node1);
@@ -290,7 +302,7 @@ mod test {
 
         drop(node2);
 
-        assert!(! drop_notifier.get());
+        assert!(!drop_notifier.get());
 
         heap.gc_non_cycles();
 
@@ -316,19 +328,19 @@ mod test {
 
         // `leaf` survives dropping our reference
         drop(leaf);
-        assert!(! drop_notifier.get());
+        assert!(!drop_notifier.get());
 
         // As required, we mark our remaining references here
         Gc::mark(&node1);
         Gc::mark(&node2);
         heap.gc_cycles();
-        assert!(! drop_notifier.get());
+        assert!(!drop_notifier.get());
 
         // Just keeping `node2` should still have everything live
         drop(node1);
         Gc::mark(&node2);
         heap.gc_cycles();
-        assert!(! drop_notifier.get());
+        assert!(!drop_notifier.get());
 
         // Pinning node2, then dropping it still keeps the cycle, even without marking
         let pin = node2.pin();
@@ -351,7 +363,7 @@ mod test {
 
         heap.gc_non_cycles();
 
-        assert!(! drop_notifier.get());
+        assert!(!drop_notifier.get());
 
         let pinned = node2.pin();
         drop(leaf);
@@ -360,7 +372,7 @@ mod test {
 
         heap.gc_non_cycles();
 
-        assert!(! drop_notifier.get());
+        assert!(!drop_notifier.get());
 
         drop(pinned);
         heap.gc_non_cycles();

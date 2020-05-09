@@ -1,9 +1,9 @@
 use std::fmt;
 
-use super::value::*;
 use super::debug;
-use super::primops;
 use super::heap::*;
+use super::primops;
+use super::value::*;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EvalError {
@@ -156,10 +156,7 @@ impl<'a> Interpreter<'a> {
         let val = self.heap.alloc(Value::PrimOp(PrimOp(op)));
         if let Some((var, _val)) = self.builtins.pin().define(var, val) {
             // TODO: allow None as location
-            Err(EvalError::new(
-                None,
-                EvalErrorKind::Redefinition(var),
-            ))
+            Err(EvalError::new(None, EvalErrorKind::Redefinition(var)))
         } else {
             Ok(())
         }
@@ -224,20 +221,20 @@ impl<'a> Interpreter<'a> {
     pub fn eval_call(&mut self, head: Gc<Value>, mut tail: Gc<Value>) -> Result<Gc<Value>> {
         let head = self.eval(head)?.pin();
         match &*head {
-            Value::PrimOp(PrimOp(f)) =>
-                f(self, tail),
+            Value::PrimOp(PrimOp(f)) => f(self, tail),
             Value::Closure(gc_closure) => {
                 let clos = gc_closure.pin();
                 // Create a new scope inside the captured scope and define the arguments
                 let scope_stack = Scope::nest(Gc::clone(&clos.captured_scope));
                 for param_var in clos.parameters.iter() {
                     let value = self.pop_argument_eval(&mut tail)?;
-                    if let Some((var, _)) = scope_stack.define(param_var.clone(), value)
-                    {
+                    if let Some((var, _)) = scope_stack.define(param_var.clone(), value) {
                         // the `lambda` prim op ensures that the parameter names are unique,
                         // but the interpreter host might have sneaked in an invalid closure.
                         // TODO: ensure invariants in `Closure`
-                        return Err(EvalError::new(None, EvalErrorKind::Other(format!(
+                        return Err(EvalError::new(
+                            None,
+                            EvalErrorKind::Other(format!(
                                 "invariant violated: closure redefined parameter name {}",
                                 var.as_str()
                             )),
@@ -254,7 +251,9 @@ impl<'a> Interpreter<'a> {
                 let mut current = clos.body.pin();
                 while let Value::Cons(head, tail) = &*current {
                     return_value = self.eval(Gc::clone(head));
-                    if return_value.is_err() { break }
+                    if return_value.is_err() {
+                        break;
+                    }
                     current = tail.pin();
                 }
 
@@ -266,7 +265,6 @@ impl<'a> Interpreter<'a> {
             _ => Err(self.make_error(head.id(), EvalErrorKind::Uncallable)),
         }
     }
-
 
     pub fn pop_argument(&mut self, args: &mut Gc<Value>) -> Result<Gc<Value>> {
         if let Value::Cons(head, tail) = &*args.pin() {
@@ -299,11 +297,9 @@ impl<'a> Interpreter<'a> {
     }
 }
 
-
-
 #[cfg(test)]
 mod test {
-    use super::super::{lexer::*, parser::*, span::*, debug::*, compiler};
+    use super::super::{compiler, debug::*, lexer::*, parser::*, span::*};
     use super::*;
     use crate::rational::*;
 
@@ -333,7 +329,10 @@ mod test {
         }
     }
 
-    fn expect_values_or_errors(input: &str, expected: &[std::result::Result<Value, EvalErrorKind>]) {
+    fn expect_values_or_errors(
+        input: &str,
+        expected: &[std::result::Result<Value, EvalErrorKind>],
+    ) {
         let (vals, mut heap, mut debug) = compile(input);
         let mut interp = Interpreter::new(&mut heap, &mut debug);
 
@@ -502,7 +501,8 @@ mod test {
     fn test_list() {
         expect_values("(list)", &[Value::Nil]);
 
-        expect_values(r#"
+        expect_values(
+            r#"
             (define (sum l)
                 (if (cons? l)
                     (+ (head l) (sum (tail l)))

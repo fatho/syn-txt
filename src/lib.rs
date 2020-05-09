@@ -10,6 +10,7 @@
 
 // Language implementation
 pub mod lang;
+pub mod lang2; // alternative interpreter
 pub mod musicc;
 
 // modules for making sounds

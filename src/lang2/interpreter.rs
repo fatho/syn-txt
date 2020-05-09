@@ -92,17 +92,23 @@ impl<'a> Interpreter<'a> {
             ("define", PrimOp(primops::define)),
             ("lambda", PrimOp(primops::lambda)),
             ("set!", PrimOp(primops::set)),
+            ("if", PrimOp(primops::if_)),
             // arithmetic
             ("+", PrimOp(primops::add)),
             ("-", PrimOp(primops::sub)),
             ("*", PrimOp(primops::mul)),
             ("/", PrimOp(primops::div)),
-            // // lists
-            // ("list", PrimOp(primops::list)),
-            // ("concat", PrimOp(primops::concat)),
-            // ("reverse", PrimOp(primops::reverse)),
-            // ("for-each", PrimOp(primops::for_each)),
-            // ("map", PrimOp(primops::map)),
+            // lists
+            ("list", PrimOp(primops::list)),
+            ("cons", PrimOp(primops::cons)),
+            ("head", PrimOp(primops::head)),
+            ("tail", PrimOp(primops::tail)),
+            ("cons?", PrimOp(primops::is_cons)),
+            ("nil?", PrimOp(primops::is_nil)),
+            ("concat", PrimOp(primops::concat)),
+            ("reverse", PrimOp(primops::reverse)),
+            ("for-each", PrimOp(primops::for_each)),
+            ("map", PrimOp(primops::map)),
             // ("range", PrimOp(primops::range)),
             // // dicts
             // ("dict", PrimOp(primops::dict)),
@@ -111,9 +117,16 @@ impl<'a> Interpreter<'a> {
             // util
             ("print", PrimOp(primops::print)),
         ];
+        let constants = vec![
+            // syntax
+            ("nil", Value::Nil),
+        ];
 
         for (name, fun) in prim {
             builtin_scope.define(name.into(), heap.alloc(Value::PrimOp(fun)));
+        }
+        for (name, c) in constants {
+            builtin_scope.define(name.into(), heap.alloc(c));
         }
 
         let builtins = heap.alloc(builtin_scope);

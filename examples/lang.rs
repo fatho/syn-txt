@@ -59,10 +59,36 @@ fn main() {
         (get-global)
         global-state
 
+        (define (map f l)
+            (if (cons? l)
+                (cons
+                    (f (head l))
+                    (map f (tail l))
+                )
+                nil
+            )
+        )
+
+        (define reverse
+            (begin
+                (define (reverse-impl l acc)
+                    (if (cons? l)
+                        (reverse-impl
+                            (tail l)
+                            (cons (head l) acc)
+                        )
+                        acc
+                    )
+                )
+                (lambda (l) (reverse-impl l nil))
+            )
+        )
+
         (define foo (list 1 2 3 4))
-        (define (cat-rev l) (concat l (reverse l)))
-        (print (cat-rev foo))
-        (for-each print (map (lambda (x) (+ 1 x)) (cat-rev foo)))
+        (map (lambda (x) (+ 1 x)) (reverse foo))
+        ; (define (cat-rev l) (concat l (reverse l)))
+        ; (print (cat-rev foo))
+        ; (for-each print (map (lambda (x) (+ 1 x)) (cat-rev foo)))
     "#;
 
     println!("{}", std::mem::size_of::<Value>());

@@ -11,7 +11,7 @@ pub fn add(int: &mut Interpreter, mut args: Gc<Value>) -> Result<Gc<Value>> {
     while let Some((next, id)) = Number::try_pop(int, &mut args)? {
         accum = match widen(accum, next) {
             (Number::Int(x), Number::Int(y)) => Number::Int(x + y),
-            (Number::Ratio(x), Number::Ratio(y)) => Number::Ratio(x + y),
+            (Number::Ratio(x), Number::Ratio(y)) => Number::from_rational(x + y),
             (Number::Float(x), Number::Float(y)) => Number::Float(x + y),
             _ => return Err(int.make_error(id, EvalErrorKind::Type)),
         };
@@ -27,7 +27,7 @@ pub fn sub(int: &mut Interpreter, mut args: Gc<Value>) -> Result<Gc<Value>> {
         has_more = true;
         accum = match widen(accum, next) {
             (Number::Int(x), Number::Int(y)) => Number::Int(x - y),
-            (Number::Ratio(x), Number::Ratio(y)) => Number::Ratio(x - y),
+            (Number::Ratio(x), Number::Ratio(y)) => Number::from_rational(x - y),
             (Number::Float(x), Number::Float(y)) => Number::Float(x - y),
             _ => return Err(int.make_error(id, EvalErrorKind::Type)),
         };
@@ -35,7 +35,7 @@ pub fn sub(int: &mut Interpreter, mut args: Gc<Value>) -> Result<Gc<Value>> {
     if ! has_more {
         accum = match accum {
             Number::Float(x) => Number::Float(-x),
-            Number::Ratio(x) => Number::Ratio(-x),
+            Number::Ratio(x) => Number::from_rational(-x),
             Number::Int(x) => Number::Int(-x),
         };
     }
@@ -48,7 +48,7 @@ pub fn mul(int: &mut Interpreter, mut args: Gc<Value>) -> Result<Gc<Value>> {
     while let Some((next, id)) = Number::try_pop(int, &mut args)? {
         accum = match widen(accum, next) {
             (Number::Int(x), Number::Int(y)) => Number::Int(x * y),
-            (Number::Ratio(x), Number::Ratio(y)) => Number::Ratio(x * y),
+            (Number::Ratio(x), Number::Ratio(y)) => Number::from_rational(x * y),
             (Number::Float(x), Number::Float(y)) => Number::Float(x * y),
             _ => return Err(int.make_error(id, EvalErrorKind::Type)),
         };
@@ -67,8 +67,8 @@ pub fn div(int: &mut Interpreter, mut args: Gc<Value>) -> Result<Gc<Value>> {
             return Err(int.make_error(id, EvalErrorKind::DivisionByZero));
         }
         accum = match widen(accum, next) {
-            (Number::Int(x), Number::Int(y)) => Number::Ratio(Rational::new(x, y)),
-            (Number::Ratio(x), Number::Ratio(y)) => Number::Ratio(x / y),
+            (Number::Int(x), Number::Int(y)) => Number::from_rational(Rational::new(x, y)),
+            (Number::Ratio(x), Number::Ratio(y)) => Number::from_rational(x / y),
             (Number::Float(x), Number::Float(y)) => Number::Float(x / y),
             _ => return Err(int.make_error(args.id(), EvalErrorKind::Type)),
         };
@@ -97,6 +97,15 @@ enum Number {
 }
 
 impl Number {
+    /// Convert from rational, downgrading a rational with denominator one back to int.
+    pub fn from_rational(r: Rational) -> Self {
+        if r.denominator() == 1 {
+            Number::Int(r.numerator())
+        } else {
+            Number::Ratio(r)
+        }
+    }
+
     pub fn to_value(self) -> Value {
         match self {
             Number::Float(x) => Value::Float(x),

@@ -19,8 +19,8 @@ pub use arithmetic::*;
 mod util;
 pub use util::*;
 
-// mod list;
-// pub use list::*;
+mod list;
+pub use list::*;
 
 // mod dict;
 // pub use dict::*;

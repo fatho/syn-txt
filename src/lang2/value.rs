@@ -1,7 +1,7 @@
 
 use std::{cell::{RefCell}, collections::HashMap, rc::Rc, fmt};
 use crate::rational::Rational;
-use super::{Gc, Trace};
+use super::{Gc, Trace, Heap};
 use super::interpreter;
 
 /// A symbolic value.

@@ -9,7 +9,8 @@ use crate::lang2::pretty::pretty;
 pub fn print(int: &mut Interpreter, args: Gc<Value>) -> Result<Gc<Value>> {
     let mut current = args.pin();
     while let Value::Cons(arg, tail) = &*current {
-        println!("{}", pretty(&arg.pin()));
+        let value = int.eval(Gc::clone(arg))?;
+        println!("{}", pretty(&value.pin()));
         current = tail.pin();
     }
     Ok(int.heap_alloc_value(Value::Void))

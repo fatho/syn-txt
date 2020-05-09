@@ -96,3 +96,24 @@ pub fn set(int: &mut Interpreter, mut args: Gc<Value>) -> Result<Gc<Value>> {
         Err(_) => Err(int.make_error(var_arg.id(), EvalErrorKind::NoSuchVariable(var.clone()))),
     }
 }
+
+/// If expression
+pub fn if_(int: &mut Interpreter, mut args: Gc<Value>) -> Result<Gc<Value>> {
+    let cond = int.pop_argument_eval(&mut args)?;
+    let then = int.pop_argument(&mut args)?;
+    let else_ = int.pop_argument(&mut args)?;
+    int.expect_no_more_arguments(&mut args)?;
+
+    let is_true = match &*cond.pin() {
+        Value::Bool(b) => *b,
+        Value::Nil => false,
+        Value::Void => false,
+        _ => true,
+    };
+
+    if is_true {
+        int.eval(then)
+    } else {
+        int.eval(else_)
+    }
+}

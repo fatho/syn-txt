@@ -1,5 +1,5 @@
 use std::cell::{Cell};
-use std::rc::{Rc, Weak};
+use std::{fmt::Debug, rc::{Rc, Weak}};
 
 /// A heap based on `Rc` with cooperative cycle detection bolted
 /// on top in the form of a mark-and-sweep collection scheme.
@@ -77,6 +77,16 @@ impl Heap {
     }
 }
 
+/// Opaque unique value ID.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub struct Id(usize);
+
+impl Id {
+    pub fn is_valid(self) -> bool {
+        self.0 != 0
+    }
+}
+
 /// Internal implementation of a heap object. In addition to the actual value,
 /// it contains a flag indicating whether the object was marked as live since
 /// the most recent GC pass.
@@ -126,8 +136,19 @@ impl<T: Trace> HeapObject for HeapCell<T> {
 
 
 /// A reference-counted pointer with additional mark-and-sweep cycle collection.
-#[derive(Debug)]
 pub struct Gc<T>(Weak<HeapCell<T>>);
+
+impl<T: Debug> Debug for Gc<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Gc(")?;
+        if let Some(real) = self.0.upgrade() {
+            write!(f, "{:?}", (&*real))?;
+        } else {
+            write!(f, "<collected>")?;
+        }
+        write!(f, ")")
+    }
+}
 
 impl<T: PartialEq> PartialEq for Gc<T> {
     fn eq(&self, other: &Self) -> bool {
@@ -162,10 +183,9 @@ impl<T: Trace> Gc<T> {
         self.try_pin().expect("cannot already collected value")
     }
 
-    /// Unique (as long as the value is live) id of this Gc pointer,
-    /// otherwise 0.
-    pub fn id(&self) -> usize {
-        self.0.upgrade().map_or(0, |rc| rc.header.get().get_id())
+    /// Unique (as long as the value is live) id of this Gc pointer. Otherwise a bogus sentinel value.
+    pub fn id(&self) -> Id {
+        Id(self.0.upgrade().map_or(0, |rc| rc.header.get().get_id()))
     }
 }
 

@@ -1,36 +1,29 @@
 use std::fmt;
 
 use super::ast;
-use super::span::*;
 use super::value::*;
+use super::debug;
 
 pub type InterpreterResult<T> = Result<T, EvalError>;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EvalError {
-    location: Option<SourceLocation>,
+    location: Option<debug::SourceLocation>,
     info: EvalErrorKind,
 }
 
 impl EvalError {
-    pub fn new(location: Option<SourceLocation>, info: EvalErrorKind) -> Self {
+    pub fn new(location: Option<debug::SourceLocation>, info: EvalErrorKind) -> Self {
         Self { location, info }
     }
 
-    pub fn location(&self) -> Option<&SourceLocation> {
+    pub fn location(&self) -> Option<&debug::SourceLocation> {
         self.location.as_ref()
     }
 
     pub fn info(&self) -> &EvalErrorKind {
         &self.info
     }
-}
-
-/// Location referring to a source file.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SourceLocation {
-    pub file: String,
-    pub span: Span,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

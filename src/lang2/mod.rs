@@ -6,6 +6,9 @@ pub mod heap;
 pub mod value;
 pub mod interpreter;
 pub mod compiler;
+pub mod debug;
+pub mod pretty;
 
 pub use value::*;
 pub use heap::*;
+pub use interpreter::*;

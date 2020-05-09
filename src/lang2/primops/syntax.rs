@@ -38,9 +38,9 @@ pub fn lambda_impl(
     while let Value::Cons(param, tail) = &*params.pin() {
         let ident = int.as_symbol(param)?;
         if parameters.contains(&ident) {
-            return Err(int.make_error(param.id(), EvalErrorKind::Redefinition(ident.clone())));
+            return Err(int.make_error(param.id(), EvalErrorKind::Redefinition(ident)));
         } else {
-            parameters.push(ident.clone());
+            parameters.push(ident);
         }
         params = Gc::clone(tail);
     }
@@ -76,7 +76,7 @@ pub fn define(int: &mut Interpreter, mut args: Gc<Value>) -> Result<Gc<Value>> {
         }
     };
 
-    if let Some((var, _)) = int.scope_stack().pin().define(var.clone(), value) {
+    if let Some((var, _)) = int.scope_stack().pin().define(var, value) {
         Err(int.make_error(defined.id(), EvalErrorKind::Redefinition(var)))
     } else {
         Ok(int.heap_alloc_value(Value::Void))
@@ -88,7 +88,7 @@ pub fn set(int: &mut Interpreter, mut args: Gc<Value>) -> Result<Gc<Value>> {
     let var_arg = int.pop_argument(&mut args)?;
     let var = int.as_symbol(&var_arg)?;
     let value = int.pop_argument_eval(&mut args)?;
-    int.expect_no_more_arguments(&mut args)?;
+    int.expect_no_more_arguments(&args)?;
 
     // Traverse the scopes from top to bottom
     match int.scope_stack().pin().set(&var, value) {
@@ -102,7 +102,7 @@ pub fn if_(int: &mut Interpreter, mut args: Gc<Value>) -> Result<Gc<Value>> {
     let cond = int.pop_argument_eval(&mut args)?;
     let then = int.pop_argument(&mut args)?;
     let else_ = int.pop_argument(&mut args)?;
-    int.expect_no_more_arguments(&mut args)?;
+    int.expect_no_more_arguments(&args)?;
 
     let is_true = match &*cond.pin() {
         Value::Bool(b) => *b,

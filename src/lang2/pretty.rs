@@ -29,6 +29,7 @@ impl PrettyPrinter {
             Value::Cons(head, tail) => self.print_list(head, tail),
             Value::Closure(_) => self.output.push_str("<<<closure>>>"),
             Value::PrimOp(_) => self.output.push_str("<<<prim-op>>>"),
+            Value::Dict(d) => self.print_dict(d),
         }
     }
 
@@ -54,6 +55,21 @@ impl PrettyPrinter {
         if !current.is_nil() {
             self.output.push_str(" . ");
             self.print(&current);
+        }
+        self.output.push(')');
+        self.indent -= 2;
+    }
+
+    fn print_dict(&mut self, d: &std::collections::HashMap<Symbol, Gc<Value>>) {
+        self.output.push_str("(dict");
+        self.indent += 2;
+
+        for (key, value) in d.iter() {
+            self.output.push('\n');
+            self.print_indent();
+            self.output.push_str(key.as_str());
+            self.output.push(' ');
+            self.print(&value.pin());
         }
         self.output.push(')');
         self.indent -= 2;

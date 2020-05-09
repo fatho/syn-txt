@@ -117,10 +117,10 @@ impl<'a> Interpreter<'a> {
             ("for-each", PrimOp(primops::for_each)),
             ("map", PrimOp(primops::map)),
             // ("range", PrimOp(primops::range)),
-            // // dicts
-            // ("dict", PrimOp(primops::dict)),
-            // ("update", PrimOp(primops::dict_update)),
-            // ("get", PrimOp(primops::dict_get)),
+            // dicts
+            ("dict", PrimOp(primops::dict)),
+            ("update", PrimOp(primops::dict_update)),
+            ("get", PrimOp(primops::dict_get)),
             // util
             ("print", PrimOp(primops::print)),
         ];
@@ -302,6 +302,7 @@ mod test {
     use super::super::{compiler, debug::*, lexer::*, parser::*, span::*};
     use super::*;
     use crate::rational::*;
+    use std::collections::HashMap;
 
     fn compile(input: &str) -> (Vec<Gc<Value>>, Heap, DebugTable) {
         let tokens = Lexer::new(input)
@@ -558,44 +559,45 @@ mod test {
         // expect_values("(range 0)", &[Value::List(vec![].into())]);
     }
 
-    // #[test]
-    // fn test_dict() {
-    //     expect_values("(dict)", &[Value::Dict(Rc::new(HashMap::new()))]);
-    //     expect_values(
-    //         "
-    //         (define d (dict :foo 1 :bar 2))
-    //         d
-    //         (get d :foo)
-    //         (define d2 (update d :foo 4))
-    //         (get d :foo)
-    //         (get d2 :foo)
-    //         (get d2 :bar)
-    //         (get d2 :baz)
-    //         ",
-    //         &[
-    //             Value::Void,
-    //             Value::Dict({
-    //                 let mut d = HashMap::new();
-    //                 d.insert(":foo".into(), Value::Int(1));
-    //                 d.insert(":bar".into(), Value::Int(2));
-    //                 Rc::new(d)
-    //             }),
-    //             Value::Int(1),
-    //             Value::Void,
-    //             Value::Int(1),
-    //             Value::Int(4),
-    //             Value::Int(2),
-    //         ],
-    //     );
-    //     expect_values_or_errors(
-    //         "
-    //         (define d (dict :foo 1 :bar 2))
-    //         (get d :baz)
-    //         ",
-    //         &[
-    //             Ok(Value::Void),
-    //             Err(IntpErrInfo::UnknownKeyword(":baz".into())),
-    //         ],
-    //     );
-    // }
+    #[test]
+    fn test_dict() {
+        let mut heap = Heap::new();
+        expect_values("(dict)", &[Value::Dict(HashMap::new())]);
+        expect_values(
+            "
+            (define d (dict :foo 1 :bar 2))
+            d
+            (get d :foo)
+            (define d2 (update d :foo 4))
+            (get d :foo)
+            (get d2 :foo)
+            (get d2 :bar)
+            (get d2 :baz)
+            ",
+            &[
+                Value::Void,
+                Value::Dict({
+                    let mut d = HashMap::new();
+                    d.insert(":foo".into(), heap.alloc(Value::Int(1)));
+                    d.insert(":bar".into(), heap.alloc(Value::Int(2)));
+                    d
+                }),
+                Value::Int(1),
+                Value::Void,
+                Value::Int(1),
+                Value::Int(4),
+                Value::Int(2),
+            ],
+        );
+        expect_values_or_errors(
+            "
+            (define d (dict :foo 1 :bar 2))
+            (get d :baz)
+            ",
+            &[
+                Ok(Value::Void),
+                Err(EvalErrorKind::UnknownKeyword(":baz".into())),
+            ],
+        );
+    }
 }

@@ -76,6 +76,8 @@ pub enum Value {
     Nil,
     /// A cons cell, used for creating lists of values.
     Cons(Gc<Value>, Gc<Value>),
+    /// A dictionary value consisting of static keys.
+    Dict(HashMap<Symbol, Gc<Value>>),
     /// Closure that can be called
     Closure(Gc<Closure>),
     /// Primitive operation.
@@ -172,6 +174,9 @@ impl Trace for Value {
                 Gc::mark(tail);
             }
             Value::Closure(clos) => clos.mark(),
+            Value::Dict(d) => {
+                d.iter().for_each(|(_, v)| v.mark());
+            }
             Value::Symbol(_) => {}
             Value::Keyword(_) => {}
             Value::PrimOp(_) => {}

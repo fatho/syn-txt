@@ -214,6 +214,13 @@ impl<T> std::ops::Deref for GcPin<T> {
     }
 }
 
+impl<T> GcPin<T> {
+    /// Unique (as long as the value is live) id of this Gc pointer. Otherwise a bogus sentinel value.
+    pub fn id(&self) -> Id {
+        Id(self.0.header.get().get_id())
+    }
+}
+
 
 /// Trait for cooperative mark-and-sweep garbage collection.
 pub trait Trace {

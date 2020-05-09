@@ -21,6 +21,7 @@ use syn_txt::lang2::span::{LineMap, Span};
 
 fn main() {
     let input = r#"
+        (print 5 1/3 "foo")
         (define r 5)
         (define area
             (begin
@@ -78,7 +79,7 @@ fn run_test(input: &str) {
         match token_or_error {
             Ok(tok) => tokens.push(tok),
             Err(err) => {
-                print_error(&lines, err.location(), err.kind());
+                print_error(&lines, mk_loc(err.location()).as_ref(), err.kind());
             }
         }
     }
@@ -89,7 +90,7 @@ fn run_test(input: &str) {
     let ast = match parser.parse() {
         Ok(ast) => ast,
         Err(err) => {
-            print_error(&lines, err.location(), err.info());
+            print_error(&lines, mk_loc(err.location()).as_ref(), err.info());
             return;
         }
     };
@@ -104,9 +105,17 @@ fn run_test(input: &str) {
     };
     let values: Vec<heap::Gc<Value>> = ast.iter().map(|e| context.compile(e)).collect();
 
+    println!("Evaluating...");
+    let mut int = Interpreter::new(heap, debug);
+    // let extension_state = Rc::new(RefCell::new(0));
+    // int.register_primop_ext("foo/new", move |intp, args| {
+    //     foo_ext_foo_new(&mut *extension_state.borrow_mut(), intp, args)
+    // })
+    // .unwrap();
+
     for v in values {
         print!("at ");
-        let dbg_loc = debug.get_location(v.id());
+        let dbg_loc = int.debug_info().get_location(v.id());
         if let Some(loc) = dbg_loc {
             let start = lines.offset_to_pos(loc.span.begin);
             let end = lines.offset_to_pos(loc.span.end);
@@ -116,33 +125,34 @@ fn run_test(input: &str) {
         }
         println!("{}", pretty::pretty(&v.pin()));
         println!();
+
+        match int.eval(v) {
+            Ok(val) => println!("  {:?}", val),
+            Err(err) => {
+                print_error(&lines, err.location(), err.info());
+                return;
+            }
+        }
+        println!("----------------------------");
     }
-
-    println!("Evaluating...");
-    // let mut int = Interpreter::new();
-    // let extension_state = Rc::new(RefCell::new(0));
-    // int.register_primop_ext("foo/new", move |intp, args| {
-    //     foo_ext_foo_new(&mut *extension_state.borrow_mut(), intp, args)
-    // })
-    // .unwrap();
-
-    // for s in ast {
-    //     println!("{}", &input[s.src.begin..s.src.end]);
-    //     match int.eval(&s) {
-    //         Ok(val) => println!("  {:?}", val),
-    //         Err(err) => {
-    //             print_error(&lines, err.location(), err.info());
-    //             return;
-    //         }
-    //     }
-    // }
 }
 
-fn print_error<E: std::fmt::Display>(lines: &LineMap, location: Span, message: E) {
-    let start = lines.offset_to_pos(location.begin);
-    let end = lines.offset_to_pos(location.end);
-    println!("error: {} (<input>:{}-{})", message, start, end);
-    println!("{}", lines.highlight(start, end, true));
+fn mk_loc(span: Span) -> Option<debug::SourceLocation> {
+    Some(debug::SourceLocation{
+        file: "<input>".into(),
+        span,
+    })
+}
+
+fn print_error<E: std::fmt::Display>(lines: &LineMap, location: Option<&debug::SourceLocation>, message: E) {
+    if let Some(location) = location {
+        let start = lines.offset_to_pos(location.span.begin);
+        let end = lines.offset_to_pos(location.span.end);
+        println!("error: {} ({} {}-{})", message, location.file, start, end);
+        println!("{}", lines.highlight(start, end, true));
+    } else {
+        println!("error: {}", message)
+    }
 }
 
 // fn foo_ext_foo_new(

@@ -28,6 +28,7 @@ impl PrettyPrinter {
             Value::Nil => self.output.push_str("'()"),
             Value::Cons(head, tail) => self.print_list(head, tail),
             Value::Closure(_) => self.output.push_str("<<<closure>>>"),
+            Value::PrimOp(_) => self.output.push_str("<<<prim-op>>>"),
         }
     }
 

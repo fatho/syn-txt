@@ -8,6 +8,7 @@ pub mod interpreter;
 pub mod compiler;
 pub mod debug;
 pub mod pretty;
+pub mod primops;
 
 pub use value::*;
 pub use heap::*;

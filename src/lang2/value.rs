@@ -1,7 +1,8 @@
 
-use std::{cell::{RefCell}, collections::HashMap, rc::Rc};
+use std::{cell::{RefCell}, collections::HashMap, rc::Rc, fmt};
 use crate::rational::Rational;
-use super::heap;
+use super::{Gc, Trace};
+use super::interpreter;
 
 /// A symbolic value.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -32,6 +33,26 @@ impl From<Rc<str>> for Symbol {
     }
 }
 
+/// A primitive operation exposed to the interpreted language.
+#[derive(Copy, Clone)]
+pub struct PrimOp(pub for<'a> fn(&mut interpreter::Interpreter, Gc<Value>) -> interpreter::Result<Gc<Value>>);
+
+impl fmt::Debug for PrimOp {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let ptr = self.0 as *const ();
+        write!(f, "PrimOp({:p})", ptr)
+    }
+}
+
+impl PartialEq for PrimOp {
+    fn eq(&self, other: &Self) -> bool {
+        let self_ptr = self.0 as *const ();
+        let other_ptr = other.0 as *const ();
+        self_ptr == other_ptr
+    }
+}
+impl Eq for PrimOp {}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
     /// A symbol
@@ -53,9 +74,11 @@ pub enum Value {
     /// The empty list, nil
     Nil,
     /// A cons cell, used for creating lists of values.
-    Cons(heap::Gc<Value>, heap::Gc<Value>),
+    Cons(Gc<Value>, Gc<Value>),
     /// Closure that can be called
-    Closure(heap::Gc<Closure>),
+    Closure(Gc<Closure>),
+    /// Primitive operation.
+    PrimOp(PrimOp),
 }
 
 impl Value {
@@ -125,9 +148,15 @@ impl Value {
             _ => false,
         }
     }
+    pub fn is_primop(&self) -> bool {
+        match self {
+            Value::PrimOp(_) => true,
+            _ => false,
+        }
+    }
 }
 
-impl heap::Trace for Value {
+impl Trace for Value {
     fn mark(&self) {
         match self {
             Value::Str(_) =>{},
@@ -138,12 +167,13 @@ impl heap::Trace for Value {
             Value::Void => {}
             Value::Nil => {}
             Value::Cons(head, tail) => {
-                heap::Gc::mark(head);
-                heap::Gc::mark(tail);
+                Gc::mark(head);
+                Gc::mark(tail);
             },
             Value::Closure(clos) => clos.mark(),
             Value::Symbol(_) => {}
             Value::Keyword(_) => {}
+            Value::PrimOp(_) => {}
         }
     }
 }
@@ -154,7 +184,7 @@ impl heap::Trace for Value {
 pub struct Closure {
     /// The current scope stack at the point when the closure was made.
     /// Note: mutating variables in these scopes affects the closure as well.
-    pub captured_scope: ScopeRef,
+    pub captured_scope: Gc<Scope>,
     /// Name of the parameters that must be passed to the closure when calling it.
     /// The names must be unique.
     pub parameters: Vec<Symbol>,
@@ -163,22 +193,19 @@ pub struct Closure {
     pub body: Vec<Value>,
 }
 
-impl heap::Trace for Closure {
+impl Trace for Closure {
     fn mark(&self) {
         self.captured_scope.mark();
         self.body.iter().for_each(Value::mark);
     }
 }
-
-/// A reference to a shared scope.
-pub type ScopeRef = heap::Gc<RefCell<Scope>>;
-
 /// A binding scope for variables.
 /// Scopes are lexially nested, and inner scopes have precedence before outer scopes.
 #[derive(Debug, PartialEq, Clone)]
 pub struct Scope {
-    bindings: HashMap<Symbol, Value>,
-    outer: Option<ScopeRef>,
+    // TODO: maybe store small values (Int, Bool, etc.) inline after all?
+    bindings: RefCell<HashMap<Symbol, Gc<Value>>>,
+    outer: Option<Gc<Scope>>,
 }
 
 impl Default for Scope {
@@ -190,35 +217,31 @@ impl Default for Scope {
 impl Scope {
     pub fn new() -> Self {
         Self {
-            bindings: HashMap::new(),
+            bindings: RefCell::new(HashMap::new()),
             outer: None,
         }
     }
 
-    /// Wrap this scope into a `ScopeRef`.
-    pub fn into_ref(self, heap: &mut heap::Heap) -> ScopeRef {
-        heap.alloc(RefCell::new(self))
-    }
-
     /// Create a nested scope inside the given outer scope.
-    pub fn nest(outer: ScopeRef) -> Self {
+    pub fn nest(outer: Gc<Scope>) -> Self {
         Self {
-            bindings: HashMap::new(),
+            bindings: RefCell::new(HashMap::new()),
             outer: Some(outer),
         }
     }
 
     /// Return a reference to the lexically outer scope, if this scope is not the outermost.
-    pub fn outer(&self) -> Option<ScopeRef> {
+    pub fn outer(&self) -> Option<Gc<Scope>> {
         self.outer.clone()
     }
 
     /// Define a variable in this scope, if possible.
     /// On success, it returns `None`, otherwise it gives the arguments back to the caller.
     /// NOTE: `define`, unlike set, does not operate recursively on outer scopes.
-    pub fn define(&mut self, var: Symbol, value: Value) -> Option<(Symbol, Value)> {
-        if self.bindings.get(&var).is_none() {
-            self.bindings.insert(var, value);
+    pub fn define(&self, var: Symbol, value: Gc<Value>) -> Option<(Symbol, Gc<Value>)> {
+        let mut here = self.bindings.borrow_mut();
+        if here.get(&var).is_none() {
+            here.insert(var, value);
             None
         } else {
             Some((var, value))
@@ -228,31 +251,33 @@ impl Scope {
     /// Set a variable in the scope where it was defined.
     /// If the variable was not defined, the `value` argument is returned as `Err`,
     /// otherwise, the previous value is returned as `Ok`.
-    pub fn set(&mut self, var: &Symbol, value: Value) -> Result<Value, Value> {
-        if let Some(slot) = self.bindings.get_mut(var) {
+    pub fn set(&self, var: &Symbol, value: Gc<Value>) -> Result<Gc<Value>, Gc<Value>> {
+        let mut here = self.bindings.borrow_mut();
+        if let Some(slot) = here.get_mut(var) {
             Ok(std::mem::replace(slot, value))
         } else if let Some(outer) = self.outer.as_ref() {
-            outer.pin().borrow_mut().set(var, value)
+            outer.pin().set(var, value)
         } else {
             Err(value)
         }
     }
 
     /// Return a copy of the value of the given variable, or `None` if it was not defined.
-    pub fn lookup(&self, var: &Symbol) -> Option<Value> {
-        if let Some(value) = self.bindings.get(var) {
-            Some(value.clone())
+    pub fn lookup(&self, var: &Symbol) -> Option<Gc<Value>> {
+        let here = self.bindings.borrow();
+        if let Some(value) = here.get(var) {
+            Some(Gc::clone(value))
         } else if let Some(outer) = self.outer.as_ref() {
-            outer.pin().borrow().lookup(var)
+            outer.pin().lookup(var)
         } else {
             None
         }
     }
 }
 
-impl heap::Trace for Scope {
+impl Trace for Scope {
     fn mark(&self) {
-        self.outer.iter().for_each(heap::Gc::mark);
-        self.bindings.iter().for_each(|(_, value)| value.mark());
+        self.outer.iter().for_each(Gc::mark);
+        self.bindings.borrow().iter().for_each(|(_, value)| value.mark());
     }
 }

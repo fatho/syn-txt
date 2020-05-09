@@ -56,6 +56,9 @@ fn main() {
     "#;
 
     println!("{}", std::mem::size_of::<Value>());
+    println!("{}", std::mem::size_of::<syn_txt::lang2::Value>());
+    println!("{}", std::mem::size_of::<syn_txt::lang2::Gc<syn_txt::lang2::Value>>());
+    println!("{}", std::mem::size_of::<Option<syn_txt::lang2::Gc<syn_txt::lang2::Value>>>());
 
     run_test(input)
 }

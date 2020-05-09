@@ -9,19 +9,23 @@ pub struct Heap {
     /// Collection of all live heap cells.
     /// INVARIANT: does not contain the same Rc twice.
     heap: Vec<Rc<dyn HeapObject>>,
+    /// For generating Unique IDs associated with each heap object for debugging purposes.
+    unique_id: usize,
 }
 
 impl Heap {
     pub fn new() -> Self {
         Self {
             heap: Vec::new(),
+            unique_id: 0,
         }
     }
 
     /// Allocate an object inside the heap.
     pub fn alloc<T: Trace + 'static>(&mut self, value: T) -> Gc<T> {
+        self.unique_id += 1;
         let cell = HeapCell {
-            marked: Cell::new(false),
+            header: Cell::new(HeapCellHeader::new(self.unique_id)),
             value,
         };
         let holder = Rc::new(cell);
@@ -33,12 +37,14 @@ impl Heap {
     /// Garbage collect heap objects that are not part of cycles.
     pub fn gc_non_cycles(&mut self) {
         for i in (0..self.heap.len()).rev() {
-            if Rc::weak_count(&self.heap[i]) == 0 {
+            let rc = &self.heap[i];
+            if Rc::weak_count(rc) == 0 {
                 // The heap holds the only reference, we can safely drop it
                 // without affecting existing `Gc` references.
                 self.heap.swap_remove(i);
             } else {
-                self.heap[i].marked().set(false);
+                let header = rc.header();
+                header.set(header.get().with_mark(false));
             }
         }
     }
@@ -48,9 +54,10 @@ impl Heap {
     pub fn gc_cycles(&mut self) {
         // Deallocate everything that is still unmarked
         for i in (0..self.heap.len()).rev() {
-            if self.heap[i].marked().get() {
+            if self.heap[i].header().get().get_mark() {
                 // Unmark in preparation of the next collection
-                self.heap[i].marked().set(false);
+                let header = self.heap[i].header();
+                header.set(header.get().with_mark(false));
             } else {
                 // This invalidates all `Weak` references, unless there are still `GcPin`s
                 // that keep those alive. Either way, it does not matter as those objects
@@ -73,30 +80,47 @@ impl Heap {
 /// Internal implementation of a heap object. In addition to the actual value,
 /// it contains a flag indicating whether the object was marked as live since
 /// the most recent GC pass.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug)]
 struct HeapCell<T> {
-    marked: Cell<bool>,
+    header: Cell<HeapCellHeader>,
     value: T,
+}
+
+#[derive(Debug, Copy, Clone)]
+struct HeapCellHeader(usize);
+
+impl HeapCellHeader {
+    const MARK_BIT_MASK: usize = !(std::usize::MAX >> 1);
+
+    pub fn new(id: usize) -> Self {
+        Self(id & !Self::MARK_BIT_MASK)
+    }
+
+    pub fn get_mark(self) -> bool {
+        (self.0 & Self::MARK_BIT_MASK) != 0
+    }
+
+    pub fn with_mark(self, mark: bool) -> Self {
+        if mark {
+            Self(self.0 | Self::MARK_BIT_MASK)
+        } else {
+            Self(self.0 & !Self::MARK_BIT_MASK)
+        }
+    }
+
+    pub fn get_id(self) -> usize {
+        self.0 & !Self::MARK_BIT_MASK
+    }
 }
 
 /// Internal trait used for implementing dynamic dispatch on HeapCells of different types.
 trait HeapObject {
-    /// Pointer to the marked flag.
-    fn marked(&self) -> &Cell<bool>;
-    fn mark(&self);
+    fn header(&self) -> &Cell<HeapCellHeader>;
 }
 
 impl<T: Trace> HeapObject for HeapCell<T> {
-    fn marked(&self) -> &Cell<bool> {
-        &self.marked
-    }
-
-    fn mark(&self) {
-        // Break cycles by only traversing heap object the first time it is marked
-        if ! self.marked.get() {
-            self.marked.set(true);
-            self.value.mark()
-        }
+    fn header(&self) -> &Cell<HeapCellHeader> {
+        &self.header
     }
 }
 
@@ -107,7 +131,10 @@ pub struct Gc<T>(Weak<HeapCell<T>>);
 
 impl<T: PartialEq> PartialEq for Gc<T> {
     fn eq(&self, other: &Self) -> bool {
-        self.0.upgrade() == other.0.upgrade()
+        match (self.0.upgrade(), other.0.upgrade()) {
+            (Some(a), Some(b)) => a.value == b.value,
+            _ => false,
+        }
     }
 }
 impl<T: Eq> Eq for Gc<T> {}
@@ -115,7 +142,11 @@ impl<T: Eq> Eq for Gc<T> {}
 impl<T: Trace> Gc<T> {
     pub fn mark(&self) {
         if let Some(strong) = self.0.upgrade() {
-            strong.mark()
+            // Break cycles by only traversing heap object the first time it is marked
+            if ! strong.header.get().get_mark() {
+                strong.header.set(strong.header.get().with_mark(true));
+                strong.value.mark()
+            }
         } else {
             log::warn!("suspicious marking of invalidated weak pointer");
         }
@@ -129,6 +160,12 @@ impl<T: Trace> Gc<T> {
     /// Pin the value, or panic if the value has already been garbage collected.
     pub fn pin(&self) -> GcPin<T> {
         self.try_pin().expect("cannot already collected value")
+    }
+
+    /// Unique (as long as the value is live) id of this Gc pointer,
+    /// otherwise 0.
+    pub fn id(&self) -> usize {
+        self.0.upgrade().map_or(0, |rc| rc.header.get().get_id())
     }
 }
 

@@ -105,7 +105,12 @@ impl<T: Trace> HeapObject for HeapCell<T> {
 #[derive(Debug)]
 pub struct Gc<T>(Weak<HeapCell<T>>);
 
-// TODO: impl<T: PartialEq> PartialEq for
+impl<T: PartialEq> PartialEq for Gc<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.upgrade() == other.0.upgrade()
+    }
+}
+impl<T: Eq> Eq for Gc<T> {}
 
 impl<T: Trace> Gc<T> {
     pub fn mark(&self) {
@@ -116,8 +121,14 @@ impl<T: Trace> Gc<T> {
         }
     }
 
-    pub fn pin(&self) -> Option<GcPin<T>> {
+    /// Pin the value, but it may return `None` if the value has already been garbage collected.
+    pub fn try_pin(&self) -> Option<GcPin<T>> {
         self.0.upgrade().map(GcPin)
+    }
+
+    /// Pin the value, or panic if the value has already been garbage collected.
+    pub fn pin(&self) -> GcPin<T> {
+        self.try_pin().expect("cannot already collected value")
     }
 }
 
@@ -150,7 +161,14 @@ impl<T> std::ops::Deref for GcPin<T> {
 /// Trait for cooperative mark-and-sweep garbage collection.
 pub trait Trace {
     /// Should recursively `mark` all `Gc`-references held by this object.
-    fn mark(&self);
+    /// The default implementation is intended for leaves in the object graph.
+    fn mark(&self) {}
+}
+
+impl<T: Trace> Trace for std::cell::RefCell<T> {
+    fn mark(&self) {
+        self.borrow().mark()
+    }
 }
 
 #[cfg(test)]
@@ -224,7 +242,7 @@ mod test {
         let node2 = heap.alloc(Graph::Node(RefCell::new(vec![Gc::clone(&node1)])));
 
         // Introduce a cycle
-        match &*node1.pin().unwrap() {
+        match &*node1.pin() {
             Graph::Node(children) => {
                 children.borrow_mut().push(Gc::clone(&node2));
             }

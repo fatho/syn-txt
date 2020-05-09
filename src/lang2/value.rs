@@ -1,12 +1,7 @@
 
-
-// re-export the syntax part of the old interpreter, we're not changing that
-pub use super::lang::{ast, lexer, parser, span};
-pub mod heap;
-pub mod value;
-
 use std::{cell::{RefCell}, collections::HashMap};
 use crate::rational::Rational;
+use super::{ast, heap};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {

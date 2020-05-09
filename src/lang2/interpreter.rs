@@ -70,33 +70,33 @@ impl fmt::Display for EvalErrorKind {
 /// Evaluation-specific result type.
 pub type Result<T> = std::result::Result<T, EvalError>;
 
-pub struct Interpreter {
+pub struct Interpreter<'a> {
     /// Read-only scope (from the perspective of the language)
     /// providing all the built-in primops.
     builtins: Gc<Scope>,
     /// Points to the current innermost scope
     scope_stack: Gc<Scope>,
     /// The interpreter heap.
-    heap: Heap,
+    heap: &'a mut Heap,
     /// Debug information about values.
-    debug_info: debug::DebugTable,
+    debug_info: &'a mut debug::DebugTable,
 }
 
-impl Interpreter {
-    pub fn new(mut heap: Heap, debug_info: debug::DebugTable) -> Self {
+impl<'a> Interpreter<'a> {
+    pub fn new(heap: &'a mut Heap, debug_info: &'a mut debug::DebugTable) -> Self {
         let builtin_scope = Scope::new();
 
         let prim = vec![
-            // // syntax
-            // ("begin", PrimOp(primops::begin)),
-            // ("define", PrimOp(primops::define)),
-            // ("lambda", PrimOp(primops::lambda)),
-            // ("set!", PrimOp(primops::set)),
-            // // arithmetic
-            // ("+", PrimOp(primops::add)),
-            // ("-", PrimOp(primops::sub)),
-            // ("*", PrimOp(primops::mul)),
-            // ("/", PrimOp(primops::div)),
+            // syntax
+            ("begin", PrimOp(primops::begin)),
+            ("define", PrimOp(primops::define)),
+            ("lambda", PrimOp(primops::lambda)),
+            ("set!", PrimOp(primops::set)),
+            // arithmetic
+            ("+", PrimOp(primops::add)),
+            ("-", PrimOp(primops::sub)),
+            ("*", PrimOp(primops::mul)),
+            ("/", PrimOp(primops::div)),
             // // lists
             // ("list", PrimOp(primops::list)),
             // ("concat", PrimOp(primops::concat)),
@@ -149,12 +149,17 @@ impl Interpreter {
         &self.debug_info
     }
 
-    fn err_by(&self, cause: Id, kind: EvalErrorKind) -> EvalError {
+    pub fn make_error(&self, cause: Id, kind: EvalErrorKind) -> EvalError {
         let location = self.debug_info.get_location(cause);
         EvalError::new(location.cloned(), kind)
     }
 
-    pub fn heap_alloc(&mut self, value: Value) -> Gc<Value> {
+    pub fn heap_alloc_value(&mut self, value: Value) -> Gc<Value> {
+        // TODO: share heap allocation for small values
+        self.heap.alloc(value)
+    }
+
+    pub fn heap_alloc<T: Trace + std::fmt::Debug + 'static>(&mut self, value: T) -> Gc<T> {
         // TODO: share heap allocation for small values
         self.heap.alloc(value)
     }
@@ -187,7 +192,7 @@ impl Interpreter {
                 if let Some(value) = self.scope_stack().pin().lookup(sym) {
                     Ok(value)
                 } else {
-                    Err(self.err_by(pinned.id(), EvalErrorKind::NoSuchVariable(sym.clone())))
+                    Err(self.make_error(pinned.id(), EvalErrorKind::NoSuchVariable(sym.clone())))
                 }
             }
             Value::Cons(head, tail) => self.eval_call(Gc::clone(head), Gc::clone(tail)),
@@ -204,7 +209,343 @@ impl Interpreter {
             Value::Closure(_cl) => {
                 unimplemented!()
             }
-            _ => Err(self.err_by(head.id(), EvalErrorKind::Uncallable)),
+            _ => Err(self.make_error(head.id(), EvalErrorKind::Uncallable)),
         }
     }
+
+
+    pub fn pop_argument(&mut self, args: &mut Gc<Value>) -> Result<Gc<Value>> {
+        if let Value::Cons(head, tail) = &*args.pin() {
+            std::mem::replace(args, Gc::clone(tail));
+            Ok(Gc::clone(head))
+        } else {
+            Err(self.make_error(args.id(), EvalErrorKind::NotEnoughArguments))
+        }
+    }
+
+    pub fn pop_argument_eval(&mut self, args: &mut Gc<Value>) -> Result<Gc<Value>> {
+        let arg = self.pop_argument(args)?;
+        self.eval(arg)
+    }
+
+    pub fn as_symbol(&self, arg: &Gc<Value>) -> Result<Symbol> {
+        if let Value::Symbol(sym) = &*arg.pin() {
+            Ok(sym.clone())
+        } else {
+            Err(self.make_error(arg.id(), EvalErrorKind::IncompatibleArguments))
+        }
+    }
+
+    pub fn expect_no_more_arguments(&mut self, args: &Gc<Value>) -> Result<()> {
+        if let Value::Nil = &*args.pin() {
+            Ok(())
+        } else {
+            Err(self.make_error(args.id(), EvalErrorKind::TooManyArguments))
+        }
+    }
+}
+
+
+
+#[cfg(test)]
+mod test {
+    use super::super::{lexer::*, parser::*, span::*, debug::*, compiler};
+    use super::*;
+    use crate::rational::*;
+
+    fn compile(input: &str) -> (Vec<Gc<Value>>, Heap, DebugTable) {
+        let tokens = Lexer::new(input)
+            .collect::<std::result::Result<Vec<(Span, Token)>, _>>()
+            .unwrap();
+        let ast = Parser::new(input, &tokens).parse().unwrap();
+        let mut heap = Heap::new();
+        let mut debug = debug::DebugTable::new();
+        let mut context = compiler::Context {
+            debug_table: &mut debug,
+            heap: &mut heap,
+            filename: "<input>".into(),
+        };
+        let values: Vec<Gc<Value>> = ast.iter().map(|e| context.compile(e)).collect();
+        (values, heap, debug)
+    }
+
+    fn expect_values(input: &str, expected: &[Value]) {
+        let (vals, mut heap, mut debug) = compile(input);
+        let mut interp = Interpreter::new(&mut heap, &mut debug);
+
+        for (e, val) in vals.iter().zip(expected) {
+            let result = interp.eval(Gc::clone(e)).unwrap();
+            assert_eq!(&*result.pin(), val);
+        }
+    }
+
+    fn expect_values_or_errors(input: &str, expected: &[std::result::Result<Value, EvalErrorKind>]) {
+        let (vals, mut heap, mut debug) = compile(input);
+        let mut interp = Interpreter::new(&mut heap, &mut debug);
+
+        for (e, val) in vals.iter().zip(expected) {
+            let result = interp.eval(Gc::clone(e)).map(|v| v.pin());
+            let result = result.map(|v| (*v).clone()).map_err(|e| e.info);
+            assert_eq!(&result, val);
+        }
+    }
+
+    #[test]
+    fn test_arithmetic() {
+        expect_values("(+ 1 2)", &[Value::Int(3)]);
+        expect_values("(- 8 12)", &[Value::Int(-4)]);
+
+        expect_values("(- -4 -9)", &[Value::Int(5)]);
+
+        expect_values("(* 2 (/ 8 12))", &[Value::Ratio(Rational::new(4, 3))]);
+        expect_values("(/ 5/4 8/7)", &[Value::Ratio(Rational::new(35, 32))]);
+    }
+
+    #[test]
+    fn test_defines() {
+        expect_values(
+            r#"
+            (define pi 3.14)
+            (define r (/ 5. 2))
+            (define result
+                (* r (* 2 pi)))
+            result
+            (set! result
+                (* pi (* r r)))
+            result"#,
+            &[
+                Value::Void,
+                Value::Void,
+                Value::Void,
+                Value::Float(15.700000000000001),
+                Value::Void,
+                Value::Float(19.625),
+            ],
+        );
+    }
+
+    #[test]
+    fn test_scopes() {
+        expect_values_or_errors(
+            r#"
+            (define pi 3.14)
+            (define val 5)
+            val
+            (define area
+                (begin
+                    (define r 1.0)
+                    (set! val (* pi (* r r)))
+                    val
+                ))
+            r
+            val
+            ; ensure that an error inside a nested scope pops that scope
+            (begin
+                (define foo 1) ; we expect this definition to be cleaned up
+                (set! bar 1) ; the error occurs here
+            )
+            foo
+            "#,
+            &[
+                Ok(Value::Void),
+                Ok(Value::Void),
+                Ok(Value::Int(5)),
+                Ok(Value::Void),
+                Err(EvalErrorKind::NoSuchVariable("r".into())),
+                Ok(Value::Float(3.14)),
+                Err(EvalErrorKind::NoSuchVariable("bar".into())),
+                Err(EvalErrorKind::NoSuchVariable("foo".into())),
+            ],
+        )
+    }
+
+    #[test]
+    fn test_closure_stateless() {
+        expect_values(
+            r#"
+            (define plus-one
+                (lambda (x) (+ x 1)))
+            (plus-one 2)
+            (plus-one 3)
+            "#,
+            &[Value::Void, Value::Int(3), Value::Int(4)],
+        )
+    }
+
+    /// Test that closures can capture global state and any mutations
+    /// from either inside or outside the closure can be seen elsewhere.
+    #[test]
+    fn test_closure_global_state() {
+        expect_values(
+            r#"
+            (define global-state 0)
+            (define (get-global)
+                (define ret global-state)
+                (set! global-state (+ ret 1))
+                ret
+            )
+            (get-global)
+            (get-global)
+            (set! global-state 10)
+            (get-global)
+            global-state
+            "#,
+            &[
+                Value::Void,
+                Value::Void,
+                Value::Int(0),
+                Value::Int(1),
+                Value::Void,
+                Value::Int(10),
+                Value::Int(11),
+            ],
+        )
+    }
+
+    /// Test that closures can capture scopes that are subsequently popped,
+    /// never to be seen again.
+    #[test]
+    fn test_closure_hidden_state() {
+        expect_values(
+            r#"
+            ; A closure that, when called, creates a new fresh closure
+            (define make-counter
+                (lambda (initial-count)
+                    (begin
+                        (define counter initial-count)
+                        (lambda ()
+                            (begin
+                                (define count counter)
+                                (set! counter (+ 1 count))
+                                count
+                            ))
+                    )))
+
+            (define c1 (make-counter 0))
+            (define c2 (make-counter 3))
+            (c1)
+            (c1)
+            (c2)
+            (c2)
+            (c1)
+            "#,
+            &[
+                Value::Void,
+                Value::Void,
+                Value::Void,
+                Value::Int(0),
+                Value::Int(1),
+                Value::Int(3),
+                Value::Int(4),
+                Value::Int(2),
+            ],
+        )
+    }
+
+    // #[test]
+    // fn test_list() {
+    //     expect_values("(list)", &[Value::List(vec![].into())]);
+    //     expect_values(
+    //         "(list 1 2 3)",
+    //         &[Value::List(
+    //             vec![Value::Int(1), Value::Int(2), Value::Int(3)].into(),
+    //         )],
+    //     );
+    //     expect_values(
+    //         "(map (lambda (x) (+ 1 x)) (list 1 2 3))",
+    //         &[Value::List(
+    //             vec![Value::Int(2), Value::Int(3), Value::Int(4)].into(),
+    //         )],
+    //     );
+    //     expect_values(
+    //         "
+    //         (define sum 0)
+    //         (for-each
+    //             (lambda (x) (set! sum (+ sum x)))
+    //             (list 1 2 3)
+    //         )
+    //         sum
+    //         ",
+    //         &[Value::Void, Value::Void, Value::Int(6)],
+    //     );
+    //     expect_values(
+    //         "(reverse (list 3 2 1))",
+    //         &[Value::List(
+    //             vec![Value::Int(1), Value::Int(2), Value::Int(3)].into(),
+    //         )],
+    //     );
+    //     expect_values(
+    //         "(concat (list 1 2) (list 3) (list) (reverse (list 1 2)))",
+    //         &[Value::List(
+    //             vec![
+    //                 Value::Int(1),
+    //                 Value::Int(2),
+    //                 Value::Int(3),
+    //                 Value::Int(2),
+    //                 Value::Int(1),
+    //             ]
+    //             .into(),
+    //         )],
+    //     );
+    //     expect_values(
+    //         "(range 1 4)",
+    //         &[Value::List(
+    //             vec![Value::Int(1), Value::Int(2), Value::Int(3)].into(),
+    //         )],
+    //     );
+    //     expect_values(
+    //         "(range 1 -2 -1)",
+    //         &[Value::List(
+    //             vec![Value::Int(1), Value::Int(0), Value::Int(-1)].into(),
+    //         )],
+    //     );
+    //     expect_values(
+    //         "(range 3)",
+    //         &[Value::List(
+    //             vec![Value::Int(0), Value::Int(1), Value::Int(2)].into(),
+    //         )],
+    //     );
+    //     expect_values("(range 0)", &[Value::List(vec![].into())]);
+    // }
+
+    // #[test]
+    // fn test_dict() {
+    //     expect_values("(dict)", &[Value::Dict(Rc::new(HashMap::new()))]);
+    //     expect_values(
+    //         "
+    //         (define d (dict :foo 1 :bar 2))
+    //         d
+    //         (get d :foo)
+    //         (define d2 (update d :foo 4))
+    //         (get d :foo)
+    //         (get d2 :foo)
+    //         (get d2 :bar)
+    //         (get d2 :baz)
+    //         ",
+    //         &[
+    //             Value::Void,
+    //             Value::Dict({
+    //                 let mut d = HashMap::new();
+    //                 d.insert(":foo".into(), Value::Int(1));
+    //                 d.insert(":bar".into(), Value::Int(2));
+    //                 Rc::new(d)
+    //             }),
+    //             Value::Int(1),
+    //             Value::Void,
+    //             Value::Int(1),
+    //             Value::Int(4),
+    //             Value::Int(2),
+    //         ],
+    //     );
+    //     expect_values_or_errors(
+    //         "
+    //         (define d (dict :foo 1 :bar 2))
+    //         (get d :baz)
+    //         ",
+    //         &[
+    //             Ok(Value::Void),
+    //             Err(IntpErrInfo::UnknownKeyword(":baz".into())),
+    //         ],
+    //     );
+    // }
 }

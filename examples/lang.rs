@@ -20,9 +20,12 @@ use syn_txt::lang2::parser::Parser;
 use syn_txt::lang2::span::{LineMap, Span};
 
 fn main() {
+    simple_logger::init_with_level(log::Level::Debug).unwrap();
+
     let input = r#"
         (print 5 1/3 "foo")
         (define r 5)
+        r
         (define area
             (begin
                 (define pi 3.14)
@@ -31,10 +34,11 @@ fn main() {
                 result
             ))
         (print area)
-        (define f1 (foo/new))
-        (define f2 (foo/new))
-        (print f1 f2)
-        (f1)
+        ; TODO: external callables
+        ; (define f1 (foo/new))
+        ; (define f2 (foo/new))
+        ; (print f1 f2)
+        ; (f1)
 
         (define plus-one
             (lambda (x) (+ x 1)))
@@ -106,7 +110,7 @@ fn run_test(input: &str) {
     let values: Vec<heap::Gc<Value>> = ast.iter().map(|e| context.compile(e)).collect();
 
     println!("Evaluating...");
-    let mut int = Interpreter::new(heap, debug);
+    let mut int = Interpreter::new(&mut heap, &mut debug);
     // let extension_state = Rc::new(RefCell::new(0));
     // int.register_primop_ext("foo/new", move |intp, args| {
     //     foo_ext_foo_new(&mut *extension_state.borrow_mut(), intp, args)
@@ -127,14 +131,23 @@ fn run_test(input: &str) {
         println!();
 
         match int.eval(v) {
-            Ok(val) => println!("  {:?}", val),
+            Ok(val) => {
+                println!("{}", pretty::pretty(&val.pin()));
+            },
             Err(err) => {
                 print_error(&lines, err.location(), err.info());
-                return;
+                break;
             }
         }
         println!("----------------------------");
     }
+    drop(int);
+
+    println!("GC values: {}", heap.len());
+    heap.gc_non_cycles();
+    println!("GC values in cycles: {}", heap.len());
+    heap.gc_cycles();
+    println!("Heap: {:?}", heap);
 }
 
 fn mk_loc(span: Span) -> Option<debug::SourceLocation> {

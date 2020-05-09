@@ -10,11 +10,11 @@
 
 //! Primitive operations exposed in the interpreter.
 
-// mod syntax;
-// pub use syntax::*;
+mod syntax;
+pub use syntax::*;
 
-// mod arithmetic;
-// pub use arithmetic::*;
+mod arithmetic;
+pub use arithmetic::*;
 
 mod util;
 pub use util::*;

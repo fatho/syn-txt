@@ -5,6 +5,7 @@ use std::{fmt::Debug, rc::{Rc, Weak}};
 /// on top in the form of a mark-and-sweep collection scheme.
 /// The implementation is certainly not the most efficient, but 100% safe.
 /// Dropping the heap leaves the objects dangling and no longer protects against cycles.
+#[derive(Debug)]
 pub struct Heap {
     /// Collection of all live heap cells.
     /// INVARIANT: does not contain the same Rc twice.
@@ -22,7 +23,7 @@ impl Heap {
     }
 
     /// Allocate an object inside the heap.
-    pub fn alloc<T: Trace + 'static>(&mut self, value: T) -> Gc<T> {
+    pub fn alloc<T: Trace + Debug + 'static>(&mut self, value: T) -> Gc<T> {
         self.unique_id += 1;
         let cell = HeapCell {
             header: Cell::new(HeapCellHeader::new(self.unique_id)),
@@ -31,6 +32,7 @@ impl Heap {
         let holder = Rc::new(cell);
         let handle = Rc::downgrade(&holder);
         self.heap.push(holder);
+        log::trace!("alloc: object {}", self.unique_id);
         Gc(handle)
     }
 
@@ -38,6 +40,7 @@ impl Heap {
     pub fn gc_non_cycles(&mut self) {
         for i in (0..self.heap.len()).rev() {
             let rc = &self.heap[i];
+            log::trace!("gc_non_cycles: object {:?} weak={} strong={}", rc.header().get().get_id(), Rc::weak_count(rc), Rc::strong_count(rc));
             if Rc::weak_count(rc) == 0 {
                 // The heap holds the only reference, we can safely drop it
                 // without affecting existing `Gc` references.
@@ -54,6 +57,9 @@ impl Heap {
     pub fn gc_cycles(&mut self) {
         // Deallocate everything that is still unmarked
         for i in (0..self.heap.len()).rev() {
+            let rc = &self.heap[i];
+            let marked = rc.header().get().get_mark();
+            log::trace!("gc_cycles: object {:?} weak={} strong={} marked={}", rc.header().get().get_id(), Rc::weak_count(rc), Rc::strong_count(rc), marked);
             if self.heap[i].header().get().get_mark() {
                 // Unmark in preparation of the next collection
                 let header = self.heap[i].header();
@@ -124,11 +130,11 @@ impl HeapCellHeader {
 }
 
 /// Internal trait used for implementing dynamic dispatch on HeapCells of different types.
-trait HeapObject {
+trait HeapObject: Debug {
     fn header(&self) -> &Cell<HeapCellHeader>;
 }
 
-impl<T: Trace> HeapObject for HeapCell<T> {
+impl<T: Trace + Debug> HeapObject for HeapCell<T> {
     fn header(&self) -> &Cell<HeapCellHeader> {
         &self.header
     }
@@ -138,15 +144,9 @@ impl<T: Trace> HeapObject for HeapCell<T> {
 /// A reference-counted pointer with additional mark-and-sweep cycle collection.
 pub struct Gc<T>(Weak<HeapCell<T>>);
 
-impl<T: Debug> Debug for Gc<T> {
+impl<T: Trace + Debug> Debug for Gc<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Gc(")?;
-        if let Some(real) = self.0.upgrade() {
-            write!(f, "{:?}", (&*real))?;
-        } else {
-            write!(f, "<collected>")?;
-        }
-        write!(f, ")")
+        write!(f, "Gc({:?})", self.id())
     }
 }
 
@@ -242,6 +242,7 @@ mod test {
 
     use super::*;
 
+    #[derive(Debug)]
     enum Graph {
         Leaf(Rc<Cell<bool>>),
         Node(RefCell<Vec<Gc<Graph>>>),

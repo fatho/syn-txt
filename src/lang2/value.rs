@@ -35,7 +35,7 @@ impl From<Rc<str>> for Symbol {
 
 /// A primitive operation exposed to the interpreted language.
 #[derive(Copy, Clone)]
-pub struct PrimOp(pub for<'a> fn(&mut interpreter::Interpreter, Gc<Value>) -> interpreter::Result<Gc<Value>>);
+pub struct PrimOp(pub fn(&mut interpreter::Interpreter, Gc<Value>) -> interpreter::Result<Gc<Value>>);
 
 impl fmt::Debug for PrimOp {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -190,13 +190,13 @@ pub struct Closure {
     pub parameters: Vec<Symbol>,
     /// The code to execute when calling the closure
     /// The value of the last expression becomes the return value.
-    pub body: Vec<Value>,
+    pub body: Gc<Value>,
 }
 
 impl Trace for Closure {
     fn mark(&self) {
         self.captured_scope.mark();
-        self.body.iter().for_each(Value::mark);
+        self.body.mark();
     }
 }
 /// A binding scope for variables.

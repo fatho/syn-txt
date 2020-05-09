@@ -201,13 +201,47 @@ impl<'a> Interpreter<'a> {
         }
     }
 
-    pub fn eval_call(&mut self, head: Gc<Value>, tail: Gc<Value>) -> Result<Gc<Value>> {
+    pub fn eval_call(&mut self, head: Gc<Value>, mut tail: Gc<Value>) -> Result<Gc<Value>> {
         let head = self.eval(head)?.pin();
         match &*head {
             Value::PrimOp(PrimOp(f)) =>
                 f(self, tail),
-            Value::Closure(_cl) => {
-                unimplemented!()
+            Value::Closure(gc_closure) => {
+                let clos = gc_closure.pin();
+                // Create a new scope inside the captured scope and define the arguments
+                let scope_stack = Scope::nest(Gc::clone(&clos.captured_scope));
+                for param_var in clos.parameters.iter() {
+                    let value = self.pop_argument_eval(&mut tail)?;
+                    if let Some((var, _)) = scope_stack.define(param_var.clone(), value)
+                    {
+                        // the `lambda` prim op ensures that the parameter names are unique,
+                        // but the interpreter host might have sneaked in an invalid closure.
+                        // TODO: ensure invariants in `Closure`
+                        return Err(EvalError::new(None, EvalErrorKind::Other(format!(
+                                "invariant violated: closure redefined parameter name {}",
+                                var.as_str()
+                            )),
+                        ));
+                    }
+                }
+
+                // switch out stack, and switch back in the end
+                let closure_scope = self.heap_alloc(scope_stack);
+                let previous_stack = std::mem::replace(&mut self.scope_stack, closure_scope);
+
+                let mut return_value = Ok(self.heap_alloc_value(Value::Void));
+
+                let mut current = clos.body.pin();
+                while let Value::Cons(head, tail) = &*current {
+                    return_value = self.eval(Gc::clone(head));
+                    if return_value.is_err() { break }
+                    current = tail.pin();
+                }
+
+                // ensure that we always switch back the original scope
+                std::mem::replace(&mut self.scope_stack, previous_stack);
+
+                return_value
             }
             _ => Err(self.make_error(head.id(), EvalErrorKind::Uncallable)),
         }
@@ -296,9 +330,11 @@ mod test {
         expect_values("(- 8 12)", &[Value::Int(-4)]);
 
         expect_values("(- -4 -9)", &[Value::Int(5)]);
+        expect_values("(- 7)", &[Value::Int(-7)]);
 
         expect_values("(* 2 (/ 8 12))", &[Value::Ratio(Rational::new(4, 3))]);
         expect_values("(/ 5/4 8/7)", &[Value::Ratio(Rational::new(35, 32))]);
+        expect_values("(/ 7)", &[Value::Ratio(Rational::new(1, 7))]);
     }
 
     #[test]

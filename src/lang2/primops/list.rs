@@ -78,9 +78,9 @@ pub fn map(int: &mut Interpreter, mut args: Gc<Value>) -> Result<Gc<Value>> {
 
     while let Value::Cons(head, tail) = &*list.pin() {
         let value = int.eval(Gc::clone(head))?;
-        let fun_args = int.heap_alloc_value(Value::Cons(Gc::clone(head), Gc::clone(&nil)));
-        int.eval_call(Gc::clone(&fun), fun_args)?;
-        elems.push(value);
+        let fun_args = int.heap_alloc_value(Value::Cons(value, Gc::clone(&nil)));
+        let result = int.eval_call(Gc::clone(&fun), fun_args)?;
+        elems.push(result);
         list = Gc::clone(tail);
     }
 
@@ -92,10 +92,9 @@ pub fn concat(int: &mut Interpreter, mut args: Gc<Value>) -> Result<Gc<Value>> {
     let mut elems = Vec::new();
 
     while let Value::Cons(head, tail) = &*args.pin() {
-        let mut inner = head.pin();
+        let mut inner = int.eval(Gc::clone(head))?.pin();
         while let Value::Cons(inner_head, inner_tail) = &*inner {
-            let value = int.eval(Gc::clone(inner_head))?;
-            elems.push(value);
+            elems.push(Gc::clone(inner_head));
             inner = inner_tail.pin();
         }
         args = Gc::clone(tail);
@@ -107,10 +106,11 @@ pub fn concat(int: &mut Interpreter, mut args: Gc<Value>) -> Result<Gc<Value>> {
 /// Reverse a list.
 pub fn reverse(int: &mut Interpreter, mut args: Gc<Value>) -> Result<Gc<Value>> {
     let mut reversed = int.heap_alloc_value(Value::Nil);
-    while let Value::Cons(head, tail) = &*args.pin() {
+    let mut list = int.pop_argument_eval(&mut args)?.pin();
+    while let Value::Cons(head, tail) = &*list {
         let value = int.eval(Gc::clone(head))?;
         reversed = int.heap_alloc_value(Value::Cons(value, reversed));
-        args = Gc::clone(tail);
+        list = tail.pin();
     }
     Ok(reversed)
 }

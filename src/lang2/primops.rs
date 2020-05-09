@@ -22,5 +22,8 @@ pub use util::*;
 mod list;
 pub use list::*;
 
+mod relational;
+pub use relational::*;
+
 // mod dict;
 // pub use dict::*;

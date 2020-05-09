@@ -98,6 +98,13 @@ impl<'a> Interpreter<'a> {
             ("-", PrimOp(primops::sub)),
             ("*", PrimOp(primops::mul)),
             ("/", PrimOp(primops::div)),
+            // relational
+            ("=", PrimOp(primops::eq)),
+            ("!=", PrimOp(primops::neq)),
+            ("<", PrimOp(primops::lt)),
+            ("<=", PrimOp(primops::leq)),
+            (">", PrimOp(primops::gt)),
+            (">=", PrimOp(primops::geq)),
             // lists
             ("list", PrimOp(primops::list)),
             ("cons", PrimOp(primops::cons)),
@@ -491,71 +498,65 @@ mod test {
         )
     }
 
-    // #[test]
-    // fn test_list() {
-    //     expect_values("(list)", &[Value::List(vec![].into())]);
-    //     expect_values(
-    //         "(list 1 2 3)",
-    //         &[Value::List(
-    //             vec![Value::Int(1), Value::Int(2), Value::Int(3)].into(),
-    //         )],
-    //     );
-    //     expect_values(
-    //         "(map (lambda (x) (+ 1 x)) (list 1 2 3))",
-    //         &[Value::List(
-    //             vec![Value::Int(2), Value::Int(3), Value::Int(4)].into(),
-    //         )],
-    //     );
-    //     expect_values(
-    //         "
-    //         (define sum 0)
-    //         (for-each
-    //             (lambda (x) (set! sum (+ sum x)))
-    //             (list 1 2 3)
-    //         )
-    //         sum
-    //         ",
-    //         &[Value::Void, Value::Void, Value::Int(6)],
-    //     );
-    //     expect_values(
-    //         "(reverse (list 3 2 1))",
-    //         &[Value::List(
-    //             vec![Value::Int(1), Value::Int(2), Value::Int(3)].into(),
-    //         )],
-    //     );
-    //     expect_values(
-    //         "(concat (list 1 2) (list 3) (list) (reverse (list 1 2)))",
-    //         &[Value::List(
-    //             vec![
-    //                 Value::Int(1),
-    //                 Value::Int(2),
-    //                 Value::Int(3),
-    //                 Value::Int(2),
-    //                 Value::Int(1),
-    //             ]
-    //             .into(),
-    //         )],
-    //     );
-    //     expect_values(
-    //         "(range 1 4)",
-    //         &[Value::List(
-    //             vec![Value::Int(1), Value::Int(2), Value::Int(3)].into(),
-    //         )],
-    //     );
-    //     expect_values(
-    //         "(range 1 -2 -1)",
-    //         &[Value::List(
-    //             vec![Value::Int(1), Value::Int(0), Value::Int(-1)].into(),
-    //         )],
-    //     );
-    //     expect_values(
-    //         "(range 3)",
-    //         &[Value::List(
-    //             vec![Value::Int(0), Value::Int(1), Value::Int(2)].into(),
-    //         )],
-    //     );
-    //     expect_values("(range 0)", &[Value::List(vec![].into())]);
-    // }
+    #[test]
+    fn test_list() {
+        expect_values("(list)", &[Value::Nil]);
+
+        expect_values(r#"
+            (define (sum l)
+                (if (cons? l)
+                    (+ (head l) (sum (tail l)))
+                    0
+                )
+            )
+            (define foo (list 1 2 3))
+            (sum foo)
+            (= foo (reverse (list 3 2 1)))
+            (=
+                (map (lambda (x) (+ 1 x)) (list 1 2 3))
+                (list 2 3 4)
+            )
+            (= (list 1 2) (list 1))
+            (> (list 1 2) (list 1))
+            ; TODO: move to separate test:
+            (< "apocryphal" "auxiliar")
+            (=
+                (concat (list 1 2) (list 3) (list) (reverse (list 1 2)))
+                (list 1 2 3 2 1)
+            )
+            "#,
+            &[
+                Value::Void,
+                Value::Void,
+                Value::Int(6),
+                Value::Bool(true),
+                Value::Bool(true),
+                Value::Bool(false),
+                Value::Bool(true),
+                Value::Bool(true),
+                Value::Bool(true),
+            ],
+        );
+        // expect_values(
+        //     "(range 1 4)",
+        //     &[Value::List(
+        //         vec![Value::Int(1), Value::Int(2), Value::Int(3)].into(),
+        //     )],
+        // );
+        // expect_values(
+        //     "(range 1 -2 -1)",
+        //     &[Value::List(
+        //         vec![Value::Int(1), Value::Int(0), Value::Int(-1)].into(),
+        //     )],
+        // );
+        // expect_values(
+        //     "(range 3)",
+        //     &[Value::List(
+        //         vec![Value::Int(0), Value::Int(1), Value::Int(2)].into(),
+        //     )],
+        // );
+        // expect_values("(range 0)", &[Value::List(vec![].into())]);
+    }
 
     // #[test]
     // fn test_dict() {

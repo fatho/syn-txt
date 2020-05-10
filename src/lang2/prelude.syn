@@ -19,9 +19,7 @@
                 (cons start (range-down (+ start step) stop step))
                 nil))
         (lambda (start stop :step (step 1))
-            ; TODO: implement cond syntax
-            (if (> step 0)
-                (range-up start stop step)
-                (if (< step 0)
-                    (range-down start stop step)
-                    nil)))))
+            (cond
+                ((> step 0) (range-up start stop step))
+                ((< step 0) (range-down start stop step))
+                (#t nil)))))

@@ -158,16 +158,35 @@ pub fn if_(int: &mut Interpreter, mut args: Gc<Value>) -> Result<Gc<Value>> {
     let else_ = int.pop_argument(&mut args)?.pin();
     int.expect_no_more_arguments(&args)?;
 
-    let is_true = match &*cond.pin() {
+    if is_true(cond) {
+        int.eval(then)
+    } else {
+        int.eval(else_)
+    }
+}
+
+/// cond expression (evaluates first matching branch)
+pub fn cond(int: &mut Interpreter, args: Gc<Value>) -> Result<Gc<Value>> {
+    let mut current = args.pin();
+    while let Value::Cons(branch, rest_branches) = &*current {
+        let mut branch_current = Gc::clone(branch);
+        let test = int.pop_argument_eval(&mut branch_current)?;
+        let branch = int.pop_argument(&mut branch_current)?;
+        int.expect_no_more_arguments(&branch_current)?;
+        if is_true(test) {
+            return int.eval(branch.pin());
+        }
+        current = rest_branches.pin();
+    }
+    Err(int.make_error(args.id(), EvalErrorKind::Other("no match".to_string())))
+}
+
+
+fn is_true(value: Gc<Value>) -> bool {
+    match &*value.pin() {
         Value::Bool(b) => *b,
         Value::Nil => false,
         Value::Void => false,
         _ => true,
-    };
-
-    if is_true {
-        int.eval(then)
-    } else {
-        int.eval(else_)
     }
 }

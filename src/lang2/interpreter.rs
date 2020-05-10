@@ -101,6 +101,7 @@ impl<'a> Interpreter<'a> {
             ("lambda", PrimOp(primops::lambda)),
             ("set!", PrimOp(primops::set)),
             ("if", PrimOp(primops::if_)),
+            ("cond", PrimOp(primops::cond)),
             // arithmetic
             ("+", PrimOp(primops::add)),
             ("-", PrimOp(primops::sub)),
@@ -133,8 +134,9 @@ impl<'a> Interpreter<'a> {
             ("print", PrimOp(primops::print)),
         ];
         let constants = vec![
-            // syntax
             ("nil", Value::Nil),
+            ("#t", Value::Bool(true)),
+            ("#f", Value::Bool(false)),
         ];
 
         for (name, fun) in prim {

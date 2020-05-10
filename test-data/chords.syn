@@ -26,6 +26,7 @@
             :gain 1.0
             :unison-detune-cents 10
             :wave-shape "supersaw"
+            :envelope (envelope :attack 1.0 :decay 1.0 :sustain 0.2 :release 0.1)
         )
     ))
 

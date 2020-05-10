@@ -21,6 +21,18 @@
     ; This type annotation is used when parsing the values in the host.
     (dict :__type__ "song" :bpm bpm :notes notes :instrument instrument))
 
+; Create an ASDR envelope, or just an AR envelope.
+(define (envelope :attack attack :decay (decay 0.0) :sustain (sustain 1.0) :release release)
+    (dict :__type__ "asdr" :attack attack :decay decay :sustain sustain :release release))
+
+
+; A lowpass biquad filter
+(define (biquad/lowpass :cutoff cutoff :q (q 0.7071))
+    (dict :__type__ "biquad-filter" :name "lowpass" :cutoff cutoff :q q))
+
+; An allpass biquad filter
+(define (biquad/allpass)
+    (dict :__type__ "biquad-filter" :name "allpass"))
 
 
 ; Compute the time when the last note of the given melody ends.

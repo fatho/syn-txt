@@ -187,6 +187,18 @@ pub mod parsers {
                         "test.wave-shape",
                         wave_shape(),
                     ),
+                    ":envelope" => update_if_valid(
+                        &mut params.envelope,
+                        value,
+                        "test.envelope",
+                        envelope(),
+                    ),
+                    ":filter" => update_if_valid(
+                        &mut params.filter,
+                        value,
+                        "test.filter",
+                        biquad_filter(),
+                    ),
                     other => log::warn!("unused test synth parameter {}", other),
                 }
             }
@@ -201,6 +213,36 @@ pub mod parsers {
                 "test" => fields
                     .get(":params", test_synth_params())
                     .map(output::Instrument::TestSynth),
+                _ => {
+                    log::error!("unknown synth {:?}", name);
+                    None
+                }
+            }
+        })
+    }
+
+    pub fn envelope() -> impl marshal::ParseValue<Repr = synth::envelope::ADSR> {
+        marshal::record("asdr", |fields| {
+            Some(synth::envelope::ADSR {
+                attack: fields.get(":attack", marshal::float_coercing())?,
+                decay: fields.get(":decay", marshal::float_coercing())?,
+                sustain: fields.get(":sustain", marshal::float_coercing())?,
+                release: fields.get(":release", marshal::float_coercing())?,
+            })
+        })
+    }
+
+    pub fn biquad_filter() -> impl marshal::ParseValue<Repr = synth::filter::BiquadType> {
+        use synth::filter::BiquadType;
+        marshal::record("biquad-filter", |fields| {
+            let name = fields.get(":name", marshal::string())?;
+            match name.as_ref() {
+                "allpass" => Some(BiquadType::Allpass),
+                "lowpass" => {
+                    let cutoff = fields.get(":cutoff", marshal::float_coercing())?;
+                    let q = fields.get(":q", marshal::float_coercing())?;
+                    Some(BiquadType::Lowpass { cutoff, q })
+                },
                 _ => {
                     log::error!("unknown synth {:?}", name);
                     None

@@ -24,15 +24,10 @@ pub struct TestSynth {
     /// Reference note and frequency, determining the pitch of all other notes.
     tuning: Tuning,
 
-    /// Evenlope for played notes
-    envelope: ADSR,
-
     /// The public parameters influencing the sound.
     /// TODO: these are eventually automatable
     parameters: Params,
 
-    // low-pass filter
-    filter_coefficients: filter::BiquadCoefficients,
     biquad: Stereo<filter::Biquad>,
 
     /// Monotoneously increasing id used for identifying playing notes.
@@ -58,6 +53,13 @@ pub struct Params {
 
     /// Oscillator shape
     pub wave_shape: WaveShape,
+
+    /// Evenlope for played notes
+    pub envelope: ADSR,
+
+    /// The type of filter to apply to the synthesizer output.
+    /// Currently limited to biquadratic filters.
+    pub filter: filter::BiquadType,
 }
 
 impl Default for Params {
@@ -69,6 +71,13 @@ impl Default for Params {
             unison_detune_cents: 15.0,
             unison_falloff: 0.0,
             wave_shape: WaveShape::SuperSaw,
+            envelope: ADSR {
+                attack: 0.01,
+                decay: 0.0,
+                sustain: 1.0,
+                release: 0.1,
+            },
+            filter: filter::BiquadType::Lowpass { cutoff: 2000.0, q: 0.7071 },
         }
     }
 }
@@ -82,18 +91,9 @@ impl TestSynth {
         Self::with_params(sample_rate, Params::default())
     }
     pub fn with_params(sample_rate: f64, params: Params) -> Self {
-        let filter_coefficients = filter::BiquadCoefficients::lowpass(sample_rate, 2000.0, 0.7071);
         TestSynth {
             parameters: params,
             tuning: Tuning::default(),
-            // volume
-            envelope: ADSR {
-                attack: 0.01,
-                decay: 0.0,
-                sustain: 1.0,
-                release: 0.1,
-            },
-            filter_coefficients,
             biquad: Stereo {
                 left: filter::Biquad::new(),
                 right: filter::Biquad::new(),
@@ -161,7 +161,7 @@ impl TestSynth {
             release_delay_samples: std::usize::MAX,
             voices,
             // volume
-            envelope: self.envelope.instantiate(self.sample_rate),
+            envelope: self.parameters.envelope.instantiate(self.sample_rate),
         });
         handle
     }
@@ -197,12 +197,15 @@ impl TestSynth {
                 }
             }
             wave *= self.parameters.gain;
+            // It's inefficient to compute these every sample, but once
+            // we get to automation, we'd have to do that anyway.
+            let filter_coefficients = self.parameters.filter.to_coefficients(self.sample_rate);
             wave = Stereo {
-                left: self.biquad.left.step(&self.filter_coefficients, wave.left),
+                left: self.biquad.left.step(&filter_coefficients, wave.left),
                 right: self
                     .biquad
                     .right
-                    .step(&self.filter_coefficients, wave.right),
+                    .step(&filter_coefficients, wave.right),
             };
 
             *out_sample += wave;

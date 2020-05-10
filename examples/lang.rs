@@ -8,63 +8,21 @@
 // A copy of the license can be found in the LICENSE file in the root of
 // this repository.
 
-use std::{cell::RefCell, rc::Rc};
-use syn_txt::lang::interpreter::*;
-use syn_txt::lang::lexer::Lexer;
-use syn_txt::lang::parser::Parser;
-use syn_txt::lang::span::{LineMap, Span};
+use syn_txt::lang2::compiler;
+use syn_txt::lang2::debug;
+use syn_txt::lang2::heap;
+use syn_txt::lang2::interpreter::*;
+use syn_txt::lang2::pretty;
+use syn_txt::lang2::span::{LineMap};
+use syn_txt::lang2::value::*;
 
 fn main() {
-    let _input = r#"
-        (define lead-synth
-            (instruments/the-synth
-                :pan 0.0
-                :gain 1.0
-            )
-        )
-
-        (define
-            (channel
-                :gain 1.0
-            )
-        )
-
-        ; This is a melody in A minor
-        (define ascending-melody
-            (piano-roll
-                (note :pitch "a4" :length 1/4 :velocity 0.1)
-                (note :pitch "b4" :length 1/4 :velocity 0.3)
-                (note :pitch "c5" :length 1/4 :velocity 0.5)
-                (note :pitch "d5" :length 1/4 :velocity 0.7)
-                (note :pitch "e5" :length 1/1 :velocity 1.0)
-                ; Note how these two notes don't start *after* the previous note ended,
-                ; but only 1/4th after the previous note *started*,
-                (note :pitch "a5" :length 3/4 :velocity 1.0 :offset: 1/4)
-                (note :pitch "c5" :length 1/2 :velocity 1.0 :offset: 1/4)
-            )
-        )
-
-        ; Play the above melody twice
-        (define final-melody
-            (sequence
-                ascending-melody
-                ascending-melody)
-        )
-
-        (song
-            :bpm 128
-            :measure 4
-            :channels (channel-set "master" master)
-            :tracks (track-set "lead" (track :instrument lead-synth))
-            :playlist
-                (playlist
-                    (play "lead" final-melody)
-                )
-        )
-    "#;
+    simple_logger::init_with_level(log::Level::Debug).unwrap();
 
     let input = r#"
+        (print 5 1/3 "foo")
         (define r 5)
+        r
         (define area
             (begin
                 (define pi 3.14)
@@ -73,10 +31,11 @@ fn main() {
                 result
             ))
         (print area)
-        (define f1 (foo/new))
-        (define f2 (foo/new))
-        (print f1 f2)
-        (f1)
+        ; TODO: external callables
+        ; (define f1 (foo/new))
+        ; (define f2 (foo/new))
+        ; (print f1 f2)
+        ; (f1)
 
         (define plus-one
             (lambda (x) (+ x 1)))
@@ -97,99 +56,100 @@ fn main() {
         (get-global)
         global-state
 
+        (define (map f l)
+            (if (cons? l)
+                (cons
+                    (f (head l))
+                    (map f (tail l))
+                )
+                nil
+            )
+        )
+
+        (define reverse
+            (begin
+                (define (reverse-impl l acc)
+                    (if (cons? l)
+                        (reverse-impl
+                            (tail l)
+                            (cons (head l) acc)
+                        )
+                        acc
+                    )
+                )
+                (lambda (l) (reverse-impl l nil))
+            )
+        )
+
         (define foo (list 1 2 3 4))
-        (define (cat-rev l) (concat l (reverse l)))
-        (print (cat-rev foo))
-        (for-each print (map (lambda (x) (+ 1 x)) (cat-rev foo)))
+        (map (lambda (x) (+ 1 x)) (reverse foo))
+        ; (define (cat-rev l) (concat l (reverse l)))
+        ; (print (cat-rev foo))
+        ; (for-each print (map (lambda (x) (+ 1 x)) (cat-rev foo)))
     "#;
 
     println!("{}", std::mem::size_of::<Value>());
+    println!("{}", std::mem::size_of::<syn_txt::lang2::Value>());
+    println!(
+        "{}",
+        std::mem::size_of::<syn_txt::lang2::Gc<syn_txt::lang2::Value>>()
+    );
+    println!(
+        "{}",
+        std::mem::size_of::<Option<syn_txt::lang2::Gc<syn_txt::lang2::Value>>>()
+    );
 
     run_test(input)
 }
 
 fn run_test(input: &str) {
-    let mut lex = Lexer::new(input);
-    let mut tokens = Vec::new();
-    let lines = LineMap::new(input);
+    let mut heap = heap::Heap::new();
+    let mut debug = debug::DebugTable::new();
+    let values = compiler::compile_str(&mut heap, &mut debug, "<input>", input).unwrap();
 
-    println!("Lexing...");
-    while let Some(token_or_error) = lex.next_token() {
-        match token_or_error {
-            Ok(tok) => tokens.push(tok),
+    log::info!("evaluating <input>");
+    let mut int = Interpreter::new(&mut heap, &mut debug);
+
+    for v in values {
+        println!("In:\n{}", pretty::pretty(&v));
+        println!();
+
+        match int.eval(v) {
+            Ok(val) => {
+                println!("Out:\n{}", pretty::pretty(&val.pin()));
+            }
             Err(err) => {
-                print_error(&lines, err.location(), err.kind());
+                let source = err.location().and_then(|loc| int.debug_info().get_source(&loc.file));
+                let lines = source.map(LineMap::new);
+                print_error(lines.as_ref(), err.location(), err.info());
+                break;
             }
         }
+        println!("----------------------------");
     }
+    drop(int);
 
-    println!("Parsing...");
-    let mut parser = Parser::new(input, &tokens);
-    // println!("{:?}", parser.parse());
-    let ast = match parser.parse() {
-        Ok(ast) => ast,
-        Err(err) => {
-            print_error(&lines, err.location(), err.info());
-            return;
-        }
-    };
-
-    println!("Evaluating...");
-    let mut int = Interpreter::new();
-    let extension_state = Rc::new(RefCell::new(0));
-    int.register_primop_ext("foo/new", move |intp, args| {
-        foo_ext_foo_new(&mut *extension_state.borrow_mut(), intp, args)
-    })
-    .unwrap();
-
-    for s in ast {
-        println!("{}", &input[s.src.begin..s.src.end]);
-        match int.eval(&s) {
-            Ok(val) => println!("  {:?}", val),
-            Err(err) => {
-                print_error(&lines, err.location(), err.info());
-                return;
-            }
-        }
-    }
+    println!("GC values: {}", heap.len());
+    heap.gc_non_cycles();
+    println!("GC values in cycles: {}", heap.len());
+    heap.gc_cycles();
+    println!("GC values remaining: {}", heap.len());
 }
 
-fn print_error<E: std::fmt::Display>(lines: &LineMap, location: Span, message: E) {
-    let start = lines.offset_to_pos(location.begin);
-    let end = lines.offset_to_pos(location.end);
-    println!("error: {} (<input>:{}-{})", message, start, end);
-    println!("{}", lines.highlight(start, end, true));
-}
-
-fn foo_ext_foo_new(
-    state: &mut usize,
-    _intp: &mut Interpreter,
-    args: ArgParser,
-) -> InterpreterResult<Value> {
-    args.done()?;
-    let foo = FooVal(*state);
-    *state += 1;
-    Ok(Value::ext(foo))
-}
-
-#[derive(Debug, PartialEq, Clone)]
-struct FooVal(usize);
-
-impl ExtensionValue for FooVal {
-    fn partial_eq(&self, other: &dyn ExtensionValue) -> bool {
-        if let Some(foo) = other.as_any().downcast_ref::<Self>() {
-            self == foo
+fn print_error<E: std::fmt::Display>(
+    lines: Option<&LineMap>,
+    location: Option<&debug::SourceLocation>,
+    message: E,
+) {
+    print!("error: {}", message);
+    if let Some(location) = location {
+        if let Some(lines) = lines {
+            let start = lines.offset_to_pos(location.span.begin);
+            let end = lines.offset_to_pos(location.span.end);
+            println!("({} {}-{})", location.file, start, end);
+            println!("{}", lines.highlight(start, end, true));
         } else {
-            false
+            println!("({} {}-{})", location.file, location.span.begin, location.span.end);
         }
-    }
-
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
-
-    fn call(&self, _intp: &mut Interpreter, args: ArgParser) -> InterpreterResult<Value> {
-        args.done()?;
-        Ok(Value::Int(self.0 as i64))
     }
 }

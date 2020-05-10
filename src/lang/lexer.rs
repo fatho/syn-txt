@@ -310,7 +310,7 @@ impl<'a> Iterator for Lexer<'a> {
 mod charsets {
     /// Characters that are allowed as the first character of an identifier.
     pub fn is_ident_start(ch: char) -> bool {
-        let extra = "!$%&*/:<=>?~_^";
+        let extra = "!$%&*/:<=>?~_^#";
         ch.is_alphabetic() || extra.chars().any(|c| c == ch)
     }
 

@@ -1,0 +1,25 @@
+; This prelude is sourced by every interpreter instance.
+; See interpreter.rs.
+
+
+; Generate a list consisting of a range of values.
+; Usage:
+;  (range start stop)
+;  (range start stop :step)
+;
+; Both start and stop are inclusive.
+(define range
+    (begin
+        (define (range-up start stop step)
+            (if (<= start stop)
+                (cons start (range-up (+ start step) stop step))
+                nil))
+        (define (range-down start stop step)
+            (if (>= start stop)
+                (cons start (range-down (+ start step) stop step))
+                nil))
+        (lambda (start stop :step (step 1))
+            (cond
+                ((> step 0) (range-up start stop step))
+                ((< step 0) (range-down start stop step))
+                (#t nil)))))

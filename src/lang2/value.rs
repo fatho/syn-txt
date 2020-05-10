@@ -194,6 +194,9 @@ pub struct Closure {
     /// Name of the parameters that must be passed to the closure when calling it.
     /// The names must be unique.
     pub parameters: Vec<Symbol>,
+    /// Named arguments of the closure, pairs of a keyword with a variable to bind the
+    /// value to, and an optional default value.
+    pub named_parameters: HashMap<Symbol, (Symbol, Option<Gc<Value>>)>,
     /// The code to execute when calling the closure
     /// The value of the last expression becomes the return value.
     pub body: Gc<Value>,

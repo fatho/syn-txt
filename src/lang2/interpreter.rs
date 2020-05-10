@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{collections::HashSet, fmt};
 
 use super::debug;
 use super::heap::*;
@@ -39,9 +39,15 @@ pub enum EvalErrorKind {
     TooManyArguments,
     /// Keyword was not understood by callee.
     UnknownKeyword(Symbol),
+    /// A mandatory keyword was missing.
+    MissingKeyword(Symbol),
+    /// A keyword was provided more than once.
+    DuplicateKeyword(Symbol),
+
     DivisionByZero,
     /// Type error (e.g. trying to add two incompatible types).
     Type,
+
     /// Tried to redefine a variable in the scope it was originally defined.
     /// (Shadowing variables in a new scope is fine).
     Redefinition(Symbol),
@@ -59,6 +65,8 @@ impl fmt::Display for EvalErrorKind {
             EvalErrorKind::NotEnoughArguments => write!(f, "not enough arguments in function call"),
             EvalErrorKind::TooManyArguments => write!(f, "too many arguments in function call"),
             EvalErrorKind::UnknownKeyword(var) => write!(f, "unknown keyword `{}`", var.as_str()),
+            EvalErrorKind::MissingKeyword(var) => write!(f, "missing keyword `{}`", var.as_str()),
+            EvalErrorKind::DuplicateKeyword(var) => write!(f, "duplicate keyword `{}`", var.as_str()),
             EvalErrorKind::DivisionByZero => write!(f, "division by zero"),
             EvalErrorKind::Redefinition(var) => write!(f, "redefined variable `{}`", var.as_str()),
             EvalErrorKind::Type => write!(f, "type error"),
@@ -226,21 +234,55 @@ impl<'a> Interpreter<'a> {
                 let clos = gc_closure.pin();
                 // Create a new scope inside the captured scope and define the arguments
                 let scope_stack = Scope::nest(Gc::clone(&clos.captured_scope));
+
+                // 1. Parse positional arguments
                 for param_var in clos.parameters.iter() {
-                    let value = self.pop_argument_eval(&mut tail)?;
-                    if let Some((var, _)) = scope_stack.define(param_var.clone(), value) {
-                        // the `lambda` prim op ensures that the parameter names are unique,
-                        // but the interpreter host might have sneaked in an invalid closure.
-                        // TODO: ensure invariants in `Closure`
-                        return Err(EvalError::new(
-                            None,
-                            EvalErrorKind::Other(format!(
-                                "invariant violated: closure redefined parameter name {}",
-                                var.as_str()
-                            )),
-                        ));
+                    let arg = self.pop_argument(&mut tail)?;
+                    let value = self.eval(Gc::clone(&arg))?;
+                    if value.pin().is_keyword() {
+                        return Err(self.make_error(arg.id(), EvalErrorKind::NotEnoughArguments))
+                    }
+                    let redefined = scope_stack.define(param_var.clone(), value);
+                    debug_assert!(redefined.is_none(), "closure invariant violated");
+                }
+
+                // 2. Parse keyword arguments in arbitrary order
+                let mut provided_keywords: HashSet<Symbol> = HashSet::new();
+                while tail.pin().is_cons() {
+                    let key_arg = self.pop_argument(&mut tail)?;
+                    if let Value::Keyword(key) = &*key_arg.pin() {
+                        let value = self.pop_argument_eval(&mut tail)?;
+                        if ! provided_keywords.insert(key.clone()) {
+                            return Err(self.make_error(key_arg.id(), EvalErrorKind::DuplicateKeyword(key.clone())))
+                        }
+                        if value.pin().is_keyword() {
+                            return Err(self.make_error(key_arg.id(), EvalErrorKind::NotEnoughArguments))
+                        }
+                        if let Some((var, _)) = clos.named_parameters.get(key) {
+                            let redefined = scope_stack.define(var.clone(), value);
+                            debug_assert!(redefined.is_none(), "closure invariant violated");
+                        } else {
+                            return Err(self.make_error(key_arg.id(), EvalErrorKind::UnknownKeyword(key.clone())))
+                        }
+                    } else {
+                        // Either too many positional arguments, or too many arguments for one keyword.
+                        return Err(self.make_error(key_arg.id(), EvalErrorKind::TooManyArguments))
                     }
                 }
+
+                // 3. Fill in default values for omitted arguments
+                for (key, (var, default)) in clos.named_parameters.iter() {
+                    if ! provided_keywords.contains(key) {
+                        if let Some(default) = default {
+                            let redefined = scope_stack.define(var.clone(), Gc::clone(default));
+                            debug_assert!(redefined.is_none(), "closure invariant violated");
+                        } else {
+                            return Err(self.make_error(head.id(), EvalErrorKind::MissingKeyword(key.clone())))
+                        }
+                    }
+                }
+
+                self.expect_no_more_arguments(&tail)?;
 
                 // switch out stack, and switch back in the end
                 let closure_scope = self.heap_alloc(scope_stack);
@@ -557,6 +599,73 @@ mod test {
         //     )],
         // );
         // expect_values("(range 0)", &[Value::List(vec![].into())]);
+    }
+
+    #[test]
+    fn test_closure_keywords() {
+        expect_values(
+            r#"
+            (define (frob x y :frob-factor f :flux-compensation (comp -1))
+                (- (* (+ x y) f) comp)
+            )
+            (frob 1 2 :frob-factor 4)
+            (frob 1 2 :flux-compensation 1 :frob-factor 4)
+            "#,
+            &[Value::Void, Value::Int(13), Value::Int(11)],
+        );
+        expect_values_or_errors(
+            r#"
+            ; Duplicate keyword
+            (define (frob x y :frob-factor f :flux-compensation (comp 0) :frob-factor g)
+                (- (* (+ x y) f) comp))
+            ; Duplicate variable in positionals
+            (define (frob x x :frob-factor f :flux-compensation (comp 0))
+                (- (* (+ x y) f) comp))
+            ; Duplicate variable in keyword args
+            (define (frob x y :frob-factor f :flux-compensation (f 0))
+                (- (* (+ x y) f) comp))
+            ; Duplicate variable across both
+            (define (frob x y :frob-factor f :flux-compensation (x 0))
+                (- (* (+ x y) f) comp))
+
+            (define (frob x y :frob-factor f :flux-compensation (comp 0))
+                (- (* (+ x y) f) comp)
+            )
+            ; Missing positional
+            (frob 1 :frob-factor 4)
+            ; Too many positional
+            (frob 1 2 3 :frob-factor 4)
+            ; Positional after keyword
+            (frob 1 2 :frob-factor 4 3 :flux-compensation 1)
+            ; Missing mandatory keyword
+            (frob 1 2)
+            ; Duplicate keyword
+            (frob 1 2 :frob-factor 4 :frob-factor 3)
+            ; Keyword without value
+            (frob 1 2 :frob-factor :flux-compensation 3)
+            ; Keyword without value at the end
+            (frob 1 2 :frob-factor 3 :flux-compensation)
+
+            (frob 1 2 :frob-factor 4)
+            (frob 1 2 :flux-compensation 1 :frob-factor 4)
+            "#,
+            &[
+                Err(EvalErrorKind::DuplicateKeyword(":frob-factor".into())),
+                Err(EvalErrorKind::Redefinition("x".into())),
+                Err(EvalErrorKind::Redefinition("f".into())),
+                Err(EvalErrorKind::Redefinition("x".into())),
+                Ok(Value::Void),
+                Err(EvalErrorKind::NotEnoughArguments),
+                Err(EvalErrorKind::TooManyArguments),
+                Err(EvalErrorKind::TooManyArguments),
+                Err(EvalErrorKind::MissingKeyword(":frob-factor".into())),
+                Err(EvalErrorKind::DuplicateKeyword(":frob-factor".into())),
+                Err(EvalErrorKind::NotEnoughArguments),
+                Err(EvalErrorKind::NotEnoughArguments),
+                Ok(Value::Int(12)),
+                Ok(Value::Int(11)),
+            ],
+        )
     }
 
     #[test]

@@ -3,6 +3,7 @@
 use crate::lang2::heap::*;
 use crate::lang2::interpreter::*;
 use crate::lang2::value::*;
+use std::collections::{HashSet, HashMap};
 
 /// Interprets the `(begin ...)` construct that creates a new scope and executes a series of expressions,
 /// returning the value of the last one.
@@ -29,24 +30,77 @@ pub fn lambda(int: &mut Interpreter, mut args: Gc<Value>) -> Result<Gc<Value>> {
     lambda_impl(int, arg_parameters, args)
 }
 
+
 pub fn lambda_impl(
     int: &mut Interpreter,
     mut params: Gc<Value>,
     body: Gc<Value>,
 ) -> Result<Gc<Value>> {
+    let mut seen_vars: HashSet<Symbol> = HashSet::new();
     let mut parameters = Vec::new();
+
+    // Positional arguments must always come before keyword arguments
     while let Value::Cons(param, tail) = &*params.pin() {
-        let ident = int.as_symbol(param)?;
-        if parameters.contains(&ident) {
-            return Err(int.make_error(param.id(), EvalErrorKind::Redefinition(ident)));
-        } else {
-            parameters.push(ident);
+        match &*param.pin() {
+            Value::Symbol(var) => {
+                let var = var.clone();
+                if ! seen_vars.insert(var.clone()) {
+                    return Err(int.make_error(param.id(), EvalErrorKind::Redefinition(var)));
+                }
+                parameters.push(var);
+            }
+            _ => break,
         }
         params = Gc::clone(tail);
     }
+
+    let mut named_parameters: HashMap<Symbol, (Symbol, Option<Gc<Value>>)> = HashMap::new();
+    while let Value::Cons(param, tail) = &*params.pin() {
+        params = Gc::clone(tail);
+        let result = match &*param.pin() {
+            Value::Keyword(key) => {
+                // Named arguments either look like this:
+                //   (... :name var ...)
+                // or this
+                //   (... :name (var default) ...)
+
+                let next = int.pop_argument(&mut params)?.pin();
+                match &*next {
+                    Value::Symbol(var) => Ok((key.clone(), var.clone(), None)),
+                    // TODO: find a suitable abstraction for parsing complex syntactic forms
+                    // without producing a mess like this.
+                    Value::Cons(var, default_tail) => match (&*var.pin(), &*default_tail.pin()) {
+                        (Value::Symbol(var), Value::Cons(default, arg_tail)) => match &*arg_tail.pin() {
+                            Value::Nil => Ok((key.clone(), var.clone(), Some(Gc::clone(default)))),
+                            _ => Err(next.id()),
+                        },
+                        _ => Err(next.id()),
+                    },
+                    _ => Err(next.id()),
+                }
+            }
+            _ => Err(param.id()),
+        };
+        match result {
+            Ok((key, var, default)) => {
+                if ! seen_vars.insert(var.clone()) {
+                    return Err(int.make_error(param.id(), EvalErrorKind::Redefinition(var)));
+                }
+                if named_parameters.insert(key.clone(), (var, default)).is_some() {
+                    return Err(int.make_error(param.id(), EvalErrorKind::DuplicateKeyword(key)));
+                }
+            }
+            Err(id) => return Err(int.make_error(id, EvalErrorKind::IncompatibleArguments)),
+        }
+    }
+
+    int.expect_no_more_arguments(&params)?;
+
+
     let closure = Closure {
         captured_scope: int.scope_stack().clone(),
         parameters,
+        named_parameters,
         body,
     };
     let heap_closure = int.heap_alloc(closure);

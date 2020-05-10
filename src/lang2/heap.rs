@@ -232,6 +232,10 @@ impl<T> GcPin<T> {
     pub fn id(&self) -> Id {
         Id(self.0.header.get().get_id())
     }
+
+    pub fn unpin(self) -> Gc<T> {
+        Gc(Rc::downgrade(&self.0))
+    }
 }
 
 /// Trait for cooperative mark-and-sweep garbage collection.

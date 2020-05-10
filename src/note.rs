@@ -209,7 +209,7 @@ impl Velocity {
 
     pub fn try_from_f64(velocity: f64) -> Option<Velocity> {
         if velocity.is_nan() || velocity < 0.0 || velocity > 1.0 {
-            return None
+            return None;
         }
         Some(Velocity(velocity))
     }

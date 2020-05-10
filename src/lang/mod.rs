@@ -7,10 +7,10 @@ pub mod compiler;
 pub mod debug;
 pub mod heap;
 pub mod interpreter;
+pub mod marshal;
 pub mod pretty;
 pub mod primops;
 pub mod value;
-pub mod marshal;
 
 pub use heap::*;
 pub use interpreter::*;

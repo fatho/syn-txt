@@ -22,7 +22,7 @@ pub static PRIMOPS: &[(&str, PrimOp)] = &[
 
 pub fn prim_transpose(int: &mut Interpreter, mut args: Gc<Value>) -> Result<Gc<Value>> {
     let note = int.pop_argument_eval_parse(&mut args, note_parser())?;
-    let amount =  int.pop_argument_eval_parse(&mut args, marshal::int())?;
+    let amount = int.pop_argument_eval_parse(&mut args, marshal::int())?;
     int.expect_no_more_arguments(&args)?;
 
     if let Some(new_note) = Note::try_from_midi(note.to_midi() as i64 + amount) {
@@ -35,8 +35,9 @@ pub fn prim_transpose(int: &mut Interpreter, mut args: Gc<Value>) -> Result<Gc<V
     }
 }
 
-
-pub fn note_parser() -> impl marshal::ParseValue<Repr=Note> {
+pub fn note_parser() -> impl marshal::ParseValue<Repr = Note> {
     use marshal::ParseValue;
-    marshal::string().and_then(|s| Note::named_str(&s)).or(marshal::int().and_then(Note::try_from_midi))
+    marshal::string()
+        .and_then(|s| Note::named_str(&s))
+        .or(marshal::int().and_then(Note::try_from_midi))
 }

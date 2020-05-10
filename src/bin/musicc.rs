@@ -48,7 +48,9 @@ fn main() -> io::Result<()> {
     simple_logger::init_with_level(level).unwrap();
 
     let source = std::fs::read_to_string(&opt.source)?;
-    let dump_out = opt.dump_description.map(|path| path.unwrap_or("/dev/stdout".into()));
+    let dump_out = opt
+        .dump_description
+        .map(|path| path.unwrap_or("/dev/stdout".into()));
     let song = musicc::eval::eval(&opt.source.to_string_lossy(), &source, dump_out.as_deref())?;
     musicc::output::play(song, opt.output.as_deref())
 }

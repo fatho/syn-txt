@@ -10,12 +10,12 @@
 
 //! Easy interface for getting sound to play using a sox subprocess.
 use std::io;
-use std::process::{Command, Stdio};
 use std::path::Path;
+use std::process::{Command, Stdio};
 
 pub enum SoxTarget<'a> {
     Play,
-    File(&'a Path)
+    File(&'a Path),
 }
 
 pub fn with_sox<R, F: FnOnce(&mut dyn io::Write) -> io::Result<R>>(

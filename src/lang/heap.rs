@@ -68,7 +68,7 @@ impl Heap {
             if Rc::strong_count(object) > 1 {
                 let header = object.header().get();
                 // There is a GcPin reference to this object, since the heap itself only holds one Rc.
-                if ! header.get_mark() {
+                if !header.get_mark() {
                     log::trace!("object {:?} kept alive by pin only", header.get_id());
                     object.mark();
                 }
@@ -373,7 +373,7 @@ mod test {
 
         // Just dropping the pin is not enough
         drop(pin);
-        assert!(! drop_notifier.get());
+        assert!(!drop_notifier.get());
 
         // But collecting once more is
         heap.gc_cycles();

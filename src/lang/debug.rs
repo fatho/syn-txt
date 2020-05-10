@@ -26,7 +26,9 @@ impl DebugTable {
     }
 
     pub fn get_location(&self, value: heap::Id) -> Option<&SourceLocation> {
-        self.value_info.get(&value).and_then(|entry| entry.location.as_ref())
+        self.value_info
+            .get(&value)
+            .and_then(|entry| entry.location.as_ref())
     }
 
     pub fn get_source(&self, filename: &str) -> Option<&str> {

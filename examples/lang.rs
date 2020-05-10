@@ -13,7 +13,7 @@ use syn_txt::lang::debug;
 use syn_txt::lang::heap;
 use syn_txt::lang::interpreter::*;
 use syn_txt::lang::pretty;
-use syn_txt::lang::span::{LineMap};
+use syn_txt::lang::span::LineMap;
 use syn_txt::lang::value::*;
 
 fn main() {
@@ -119,7 +119,9 @@ fn run_test(input: &str) {
                 println!("Out:\n{}", pretty::pretty(&val.pin()));
             }
             Err(err) => {
-                let source = err.location().and_then(|loc| int.debug_info().get_source(&loc.file));
+                let source = err
+                    .location()
+                    .and_then(|loc| int.debug_info().get_source(&loc.file));
                 let lines = source.map(LineMap::new);
                 print_error(lines.as_ref(), err.location(), err.info());
                 break;
@@ -149,7 +151,10 @@ fn print_error<E: std::fmt::Display>(
             println!("({} {}-{})", location.file, start, end);
             println!("{}", lines.highlight(start, end, true));
         } else {
-            println!("({} {}-{})", location.file, location.span.begin, location.span.end);
+            println!(
+                "({} {}-{})",
+                location.file, location.span.begin, location.span.end
+            );
         }
     }
 }

@@ -1,18 +1,18 @@
 (define (arpeggio/maj base length)
-    (piano-roll
-        (note :pitch base :length (/ length 3))
-        (note :pitch (transpose base 3) :length (/ length 3))
-        (note :pitch (transpose base 5) :length (/ length 3))
-    )
-)
+    (define unit (/ length 3))
+    (list
+        (note :start (* 0 unit) :length unit :pitch base)
+        (note :start (* 1 unit) :length unit :pitch (transpose base 3))
+        (note :start (* 2 unit) :length unit :pitch (transpose base 5))
+    ))
 
 (define melody
-    (piano-roll
-        (arpeggio/maj "c2" 1/4)
-        (arpeggio/maj "d2" 1/4)
-        (arpeggio/maj "e2" 1/4)
-        (arpeggio/maj "c2" 1/4)
-    )
-)
+    (sequence-all
+        (list
+            (arpeggio/maj "c2" 1/4)
+            (arpeggio/maj "d2" 1/4)
+            (arpeggio/maj "e2" 1/4)
+            (arpeggio/maj "c2" 1/4)
+        )))
 
 (song :bpm 90 :notes melody)

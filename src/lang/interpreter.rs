@@ -62,6 +62,8 @@ pub enum EvalErrorKind {
     Redefinition(String),
     /// Miscellaneous errors that shouldn't happen, but might.
     Other(String),
+    /// Interpreter failed to compile a nested document.
+    Compile(super::compiler::CompileError)
 }
 
 impl fmt::Display for EvalErrorKind {
@@ -80,6 +82,7 @@ impl fmt::Display for EvalErrorKind {
             EvalErrorKind::Redefinition(var) => write!(f, "redefined variable `{}`", var.as_str()),
             EvalErrorKind::Type => write!(f, "type error"),
             EvalErrorKind::Other(msg) => write!(f, "{}", msg),
+            EvalErrorKind::Compile(err) => write!(f, "{}", err),
         }
     }
 }
@@ -116,6 +119,7 @@ impl<'a> Interpreter<'a> {
             ("-", PrimOp(primops::sub)),
             ("*", PrimOp(primops::mul)),
             ("/", PrimOp(primops::div)),
+            ("%", PrimOp(primops::rem)),
             // relational
             ("=", PrimOp(primops::eq)),
             ("!=", PrimOp(primops::neq)),
@@ -163,20 +167,32 @@ impl<'a> Interpreter<'a> {
             heap,
             debug_info,
         };
-        this.source_prelude();
+        this.push_scope();
+        static PRELUDE: &str = include_str!("prelude.syn");
+        this.source_prelude("<prelude>", PRELUDE).expect("prelude should compile");
         this
     }
 
-    fn source_prelude(&mut self) {
+    /// Evaluate a prelude script in the built-in scope.
+    pub fn source_prelude(&mut self, name: &str, source: &str) -> Result<()> {
         // The prelude is evaluated in the builtin scope.
-        static PRELUDE: &str = include_str!("prelude.syn");
-        let prelude_vals = super::compiler::compile_str(&mut self.heap, &mut self.debug_info, "<prelude>", PRELUDE).expect("prelude does not compile");
-        for value in prelude_vals {
-            self.eval(value).expect("prelude evaluation error");
+        let actual_scope = self.scope_stack.pin();
+        self.scope_stack = Gc::clone(&self.builtins);
+
+        let prelude_vals = super::compiler::compile_str(&mut self.heap, &mut self.debug_info, name, source);
+        let mut result = Ok(());
+        match prelude_vals {
+            Ok(prelude_vals) => for value in prelude_vals {
+                result = self.eval(value).map(|_| ());
+                if result.is_err() { break }
+            },
+            Err(compile_err) => result = Err(EvalError::new(None, EvalErrorKind::Compile(compile_err))),
         }
+
+        self.scope_stack = actual_scope.unpin();
         // Clean up the mess left by initializing the prelude
         self.perform_gc(true);
-        self.push_scope();
+        result
     }
 
     pub fn register_primop(
@@ -440,6 +456,15 @@ mod test {
         expect_values("(* 2 (/ 8 12))", vec![Value::Ratio(Rational::new(4, 3))]);
         expect_values("(/ 5/4 8/7)", vec![Value::Ratio(Rational::new(35, 32))]);
         expect_values("(/ 7)", vec![Value::Ratio(Rational::new(1, 7))]);
+
+        expect_values("(% 5 3)", vec![Value::Int(2)]);
+        expect_values("(% -5 3)", vec![Value::Int(-2)]);
+
+        expect_values("(% 7/3 1/4)", vec![Value::Ratio(Rational::new(1, 12))]);
+        expect_values("(% -7/3 1/4)", vec![Value::Ratio(Rational::new(-1, 12))]);
+
+        expect_values("(% 0.75 0.5)", vec![Value::Float(0.25)]);
+        expect_values("(% -0.75 0.5)", vec![Value::Float(-0.25)]);
     }
 
     #[test]
@@ -615,6 +640,12 @@ mod test {
             (= (range 0 4 :step 2) (list 0 2 4))
             (= (range 0 4 :step 0) nil)
             (= (range 2 -2 :step -2) (list 2 0 -2))
+
+            (reduce-left + 4 (list 1 2 3))
+            (reduce-left - 4 (list 1 1 1))
+            (reduce-right - (list 1 1 1) 4)
+
+            (= (imap * (list 1 2 3)) (list 0 2 6))
             "#,
             vec![
                 Value::Void,
@@ -629,6 +660,10 @@ mod test {
                 Value::Bool(true),
                 Value::Bool(true),
                 Value::Bool(true),
+                Value::Bool(true),
+                Value::Int(10),
+                Value::Int(1),
+                Value::Int(-3),
                 Value::Bool(true),
             ],
         );

@@ -86,6 +86,19 @@ pub fn div(int: &mut Interpreter, mut args: Gc<Value>) -> Result<Gc<Value>> {
     Ok(int.heap_alloc_value(accum.to_value()))
 }
 
+/// Compute the remainder of two numbers.
+pub fn rem(int: &mut Interpreter, mut args: Gc<Value>) -> Result<Gc<Value>> {
+    let (a, aid) = Number::pop(int, &mut args)?;
+    let (b, _) = Number::pop(int, &mut args)?;
+    let result = match widen(a, b) {
+        (Number::Int(x), Number::Int(y)) => Number::Int(x % y),
+        (Number::Ratio(x), Number::Ratio(y)) => Number::from_rational(x % y),
+        (Number::Float(x), Number::Float(y)) => Number::Float(x % y),
+        _ => return Err(int.make_error(aid, EvalErrorKind::Type)),
+    };
+    Ok(int.heap_alloc_value(result.to_value()))
+}
+
 #[derive(Debug, PartialEq, Clone, Copy)]
 enum Number {
     /// A float

@@ -1,0 +1,45 @@
+; Prelude with musical primitives
+;
+; Concepts:
+;   - a `melody` is a list of notes with absolute timings
+;   - concatenating two melodies plays both at the same time (as the absolute timings don't change)
+
+; Create a song object
+(define (song :bpm bpm :notes notes)
+    ; The convention is that objects have a :__type__ key indicating its type.
+    ; This type annotation is used when parsing the values in the host.
+    (dict :__type__ "song" :bpm bpm :notes notes))
+
+; Create a note object with absolute timing.
+(define (note :start start :length length :pitch pitch :velocity (velocity 1.0))
+    (dict :__type__ "note" :start start :length length :pitch pitch :velocity velocity))
+
+; Compute the time when the last note of the given melody ends.
+(define (last-note-end melody)
+    (if (cons? melody)
+        (begin
+            (define note (head melody))
+            (define this-end (+ (get note :start) (get note :length)))
+            (define rest-end (last-note-end (tail melody)))
+            (if (> this-end rest-end) this-end rest-end)
+        )
+        0))
+
+; Play two melodies in sequence.
+(define (sequence first next :rest (rest 0))
+    (define first-end (last-note-end first))
+    (define (shift note) (update note :start (+ (get note :start) first-end rest)))
+    (concat first (map shift next)))
+
+; Play a list of melodies in sequence.
+(define (sequence-all melodies)
+    ; TODO: inefficient O(n^2)
+    (reduce-left sequence nil melodies))
+
+; Transpose a single note by the given amount of semitones.
+(define (transpose-note note semitones)
+    (update note :pitch (transpose (get note :pitch) semitones)))
+
+; Transpose a whole melody by the given amount of semitones.
+(define (transpose-all melody semitones)
+    (map (lambda (n) (transpose-note n semitones)) melody))

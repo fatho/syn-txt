@@ -23,7 +23,7 @@ use crate::lang::marshal;
 
 use super::{langext, output};
 use crate::pianoroll::{PlayedNote, PianoRoll};
-use crate::note::{Velocity, Note};
+use crate::note::Velocity;
 
 /// Evaluate syn.txt source code into a song description.
 ///
@@ -39,6 +39,9 @@ pub fn eval(input_name: &str, input: &str) -> io::Result<output::Song> {
         int.register_primop(name, op.0)
             .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("{}", e.info())))?;
     }
+
+    static MUSIC_PRELUDE: &str = include_str!("Music.syn");
+    int.source_prelude("<music-prelude>", MUSIC_PRELUDE).expect("music prelude should compile");
 
     let mut final_value = int.heap_alloc_value(Value::Void).pin();
     for v in values {
@@ -66,7 +69,7 @@ fn build_song(value: GcPin<Value>) -> Option<output::Song> {
             note: fields.get(":pitch", langext::note_parser())?,
             velocity: fields.get_or(":velocity", Velocity::MAX, marshal::float_coercing().and_then(Velocity::try_from_f64))?,
             start: fields.get(":start", marshal::ratio_coercing())?,
-            duration: fields.get(":duration", marshal::ratio_coercing())?,
+            duration: fields.get(":length", marshal::ratio_coercing())?,
         })
     });
     let note_list_parser = marshal::list(note_parser);

@@ -6,14 +6,27 @@ use super::parser;
 use super::heap;
 use super::{debug, span::{Span, LineMap}, Value};
 
-use std::sync::Arc;
+use std::{fmt, sync::Arc};
 
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CompileError {
     filename: Arc<str>,
     lexer_errors: Vec<lexer::LexerError>,
     parse_errors: Vec<parser::ParseError>,
+}
+
+impl fmt::Display for CompileError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "failed to compile {}:", self.filename)?;
+        for l in self.lexer_errors.iter() {
+            writeln!(f, "{}", l.kind())?;
+        }
+        for p in self.parse_errors.iter() {
+            writeln!(f, "{}", p.info())?;
+        }
+        Ok(())
+    }
 }
 
 impl CompileError {

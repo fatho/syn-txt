@@ -567,6 +567,37 @@ mod test {
                 (concat (list 1 2) (list 3) (list) (reverse (list 1 2)))
                 (list 1 2 3 2 1)
             )
+
+            (define range
+                (begin
+                    (define (range-up start stop step)
+                        (if (<= start stop)
+                            (cons start (range-up (+ start step) stop step))
+                            nil
+                        )
+                    )
+                    (define (range-down start stop step)
+                        (if (>= start stop)
+                            (cons start (range-down (+ start step) stop step))
+                            nil
+                        )
+                    )
+                    (lambda (start stop :step (step 1))
+                        ; TODO: implement cond syntax
+                        (if (> step 0)
+                            (range-up start stop step)
+                            (if (< step 0)
+                                (range-down start stop step)
+                                nil
+                            )
+                        )
+                    )
+                )
+            )
+            (= (range 0 4) (list 0 1 2 3 4))
+            (= (range 0 4 :step 2) (list 0 2 4))
+            (= (range 0 4 :step 0) nil)
+            (= (range 2 -2 :step -2) (list 2 0 -2))
             "#,
             &[
                 Value::Void,
@@ -575,6 +606,11 @@ mod test {
                 Value::Bool(true),
                 Value::Bool(true),
                 Value::Bool(false),
+                Value::Bool(true),
+                Value::Bool(true),
+                Value::Bool(true),
+                Value::Void,
+                Value::Bool(true),
                 Value::Bool(true),
                 Value::Bool(true),
                 Value::Bool(true),

@@ -115,40 +115,6 @@ pub fn reverse(int: &mut Interpreter, mut args: Gc<Value>) -> Result<Gc<Value>> 
     Ok(reversed)
 }
 
-// /// Create a list of a range of integers. Possible forms:
-// ///  * `(range n)` is equivalent to `(range 0 n 1)`
-// ///  * `(range m n)` is equivalent to `(range m n 1)`
-// ///  * `(range m n step)` produces a list starting at `m` and
-// ///    adding `step` at each step, until it is greater than or equal to `n`.
-// pub fn range(int: &mut Interpreter, mut args: Gc<Value>) -> Result<Gc<Value>> {
-//     let a: i64 = int.pop_argument_eval(&mut args)?;
-//     let b: Option<i64> = if args.is_empty() {
-//         None
-//     } else {
-//         Some(args.extract(int)?)
-//     };
-//     let c: Option<i64> = if args.is_empty() {
-//         None
-//     } else {
-//         Some(args.extract(int)?)
-//     };
-//     int.expect_no_more_arguments(&args)?;
-
-//     let (start, end, step) = match (a, b, c) {
-//         (start, Some(end), Some(step)) => (start, end, step),
-//         (start, Some(end), None) => (start, end, 1),
-//         (end, _, _) => (0, end, 1),
-//     };
-
-//     let mut values: Vec<Value> = Vec::new();
-//     let mut current = start;
-//     while (step > 0 && current < end) || (step < 0 && current > end) {
-//         values.push(Value::Int(current));
-//         current += step;
-//     }
-//     Ok(Value::List(values.into()))
-// }
-
 /// Build a list from the reverse order of items in the given iterator.
 fn rev_list_from_iter<I: Iterator<Item = Gc<Value>>>(
     int: &mut Interpreter,

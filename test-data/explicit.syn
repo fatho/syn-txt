@@ -1,0 +1,14 @@
+(define (song :bpm bpm :notes notes)
+    (dict :__type__ "song" :bpm bpm :notes notes))
+
+(define (note :start start :duration duration :pitch pitch :velocity (velocity 1.0))
+    (dict :__type__ "note" :start start :duration duration :pitch pitch :velocity velocity))
+
+(define melody
+    (list
+        (note :start 0 :duration 1/4 :pitch "a4")
+        (note :start 1/4 :duration 1/4 :pitch "b4")
+        (note :start 2/4 :duration 1/4 :pitch "c5")
+    ))
+
+(song :bpm 90 :notes melody)

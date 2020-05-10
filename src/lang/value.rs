@@ -36,6 +36,12 @@ impl From<Rc<str>> for Symbol {
     }
 }
 
+impl std::borrow::Borrow<str> for Symbol {
+    fn borrow(&self) -> &str {
+        self.0.borrow()
+    }
+}
+
 /// A primitive operation exposed to the interpreted language.
 #[derive(Copy, Clone)]
 pub struct PrimOp(

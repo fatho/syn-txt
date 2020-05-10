@@ -15,12 +15,15 @@ use std::io;
 
 use crate::lang::interpreter::Interpreter;
 use crate::lang::value::Value;
-use crate::lang::heap::{Heap, GcPin, Gc};
+use crate::lang::heap::{Heap, GcPin};
 use crate::lang::debug::{DebugTable, SourceLocation};
 use crate::lang::compiler;
 use crate::lang::span::LineMap;
+use crate::lang::marshal;
 
 use super::{langext, output};
+use crate::pianoroll::{PlayedNote, PianoRoll};
+use crate::note::{Velocity, Note};
 
 /// Evaluate syn.txt source code into a song description.
 ///
@@ -57,7 +60,26 @@ pub fn eval(input_name: &str, input: &str) -> io::Result<output::Song> {
 }
 
 fn build_song(value: GcPin<Value>) -> Option<output::Song> {
-    todo!()
+    use marshal::ParseValue;
+    let note_parser = marshal::record("note", |fields| {
+        Some(PlayedNote {
+            note: fields.get(":pitch", marshal::string().and_then(|s| Note::named_str(&s)).or(marshal::int().and_then(Note::try_from_midi)))?,
+            velocity: fields.get_or(":velocity", Velocity::MAX, marshal::float_coercing().and_then(Velocity::try_from_f64))?,
+            start: fields.get(":start", marshal::ratio_coercing())?,
+            duration: fields.get(":duration", marshal::ratio_coercing())?,
+        })
+    });
+    let note_list_parser = marshal::list(note_parser);
+    let parser = marshal::record("song", move |fields| {
+        let bpm = fields.get(":bpm", marshal::int())?;
+        let note_list = fields.get(":notes", &note_list_parser)?;
+        let notes = Some(PianoRoll::with_notes(note_list))?;
+        Some(output::Song {
+            bpm,
+            notes,
+        })
+    });
+    parser.parse(value)
 }
 
 fn log_error<E: std::fmt::Display>(

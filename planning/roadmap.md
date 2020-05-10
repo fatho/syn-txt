@@ -14,20 +14,26 @@ The goal is to have a DSL based on S-Expressions for
   (for example, for piano rolls)
 - make executable that takes a DSL file, evaluates it to a piano roll and plays that on a synth
 - organize `musicc` code so that it is more maintainable
+- allow configuring the synthesizer from within the language
+- add list value and combinators to language (useful for defining chords on the fly)
+- add record accessors (in the form of dicts)
 
 ## Now
 
+- document existing functionality
 - implement useful combinators as built-ins
-- allow configuring the synthesizer from within the language
-- refactor piano roll interface to be less ad-hoc
-- add list value and combinators to language (useful for defining chords on the fly)
-- add record accessors
+- refactor syn_txt::pianoroll interface to be less ad-hoc (or get rid of it completely?)
+- allow multiple tracks to play at once on separate instruments
 
 ## Later
 
-- expose mixer channels, tracks and playlists (what to play when on which track) in DSL
-- make a distinction between value-levl primops (such as addition) and syntax primops (such as `define`).
+- design interface for composing tracks both vertically (playing multiple tracks at once)
+  and horizontally (sequencing tracks and stacks of tracks), like it is possible with notes already.
+- implement sample tracks (playing samples directly, without going through notes)
+- implement more instruments
+
 
 ## Eventually
 
 - design more complex audio routing as DAG, including effects and a mixer
+- implement song-global automation (global LFOs, automation tracks, sidechaining)

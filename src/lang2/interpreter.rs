@@ -145,14 +145,27 @@ impl<'a> Interpreter<'a> {
         }
 
         let builtins = heap.alloc(builtin_scope);
-        let top_scope = heap.alloc(Scope::nest(builtins.clone()));
 
-        Self {
+        let mut this = Self {
+            scope_stack: Gc::clone(&builtins),
             builtins,
-            scope_stack: top_scope,
             heap,
             debug_info,
+        };
+        this.source_prelude();
+        this
+    }
+
+    fn source_prelude(&mut self) {
+        // The prelude is evaluated in the builtin scope.
+        static PRELUDE: &str = include_str!("prelude.syn");
+        let prelude_vals = super::compiler::compile_str(&mut self.heap, &mut self.debug_info, "<prelude>", PRELUDE).expect("prelude does not compile");
+        for value in prelude_vals {
+            self.eval(value).expect("prelude evaluation error");
         }
+        // Clean up the mess left by initializing the prelude
+        self.perform_gc(true);
+        self.push_scope();
     }
 
     pub fn register_primop(
@@ -211,24 +224,23 @@ impl<'a> Interpreter<'a> {
     }
 
     /// Evaluate the given value in the current scope.
-    pub fn eval(&mut self, value: Gc<Value>) -> Result<Gc<Value>> {
-        let pinned = value.pin();
-        match &*pinned {
+    pub fn eval(&mut self, value: GcPin<Value>) -> Result<Gc<Value>> {
+        match &*value {
             Value::Symbol(sym) => {
                 if let Some(value) = self.scope_stack().pin().lookup(sym) {
                     Ok(value)
                 } else {
-                    Err(self.make_error(pinned.id(), EvalErrorKind::NoSuchVariable(sym.clone())))
+                    Err(self.make_error(value.id(), EvalErrorKind::NoSuchVariable(sym.clone())))
                 }
             }
             Value::Cons(head, tail) => self.eval_call(Gc::clone(head), Gc::clone(tail)),
             // The rest is self-evaluating
-            _ => Ok(value),
+            _ => Ok(value.unpin()),
         }
     }
 
     pub fn eval_call(&mut self, head: Gc<Value>, mut tail: Gc<Value>) -> Result<Gc<Value>> {
-        let head = self.eval(head)?.pin();
+        let head = self.eval(head.pin())?.pin();
         match &*head {
             Value::PrimOp(PrimOp(f)) => f(self, tail),
             Value::Closure(gc_closure) => {
@@ -239,7 +251,7 @@ impl<'a> Interpreter<'a> {
                 // 1. Parse positional arguments
                 for param_var in clos.parameters.iter() {
                     let arg = self.pop_argument(&mut tail)?;
-                    let value = self.eval(Gc::clone(&arg))?;
+                    let value = self.eval(arg.pin())?;
                     if value.pin().is_keyword() {
                         return Err(self.make_error(arg.id(), EvalErrorKind::NotEnoughArguments))
                     }
@@ -293,7 +305,7 @@ impl<'a> Interpreter<'a> {
 
                 let mut current = clos.body.pin();
                 while let Value::Cons(head, tail) = &*current {
-                    return_value = self.eval(Gc::clone(head));
+                    return_value = self.eval(head.pin());
                     if return_value.is_err() {
                         break;
                     }
@@ -320,7 +332,7 @@ impl<'a> Interpreter<'a> {
 
     pub fn pop_argument_eval(&mut self, args: &mut Gc<Value>) -> Result<Gc<Value>> {
         let arg = self.pop_argument(args)?;
-        self.eval(arg)
+        self.eval(arg.pin())
     }
 
     pub fn as_symbol(&self, arg: &Gc<Value>) -> Result<Symbol> {
@@ -338,66 +350,75 @@ impl<'a> Interpreter<'a> {
             Err(self.make_error(args.id(), EvalErrorKind::TooManyArguments))
         }
     }
+
+    /// Run a GC. Values on the current scope stack are marked as live.
+    /// Must only be called if all other values that are still needed
+    /// are currently kept as `GcPin`s.
+    pub fn perform_gc(&mut self, collect_cycles: bool) {
+        if collect_cycles {
+            self.scope_stack.mark();
+            // The scope stack at this point might not reference the builtins
+            self.builtins.mark();
+            self.heap.gc_cycles();
+        } else {
+            self.heap.gc_non_cycles();
+        }
+    }
 }
 
 #[cfg(test)]
 mod test {
-    use super::super::{compiler, debug::*, lexer::*, parser::*, span::*};
+    use super::super::{compiler, debug::*};
     use super::*;
     use crate::rational::*;
     use std::collections::HashMap;
 
-    fn compile(input: &str) -> (Vec<Gc<Value>>, Heap, DebugTable) {
-        let tokens = Lexer::new(input)
-            .collect::<std::result::Result<Vec<(Span, Token)>, _>>()
-            .unwrap();
-        let ast = Parser::new(input, &tokens).parse().unwrap();
+    fn compile(input: &str) -> (Vec<GcPin<Value>>, Heap, DebugTable) {
         let mut heap = Heap::new();
         let mut debug = debug::DebugTable::new();
-        let mut context = compiler::Context {
-            debug_table: &mut debug,
-            heap: &mut heap,
-            filename: "<input>".into(),
-        };
-        let values: Vec<Gc<Value>> = ast.iter().map(|e| context.compile(e)).collect();
+        let values = compiler::compile_str(&mut heap, &mut debug, "<test>", input).unwrap();
         (values, heap, debug)
     }
 
-    fn expect_values(input: &str, expected: &[Value]) {
+    fn expect_values(input: &str, expected: Vec<Value>) {
         let (vals, mut heap, mut debug) = compile(input);
+        let expected: Vec<GcPin<Value>> = expected.into_iter().map(|v| heap.alloc(v).pin()).collect();
         let mut interp = Interpreter::new(&mut heap, &mut debug);
 
-        for (e, val) in vals.iter().zip(expected) {
-            let result = interp.eval(Gc::clone(e)).unwrap();
-            assert_eq!(&*result.pin(), val);
+        assert_eq!(vals.len(), expected.len());
+        for (e, val) in vals.into_iter().zip(expected) {
+            let result = interp.eval(e).unwrap();
+            assert_eq!(&*result.pin(), &*val);
         }
     }
 
     fn expect_values_or_errors(
         input: &str,
-        expected: &[std::result::Result<Value, EvalErrorKind>],
+        expected: Vec<std::result::Result<Value, EvalErrorKind>>,
     ) {
         let (vals, mut heap, mut debug) = compile(input);
+        let expected: Vec<_> = expected.into_iter().map(|e| e.map(|v| heap.alloc(v).pin())).collect();
         let mut interp = Interpreter::new(&mut heap, &mut debug);
 
-        for (e, val) in vals.iter().zip(expected) {
-            let result = interp.eval(Gc::clone(e)).map(|v| v.pin());
-            let result = result.map(|v| (*v).clone()).map_err(|e| e.info);
-            assert_eq!(&result, val);
+        assert_eq!(vals.len(), expected.len());
+        for (e, val) in vals.into_iter().zip(expected) {
+            let result = interp.eval(e).map(|v| v.pin());
+            let result = result.map_err(|e| e.info);
+            assert_eq!(&result, &val);
         }
     }
 
     #[test]
     fn test_arithmetic() {
-        expect_values("(+ 1 2)", &[Value::Int(3)]);
-        expect_values("(- 8 12)", &[Value::Int(-4)]);
+        expect_values("(+ 1 2)", vec![Value::Int(3)]);
+        expect_values("(- 8 12)", vec![Value::Int(-4)]);
 
-        expect_values("(- -4 -9)", &[Value::Int(5)]);
-        expect_values("(- 7)", &[Value::Int(-7)]);
+        expect_values("(- -4 -9)", vec![Value::Int(5)]);
+        expect_values("(- 7)", vec![Value::Int(-7)]);
 
-        expect_values("(* 2 (/ 8 12))", &[Value::Ratio(Rational::new(4, 3))]);
-        expect_values("(/ 5/4 8/7)", &[Value::Ratio(Rational::new(35, 32))]);
-        expect_values("(/ 7)", &[Value::Ratio(Rational::new(1, 7))]);
+        expect_values("(* 2 (/ 8 12))", vec![Value::Ratio(Rational::new(4, 3))]);
+        expect_values("(/ 5/4 8/7)", vec![Value::Ratio(Rational::new(35, 32))]);
+        expect_values("(/ 7)", vec![Value::Ratio(Rational::new(1, 7))]);
     }
 
     #[test]
@@ -412,7 +433,7 @@ mod test {
             (set! result
                 (* pi (* r r)))
             result"#,
-            &[
+            vec![
                 Value::Void,
                 Value::Void,
                 Value::Void,
@@ -445,7 +466,7 @@ mod test {
             )
             foo
             "#,
-            &[
+            vec![
                 Ok(Value::Void),
                 Ok(Value::Void),
                 Ok(Value::Int(5)),
@@ -467,7 +488,7 @@ mod test {
             (plus-one 2)
             (plus-one 3)
             "#,
-            &[Value::Void, Value::Int(3), Value::Int(4)],
+            vec![Value::Void, Value::Int(3), Value::Int(4)],
         )
     }
 
@@ -489,7 +510,7 @@ mod test {
             (get-global)
             global-state
             "#,
-            &[
+            vec![
                 Value::Void,
                 Value::Void,
                 Value::Int(0),
@@ -528,7 +549,7 @@ mod test {
             (c2)
             (c1)
             "#,
-            &[
+            vec![
                 Value::Void,
                 Value::Void,
                 Value::Void,
@@ -543,7 +564,7 @@ mod test {
 
     #[test]
     fn test_list() {
-        expect_values("(list)", &[Value::Nil]);
+        expect_values("(list)", vec![Value::Nil]);
 
         expect_values(
             r#"
@@ -569,38 +590,12 @@ mod test {
                 (list 1 2 3 2 1)
             )
 
-            (define range
-                (begin
-                    (define (range-up start stop step)
-                        (if (<= start stop)
-                            (cons start (range-up (+ start step) stop step))
-                            nil
-                        )
-                    )
-                    (define (range-down start stop step)
-                        (if (>= start stop)
-                            (cons start (range-down (+ start step) stop step))
-                            nil
-                        )
-                    )
-                    (lambda (start stop :step (step 1))
-                        ; TODO: implement cond syntax
-                        (if (> step 0)
-                            (range-up start stop step)
-                            (if (< step 0)
-                                (range-down start stop step)
-                                nil
-                            )
-                        )
-                    )
-                )
-            )
             (= (range 0 4) (list 0 1 2 3 4))
             (= (range 0 4 :step 2) (list 0 2 4))
             (= (range 0 4 :step 0) nil)
             (= (range 2 -2 :step -2) (list 2 0 -2))
             "#,
-            &[
+            vec![
                 Value::Void,
                 Value::Void,
                 Value::Int(6),
@@ -610,7 +605,6 @@ mod test {
                 Value::Bool(true),
                 Value::Bool(true),
                 Value::Bool(true),
-                Value::Void,
                 Value::Bool(true),
                 Value::Bool(true),
                 Value::Bool(true),
@@ -619,23 +613,23 @@ mod test {
         );
         // expect_values(
         //     "(range 1 4)",
-        //     &[Value::List(
+        //     vec![Value::List(
         //         vec![Value::Int(1), Value::Int(2), Value::Int(3)].into(),
         //     )],
         // );
         // expect_values(
         //     "(range 1 -2 -1)",
-        //     &[Value::List(
+        //     vec![Value::List(
         //         vec![Value::Int(1), Value::Int(0), Value::Int(-1)].into(),
         //     )],
         // );
         // expect_values(
         //     "(range 3)",
-        //     &[Value::List(
+        //     vec![Value::List(
         //         vec![Value::Int(0), Value::Int(1), Value::Int(2)].into(),
         //     )],
         // );
-        // expect_values("(range 0)", &[Value::List(vec![].into())]);
+        // expect_values("(range 0)", vec![Value::List(vec![].into())]);
     }
 
     #[test]
@@ -648,7 +642,7 @@ mod test {
             (frob 1 2 :frob-factor 4)
             (frob 1 2 :flux-compensation 1 :frob-factor 4)
             "#,
-            &[Value::Void, Value::Int(13), Value::Int(11)],
+            vec![Value::Void, Value::Int(13), Value::Int(11)],
         );
         expect_values_or_errors(
             r#"
@@ -686,7 +680,7 @@ mod test {
             (frob 1 2 :frob-factor 4)
             (frob 1 2 :flux-compensation 1 :frob-factor 4)
             "#,
-            &[
+            vec![
                 Err(EvalErrorKind::DuplicateKeyword(":frob-factor".into())),
                 Err(EvalErrorKind::Redefinition("x".into())),
                 Err(EvalErrorKind::Redefinition("f".into())),
@@ -708,7 +702,7 @@ mod test {
     #[test]
     fn test_dict() {
         let mut heap = Heap::new();
-        expect_values("(dict)", &[Value::Dict(HashMap::new())]);
+        expect_values("(dict)", vec![Value::Dict(HashMap::new())]);
         expect_values(
             "
             (define d (dict :foo 1 :bar 2))
@@ -718,9 +712,8 @@ mod test {
             (get d :foo)
             (get d2 :foo)
             (get d2 :bar)
-            (get d2 :baz)
             ",
-            &[
+            vec![
                 Value::Void,
                 Value::Dict({
                     let mut d = HashMap::new();
@@ -740,7 +733,7 @@ mod test {
             (define d (dict :foo 1 :bar 2))
             (get d :baz)
             ",
-            &[
+            vec![
                 Ok(Value::Void),
                 Err(EvalErrorKind::UnknownKeyword(":baz".into())),
             ],

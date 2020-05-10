@@ -12,7 +12,7 @@ pub fn begin(int: &mut Interpreter, args: Gc<Value>) -> Result<Gc<Value>> {
     let mut result = Ok(int.heap_alloc_value(Value::Void));
     let mut current = args.pin();
     while let Value::Cons(head, tail) = &*current {
-        result = int.eval(Gc::clone(head));
+        result = int.eval(head.pin());
         if result.is_err() {
             break;
         }
@@ -154,8 +154,8 @@ pub fn set(int: &mut Interpreter, mut args: Gc<Value>) -> Result<Gc<Value>> {
 /// If expression
 pub fn if_(int: &mut Interpreter, mut args: Gc<Value>) -> Result<Gc<Value>> {
     let cond = int.pop_argument_eval(&mut args)?;
-    let then = int.pop_argument(&mut args)?;
-    let else_ = int.pop_argument(&mut args)?;
+    let then = int.pop_argument(&mut args)?.pin();
+    let else_ = int.pop_argument(&mut args)?.pin();
     int.expect_no_more_arguments(&args)?;
 
     let is_true = match &*cond.pin() {

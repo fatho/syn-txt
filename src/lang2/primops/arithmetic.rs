@@ -126,7 +126,7 @@ impl Number {
     pub fn pop(int: &mut Interpreter, args: &mut Gc<Value>) -> Result<(Number, Id)> {
         let arg = int.pop_argument(args)?;
         let arg_id = arg.id();
-        let value = int.eval(arg)?;
+        let value = int.eval(arg.pin())?;
         if let Some(number) = Number::try_from_value(&*value.pin()) {
             Ok((number, arg_id))
         } else {

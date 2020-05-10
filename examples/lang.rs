@@ -111,7 +111,7 @@ fn run_test(input: &str) {
     let mut int = Interpreter::new(&mut heap, &mut debug);
 
     for v in values {
-        println!("In:\n{}", pretty::pretty(&v.pin()));
+        println!("In:\n{}", pretty::pretty(&v));
         println!();
 
         match int.eval(v) {
@@ -133,7 +133,7 @@ fn run_test(input: &str) {
     heap.gc_non_cycles();
     println!("GC values in cycles: {}", heap.len());
     heap.gc_cycles();
-    println!("Heap: {:?}", heap);
+    println!("GC values remaining: {}", heap.len());
 }
 
 fn print_error<E: std::fmt::Display>(

@@ -97,7 +97,7 @@ pub fn compile_str<'a>(
     debug_table: &mut debug::DebugTable,
     filename: &str,
     source: &str,
-) -> Result<Vec<heap::Gc<Value>>, CompileError> {
+) -> Result<Vec<heap::GcPin<Value>>, CompileError> {
     let mut lex = lexer::Lexer::new(source);
     let mut tokens = Vec::new();
     let lines = LineMap::new(source);
@@ -137,7 +137,7 @@ pub fn compile_str<'a>(
         debug_table,
         filename: filename.into(),
     };
-    Ok(ast.iter().map(|exp| context.compile(exp)).collect())
+    Ok(ast.iter().map(|exp| context.compile(exp).pin()).collect())
 }
 
 

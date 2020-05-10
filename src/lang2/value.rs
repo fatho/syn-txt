@@ -205,6 +205,7 @@ pub struct Closure {
 impl Trace for Closure {
     fn mark(&self) {
         self.captured_scope.mark();
+        self.named_parameters.iter().for_each(|(_, (_, default))| default.iter().for_each(Gc::mark));
         self.body.mark();
     }
 }

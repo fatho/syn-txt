@@ -10,7 +10,7 @@ pub fn list(int: &mut Interpreter, mut args: Gc<Value>) -> Result<Gc<Value>> {
 
     // TODO: find a way to build lists without intermediate vector
     while let Value::Cons(head, tail) = &*args.pin() {
-        let value = int.eval(Gc::clone(head))?;
+        let value = int.eval(head.pin())?;
         elems.push(value);
         args = Gc::clone(tail);
     }
@@ -77,7 +77,7 @@ pub fn map(int: &mut Interpreter, mut args: Gc<Value>) -> Result<Gc<Value>> {
     let nil = int.heap_alloc_value(Value::Nil);
 
     while let Value::Cons(head, tail) = &*list.pin() {
-        let value = int.eval(Gc::clone(head))?;
+        let value = int.eval(head.pin())?;
         let fun_args = int.heap_alloc_value(Value::Cons(value, Gc::clone(&nil)));
         let result = int.eval_call(Gc::clone(&fun), fun_args)?;
         elems.push(result);
@@ -92,7 +92,7 @@ pub fn concat(int: &mut Interpreter, mut args: Gc<Value>) -> Result<Gc<Value>> {
     let mut elems = Vec::new();
 
     while let Value::Cons(head, tail) = &*args.pin() {
-        let mut inner = int.eval(Gc::clone(head))?.pin();
+        let mut inner = int.eval(head.pin())?.pin();
         while let Value::Cons(inner_head, inner_tail) = &*inner {
             elems.push(Gc::clone(inner_head));
             inner = inner_tail.pin();
@@ -108,7 +108,7 @@ pub fn reverse(int: &mut Interpreter, mut args: Gc<Value>) -> Result<Gc<Value>> 
     let mut reversed = int.heap_alloc_value(Value::Nil);
     let mut list = int.pop_argument_eval(&mut args)?.pin();
     while let Value::Cons(head, tail) = &*list {
-        let value = int.eval(Gc::clone(head))?;
+        let value = int.eval(head.pin())?;
         reversed = int.heap_alloc_value(Value::Cons(value, reversed));
         list = tail.pin();
     }

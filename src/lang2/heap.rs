@@ -49,7 +49,7 @@ impl Heap {
                 Rc::weak_count(rc),
                 Rc::strong_count(rc)
             );
-            if Rc::weak_count(rc) == 0 {
+            if Rc::strong_count(rc) == 1 && Rc::weak_count(rc) == 0 {
                 // The heap holds the only reference, we can safely drop it
                 // without affecting existing `Gc` references.
                 self.heap.swap_remove(i);
@@ -63,6 +63,17 @@ impl Heap {
     /// Garbage collect unreachable cycles.
     /// Root pointers must be marked as reachable before each call of `gc_cycle`.
     pub fn gc_cycles(&mut self) {
+        // Implicitly mark all pins
+        for object in self.heap.iter() {
+            if Rc::strong_count(object) > 1 {
+                let header = object.header().get();
+                // There is a GcPin reference to this object, since the heap itself only holds one Rc.
+                if ! header.get_mark() {
+                    log::trace!("object {:?} kept alive by pin only", header.get_id());
+                    object.mark();
+                }
+            }
+        }
         // Deallocate everything that is still unmarked
         for i in (0..self.heap.len()).rev() {
             let rc = &self.heap[i];
@@ -79,9 +90,7 @@ impl Heap {
                 let header = self.heap[i].header();
                 header.set(header.get().with_mark(false));
             } else {
-                // This invalidates all `Weak` references, unless there are still `GcPin`s
-                // that keep those alive. Either way, it does not matter as those objects
-                // should only be reachable from those `GcPin`s not from anywhere else.
+                // This invalidates all `Weak` references
                 self.heap.swap_remove(i);
             }
         }
@@ -146,11 +155,20 @@ impl HeapCellHeader {
 /// Internal trait used for implementing dynamic dispatch on HeapCells of different types.
 trait HeapObject: Debug {
     fn header(&self) -> &Cell<HeapCellHeader>;
+    fn mark(&self);
 }
 
 impl<T: Trace + Debug> HeapObject for HeapCell<T> {
     fn header(&self) -> &Cell<HeapCellHeader> {
         &self.header
+    }
+
+    fn mark(&self) {
+        // Break cycles by only traversing heap object the first time it is marked
+        if !self.header.get().get_mark() {
+            self.header.set(self.header.get().with_mark(true));
+            self.value.mark()
+        }
     }
 }
 
@@ -171,16 +189,11 @@ impl<T: PartialEq> PartialEq for Gc<T> {
         }
     }
 }
-impl<T: Eq> Eq for Gc<T> {}
 
-impl<T: Trace> Gc<T> {
+impl<T: Trace + Debug> Gc<T> {
     pub fn mark(&self) {
         if let Some(strong) = self.0.upgrade() {
-            // Break cycles by only traversing heap object the first time it is marked
-            if !strong.header.get().get_mark() {
-                strong.header.set(strong.header.get().with_mark(true));
-                strong.value.mark()
-            }
+            strong.mark();
         } else {
             log::warn!("suspicious marking of invalidated weak pointer");
         }
@@ -193,7 +206,7 @@ impl<T: Trace> Gc<T> {
 
     /// Pin the value, or panic if the value has already been garbage collected.
     pub fn pin(&self) -> GcPin<T> {
-        self.try_pin().expect("cannot already collected value")
+        self.try_pin().expect("cannot pin already collected value")
     }
 
     /// Unique (as long as the value is live) id of this Gc pointer. Otherwise a bogus sentinel value.
@@ -224,6 +237,12 @@ impl<T> std::ops::Deref for GcPin<T> {
 
     fn deref(&self) -> &Self::Target {
         &self.0.value
+    }
+}
+
+impl<T: PartialEq> PartialEq for GcPin<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.value == other.0.value
     }
 }
 
@@ -346,13 +365,18 @@ mod test {
         heap.gc_cycles();
         assert!(!drop_notifier.get());
 
-        // Pinning node2, then dropping it still keeps the cycle, even without marking
+        // Pinning node2, then dropping and only keeping the pin should still keep it alive
+        // even when the pin is dropped later.
         let pin = node2.pin();
         drop(node2);
         heap.gc_cycles();
 
-        // Finally, dropping the pin gets rid of the cycle
+        // Just dropping the pin is not enough
         drop(pin);
+        assert!(! drop_notifier.get());
+
+        // But collecting once more is
+        heap.gc_cycles();
         assert!(drop_notifier.get());
     }
 

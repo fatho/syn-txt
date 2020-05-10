@@ -9,7 +9,7 @@ use crate::lang2::value::*;
 pub fn print(int: &mut Interpreter, args: Gc<Value>) -> Result<Gc<Value>> {
     let mut current = args.pin();
     while let Value::Cons(arg, tail) = &*current {
-        let value = int.eval(Gc::clone(arg))?;
+        let value = int.eval(arg.pin())?;
         println!("{}", pretty(&value.pin()));
         current = tail.pin();
     }

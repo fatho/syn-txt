@@ -27,7 +27,7 @@ pub fn dict(int: &mut Interpreter, mut args: Gc<Value>) -> Result<Gc<Value>> {
 pub fn dict_update(int: &mut Interpreter, mut args: Gc<Value>) -> Result<Gc<Value>> {
     let dict_arg = int.pop_argument(&mut args)?;
     let dict_id = dict_arg.id();
-    let mut dict = if let Value::Dict(d) = &*int.eval(dict_arg)?.pin() {
+    let mut dict = if let Value::Dict(d) = &*int.eval(dict_arg.pin())?.pin() {
         d.clone()
     } else {
         return Err(int.make_error(dict_id, EvalErrorKind::Type));
@@ -51,7 +51,7 @@ pub fn dict_update(int: &mut Interpreter, mut args: Gc<Value>) -> Result<Gc<Valu
 pub fn dict_get(int: &mut Interpreter, mut args: Gc<Value>) -> Result<Gc<Value>> {
     let dict_arg = int.pop_argument(&mut args)?;
     let dict_id = dict_arg.id();
-    match &*int.eval(dict_arg)?.pin() {
+    match &*int.eval(dict_arg.pin())?.pin() {
         Value::Dict(dict) => {
             let arg = int.pop_argument(&mut args)?.pin();
             let key = if let Value::Keyword(key) = &*arg {

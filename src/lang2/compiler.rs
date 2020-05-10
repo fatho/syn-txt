@@ -1,10 +1,45 @@
 //! The compiler turns the AST into values.
 
 use super::ast;
+use super::lexer;
+use super::parser;
 use super::heap;
-use super::{debug, span::Span, Value};
+use super::{debug, span::{Span, LineMap}, Value};
 
 use std::rc::Rc;
+
+
+#[derive(Debug)]
+pub struct CompileError {
+    filename: Rc<str>,
+    lexer_errors: Vec<lexer::LexerError>,
+    parse_errors: Vec<parser::ParseError>,
+}
+
+impl CompileError {
+    pub fn new(filename: &str, lexer_errors: Vec<lexer::LexerError>, parse_errors: Vec<parser::ParseError>) -> Self {
+        Self {
+            filename: filename.into(),
+            lexer_errors,
+            parse_errors,
+        }
+    }
+
+    pub fn location(&self, span: Span) -> debug::SourceLocation {
+        debug::SourceLocation {
+                file: self.filename.clone(),
+                span,
+        }
+    }
+
+    pub fn lexer_errors(&self) -> &[lexer::LexerError] {
+        &self.lexer_errors
+    }
+
+    pub fn parse_errors(&self) -> &[parser::ParseError] {
+        &self.parse_errors
+    }
+}
 
 /// Surrounding context needed for compiling.
 pub struct Context<'a> {
@@ -54,4 +89,67 @@ impl<'a> Context<'a> {
             span,
         }
     }
+}
+
+
+pub fn compile_str<'a>(
+    heap: &mut heap::Heap,
+    debug_table: &mut debug::DebugTable,
+    filename: &str,
+    source: &str,
+) -> Result<Vec<heap::Gc<Value>>, CompileError> {
+    let mut lex = lexer::Lexer::new(source);
+    let mut tokens = Vec::new();
+    let lines = LineMap::new(source);
+
+    let mut lex_errs = Vec::new();
+
+    log::info!("lexing {}", filename);
+    while let Some(token_or_error) = lex.next_token() {
+        match token_or_error {
+            Ok(tok) => tokens.push(tok),
+            Err(err) => {
+                log_error(&lines, filename, err.location(), err.kind());
+                lex_errs.push(err)
+            },
+        }
+    }
+
+    if ! lex_errs.is_empty() {
+        return Err(CompileError::new(filename, lex_errs, vec![]));
+    }
+
+    log::info!("parsing {}", filename);
+    let mut parser = parser::Parser::new(source, &tokens);
+
+    let ast = match parser.parse() {
+        Ok(ast) => ast,
+        Err(err) => {
+            log_error(&lines, filename, err.location(), err.info());
+            return Err(CompileError::new(filename, lex_errs, vec![err]));
+        }
+    };
+
+    // TODO: make debug info configurable
+    debug_table.insert_source(filename.into(), source.into());
+    let mut context = Context {
+        heap,
+        debug_table,
+        filename: filename.into(),
+    };
+    Ok(ast.iter().map(|exp| context.compile(exp)).collect())
+}
+
+
+fn log_error<E: std::fmt::Display>(lines: &LineMap, input_name: &str, location: Span, message: E) {
+    let start = lines.offset_to_pos(location.begin);
+    let end = lines.offset_to_pos(location.end);
+    log::error!(
+        "error: {} ({}:{}-{})\n{}",
+        message,
+        input_name,
+        start,
+        end,
+        lines.highlight(start, end, true)
+    );
 }

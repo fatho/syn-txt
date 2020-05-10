@@ -8,15 +8,12 @@
 // A copy of the license can be found in the LICENSE file in the root of
 // this repository.
 
-use std::{cell::RefCell, rc::Rc};
 use syn_txt::lang2::compiler;
 use syn_txt::lang2::debug;
 use syn_txt::lang2::heap;
 use syn_txt::lang2::interpreter::*;
-use syn_txt::lang2::lexer::Lexer;
-use syn_txt::lang2::parser::Parser;
 use syn_txt::lang2::pretty;
-use syn_txt::lang2::span::{LineMap, Span};
+use syn_txt::lang2::span::{LineMap};
 use syn_txt::lang2::value::*;
 
 fn main() {
@@ -106,68 +103,25 @@ fn main() {
 }
 
 fn run_test(input: &str) {
-    let mut lex = Lexer::new(input);
-    let mut tokens = Vec::new();
-    let lines = LineMap::new(input);
-
-    println!("Lexing...");
-    while let Some(token_or_error) = lex.next_token() {
-        match token_or_error {
-            Ok(tok) => tokens.push(tok),
-            Err(err) => {
-                print_error(&lines, mk_loc(err.location()).as_ref(), err.kind());
-            }
-        }
-    }
-
-    println!("Parsing...");
-    let mut parser = Parser::new(input, &tokens);
-    // println!("{:?}", parser.parse());
-    let ast = match parser.parse() {
-        Ok(ast) => ast,
-        Err(err) => {
-            print_error(&lines, mk_loc(err.location()).as_ref(), err.info());
-            return;
-        }
-    };
-
-    println!("Compiling...");
     let mut heap = heap::Heap::new();
     let mut debug = debug::DebugTable::new();
-    let mut context = compiler::Context {
-        debug_table: &mut debug,
-        heap: &mut heap,
-        filename: "<input>".into(),
-    };
-    let values: Vec<heap::Gc<Value>> = ast.iter().map(|e| context.compile(e)).collect();
+    let values = compiler::compile_str(&mut heap, &mut debug, "<input>", input).unwrap();
 
-    println!("Evaluating...");
+    log::info!("evaluating <input>");
     let mut int = Interpreter::new(&mut heap, &mut debug);
-    // let extension_state = Rc::new(RefCell::new(0));
-    // int.register_primop_ext("foo/new", move |intp, args| {
-    //     foo_ext_foo_new(&mut *extension_state.borrow_mut(), intp, args)
-    // })
-    // .unwrap();
 
     for v in values {
-        print!("at ");
-        let dbg_loc = int.debug_info().get_location(v.id());
-        if let Some(loc) = dbg_loc {
-            let start = lines.offset_to_pos(loc.span.begin);
-            let end = lines.offset_to_pos(loc.span.end);
-            println!("{} {}-{}", loc.file, start, end);
-        } else {
-            println!("unknown location");
-        }
-        println!("{}", pretty::pretty(&v.pin()));
+        println!("In:\n{}", pretty::pretty(&v.pin()));
         println!();
 
         match int.eval(v) {
             Ok(val) => {
-                println!("{}", pretty::pretty(&val.pin()));
+                println!("Out:\n{}", pretty::pretty(&val.pin()));
             }
             Err(err) => {
-                print_error(&lines, err.location(), err.info());
+                let source = err.location().and_then(|loc| int.debug_info().get_source(&loc.file));
+                let lines = source.map(LineMap::new);
+                print_error(lines.as_ref(), err.location(), err.info());
                 break;
             }
         }
@@ -182,57 +136,20 @@ fn run_test(input: &str) {
     println!("Heap: {:?}", heap);
 }
 
-fn mk_loc(span: Span) -> Option<debug::SourceLocation> {
-    Some(debug::SourceLocation {
-        file: "<input>".into(),
-        span,
-    })
-}
-
 fn print_error<E: std::fmt::Display>(
-    lines: &LineMap,
+    lines: Option<&LineMap>,
     location: Option<&debug::SourceLocation>,
     message: E,
 ) {
+    print!("error: {}", message);
     if let Some(location) = location {
-        let start = lines.offset_to_pos(location.span.begin);
-        let end = lines.offset_to_pos(location.span.end);
-        println!("error: {} ({} {}-{})", message, location.file, start, end);
-        println!("{}", lines.highlight(start, end, true));
-    } else {
-        println!("error: {}", message)
+        if let Some(lines) = lines {
+            let start = lines.offset_to_pos(location.span.begin);
+            let end = lines.offset_to_pos(location.span.end);
+            println!("({} {}-{})", location.file, start, end);
+            println!("{}", lines.highlight(start, end, true));
+        } else {
+            println!("({} {}-{})", location.file, location.span.begin, location.span.end);
+        }
     }
 }
-
-// fn foo_ext_foo_new(
-//     state: &mut usize,
-//     _intp: &mut Interpreter,
-//     args: ArgParser,
-// ) -> InterpreterResult<Value> {
-//     args.done()?;
-//     let foo = FooVal(*state);
-//     *state += 1;
-//     Ok(Value::ext(foo))
-// }
-
-// #[derive(Debug, PartialEq, Clone)]
-// struct FooVal(usize);
-
-// impl ExtensionValue for FooVal {
-//     fn partial_eq(&self, other: &dyn ExtensionValue) -> bool {
-//         if let Some(foo) = other.as_any().downcast_ref::<Self>() {
-//             self == foo
-//         } else {
-//             false
-//         }
-//     }
-
-//     fn as_any(&self) -> &dyn std::any::Any {
-//         self
-//     }
-
-//     fn call(&self, _intp: &mut Interpreter, args: ArgParser) -> InterpreterResult<Value> {
-//         args.done()?;
-//         Ok(Value::Int(self.0 as i64))
-//     }
-// }

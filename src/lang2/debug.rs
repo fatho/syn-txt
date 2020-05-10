@@ -9,20 +9,35 @@ pub struct SourceLocation {
     pub span: Span,
 }
 
-/// Debug information for the values generated during compilation.
-pub struct DebugTable(HashMap<heap::Id, DebugInfo>);
+/// Debug information for the values generated during compilation,
+/// associated with a specific heap.
+pub struct DebugTable {
+    value_info: HashMap<heap::Id, DebugInfo>,
+    sources: HashMap<Rc<str>, Rc<str>>,
+}
 
 impl DebugTable {
     pub fn new() -> Self {
-        Self(HashMap::new())
+        Self {
+            value_info: HashMap::new(),
+            sources: HashMap::new(),
+        }
     }
 
     pub fn get_location(&self, value: heap::Id) -> Option<&SourceLocation> {
-        self.0.get(&value).and_then(|entry| entry.location.as_ref())
+        self.value_info.get(&value).and_then(|entry| entry.location.as_ref())
+    }
+
+    pub fn get_source(&self, filename: &str) -> Option<&str> {
+        self.sources.get(filename).map(|r| r.as_ref())
     }
 
     pub fn insert(&mut self, value: heap::Id, info: DebugInfo) {
-        self.0.insert(value, info);
+        self.value_info.insert(value, info);
+    }
+
+    pub fn insert_source(&mut self, filename: Rc<str>, source: Rc<str>) {
+        self.sources.insert(filename, source);
     }
 }
 

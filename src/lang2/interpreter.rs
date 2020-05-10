@@ -210,6 +210,7 @@ impl<'a> Interpreter<'a> {
         }
     }
 
+    /// Evaluate the given value in the current scope.
     pub fn eval(&mut self, value: Gc<Value>) -> Result<Gc<Value>> {
         let pinned = value.pin();
         match &*pinned {

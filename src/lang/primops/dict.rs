@@ -1,48 +1,72 @@
-//! List operations
+//! Dict operations
 
-use crate::lang::ast;
+use crate::lang::heap::*;
 use crate::lang::interpreter::*;
-use std::{collections::HashMap, rc::Rc};
+use crate::lang::value::*;
+use std::collections::HashMap;
 
 /// Create a dict value from its arguments.
-pub fn dict(intp: &mut Interpreter, mut args: ArgParser) -> InterpreterResult<Value> {
+pub fn dict(int: &mut Interpreter, mut args: Gc<Value>) -> Result<Gc<Value>> {
     let mut dict = HashMap::new();
-    while !args.is_empty() {
-        let key = args.keyword()?;
-        let value = args.value(intp)?;
 
-        dict.insert(key.clone(), value);
+    while let Value::Cons(head, tail) = &*args.pin() {
+        let key = if let Value::Keyword(key) = &*head.pin() {
+            key.clone()
+        } else {
+            return Err(int.make_error(head.id(), EvalErrorKind::IncompatibleArguments));
+        };
+        args = Gc::clone(tail);
+        let value = int.pop_argument_eval(&mut args)?;
+        dict.insert(key, value);
     }
 
-    Ok(Value::Dict(Rc::new(dict)))
+    Ok(int.heap_alloc_value(Value::Dict(dict)))
 }
 
 /// Return a new dict based on an existing dict where zero or more entries get a new value.
-pub fn dict_update(intp: &mut Interpreter, mut args: ArgParser) -> InterpreterResult<Value> {
-    let mut dict: Rc<HashMap<ast::Ident, Value>> = args.extract(intp)?;
+pub fn dict_update(int: &mut Interpreter, mut args: Gc<Value>) -> Result<Gc<Value>> {
+    let dict_arg = int.pop_argument(&mut args)?;
+    let dict_id = dict_arg.id();
+    let mut dict = if let Value::Dict(d) = &*int.eval(dict_arg.pin())?.pin() {
+        d.clone()
+    } else {
+        return Err(int.make_error(dict_id, EvalErrorKind::Type));
+    };
 
-    let updated_dict = Rc::make_mut(&mut dict);
-
-    while !args.is_empty() {
-        let key = args.keyword()?;
-        let value = args.value(intp)?;
-
-        updated_dict.insert(key.clone(), value);
+    while let Value::Cons(head, tail) = &*args.pin() {
+        let key = if let Value::Keyword(key) = &*head.pin() {
+            key.clone()
+        } else {
+            return Err(int.make_error(head.id(), EvalErrorKind::IncompatibleArguments));
+        };
+        args = Gc::clone(tail);
+        let value = int.pop_argument_eval(&mut args)?;
+        dict.insert(key, value);
     }
 
-    Ok(Value::Dict(dict))
+    Ok(int.heap_alloc_value(Value::Dict(dict)))
 }
 
 /// Retrieve the entry of a dict.
-pub fn dict_get(intp: &mut Interpreter, mut args: ArgParser) -> InterpreterResult<Value> {
-    let dict: Rc<HashMap<ast::Ident, Value>> = args.extract(intp)?;
-    let key = args.keyword()?;
+pub fn dict_get(int: &mut Interpreter, mut args: Gc<Value>) -> Result<Gc<Value>> {
+    let dict_arg = int.pop_argument(&mut args)?;
+    let dict_id = dict_arg.id();
+    match &*int.eval(dict_arg.pin())?.pin() {
+        Value::Dict(dict) => {
+            let arg = int.pop_argument(&mut args)?.pin();
+            let key = if let Value::Keyword(key) = &*arg {
+                key
+            } else {
+                return Err(int.make_error(arg.id(), EvalErrorKind::IncompatibleArguments));
+            };
+            int.expect_no_more_arguments(&mut args)?;
 
-    let value = dict
-        .get(key)
-        .ok_or_else(|| IntpErr::new(args.last_span(), IntpErrInfo::UnknownKeyword(key.clone())))?;
+            let value = dict.get(key).ok_or_else(|| {
+                int.make_error(arg.id(), EvalErrorKind::UnknownKeyword(key.to_name()))
+            })?;
 
-    args.done()?;
-
-    Ok(value.clone())
+            Ok(value.clone())
+        }
+        _ => Err(int.make_error(dict_id, EvalErrorKind::Type)),
+    }
 }

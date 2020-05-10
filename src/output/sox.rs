@@ -48,6 +48,7 @@ pub fn with_sox_wav<R, F: FnOnce(&mut dyn io::Write) -> io::Result<R>>(
     callback: F,
 ) -> io::Result<R> {
     let mut player = Command::new("sox")
+        .arg("-R")
         .arg("--channels")
         .arg("2")
         .arg("--rate")

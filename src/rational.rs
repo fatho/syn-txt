@@ -147,6 +147,28 @@ impl ops::Div for Rational {
     }
 }
 
+/// # Examples
+///
+/// ```
+/// use syn_txt::rational::*;
+///
+/// assert_eq!(Rational::new(5, 1) % Rational::new(3, 1), Rational::new(2, 1));
+/// assert_eq!(Rational::new(-5, 1) % Rational::new(3, 1), Rational::new(-2, 1));
+/// assert_eq!(Rational::new(7, 3) % Rational::new(1, 4), Rational::new(1, 12));
+/// assert_eq!(Rational::new(-7, 3) % Rational::new(1, 4), Rational::new(-1, 12));
+/// ```
+impl ops::Rem for Rational {
+    type Output = Rational;
+
+    #[allow(clippy::suspicious_arithmetic_impl)]
+    fn rem(self, rhs: Rational) -> Self::Output {
+        let common_denom = self.denom * rhs.denom;
+        let self_num = self.num * rhs.denom;
+        let rhs_num = rhs.num * self.denom;
+        Rational::new(self_num % rhs_num, common_denom)
+    }
+}
+
 impl ops::Mul<Int> for Rational {
     type Output = Rational;
 

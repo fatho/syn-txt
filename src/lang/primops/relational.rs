@@ -1,6 +1,6 @@
-use crate::lang2::heap::*;
-use crate::lang2::interpreter::*;
-use crate::lang2::value::*;
+use crate::lang::heap::*;
+use crate::lang::interpreter::*;
+use crate::{rational::Rational, lang::value::*};
 
 use std::cmp::Ordering;
 
@@ -63,10 +63,16 @@ pub fn neq(int: &mut Interpreter, mut args: Gc<Value>) -> Result<Gc<Value>> {
 pub fn partial_cmp_impl(a: GcPin<Value>, b: GcPin<Value>) -> Option<Ordering> {
     match (&*a, &*b) {
         (Value::Str(a), Value::Str(b)) => a.partial_cmp(b),
+
         (Value::Float(a), Value::Float(b)) => a.partial_cmp(b),
         (Value::Float(a), Value::Int(b)) => a.partial_cmp(&(*b as f64)),
         (Value::Int(a), Value::Float(b)) => (*a as f64).partial_cmp(b),
         (Value::Int(a), Value::Int(b)) => a.partial_cmp(b),
+
+        (Value::Ratio(a), Value::Ratio(b)) => a.partial_cmp(b),
+        (Value::Ratio(a), Value::Int(b)) => a.partial_cmp(&Rational::from_int(*b)),
+        (Value::Int(a), Value::Ratio(b)) => Rational::from_int(*a).partial_cmp(b),
+
         (Value::Bool(a), Value::Bool(b)) => a.partial_cmp(b),
         (Value::Nil, Value::Nil) => Some(Ordering::Equal),
         (Value::Nil, Value::Cons(_, _)) => Some(Ordering::Less),

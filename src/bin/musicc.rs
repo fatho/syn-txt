@@ -41,5 +41,5 @@ fn main() -> io::Result<()> {
 
     let source = std::fs::read_to_string(&opt.source)?;
     let song = musicc::eval::eval(&opt.source.to_string_lossy(), &source)?;
-    musicc::translate::play(song)
+    musicc::output::play(song)
 }

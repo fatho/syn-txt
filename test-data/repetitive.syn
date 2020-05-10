@@ -1,26 +1,18 @@
-(define part1
+(define melody
     (begin
-        (define (repeat note-name length)
-            (piano-roll
-                (note :pitch note-name :length length)
-                (note :pitch note-name :length length)
-                (note :pitch note-name :length length)
-                (note :pitch note-name :length length)
-                (note :pitch note-name :length length)
-                (note :pitch note-name :length length)
-                (note :pitch note-name :length length)
-                (note :pitch note-name :length length)
+        (define (repeat-note n :pitch pitch :length length)
+            (map
+                (lambda (i)
+                    (note :start (* i length) :pitch pitch :length length))
+                (range 0 (- n 1))
             )
         )
 
-        (piano-roll
-            (repeat "a4" 1/16)
+        (sequence-all
+            (list
+                (repeat-note 8 :pitch "a3" :length 1/16)
+                (repeat-note 4 :pitch "a3" :length 1/4)
+                (repeat-note 2 :pitch "a3" :length 1/2)
+            ))))
 
-            (repeat "a4" 1/4)
-
-            (repeat "a4" 1/2)
-        )
-    )
-)
-
-(song :bpm 90 :notes part1)
+(song :bpm 90 :notes melody)

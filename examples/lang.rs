@@ -8,13 +8,13 @@
 // A copy of the license can be found in the LICENSE file in the root of
 // this repository.
 
-use syn_txt::lang2::compiler;
-use syn_txt::lang2::debug;
-use syn_txt::lang2::heap;
-use syn_txt::lang2::interpreter::*;
-use syn_txt::lang2::pretty;
-use syn_txt::lang2::span::{LineMap};
-use syn_txt::lang2::value::*;
+use syn_txt::lang::compiler;
+use syn_txt::lang::debug;
+use syn_txt::lang::heap;
+use syn_txt::lang::interpreter::*;
+use syn_txt::lang::pretty;
+use syn_txt::lang::span::{LineMap};
+use syn_txt::lang::value::*;
 
 fn main() {
     simple_logger::init_with_level(log::Level::Debug).unwrap();
@@ -89,14 +89,14 @@ fn main() {
     "#;
 
     println!("{}", std::mem::size_of::<Value>());
-    println!("{}", std::mem::size_of::<syn_txt::lang2::Value>());
+    println!("{}", std::mem::size_of::<syn_txt::lang::Value>());
     println!(
         "{}",
-        std::mem::size_of::<syn_txt::lang2::Gc<syn_txt::lang2::Value>>()
+        std::mem::size_of::<syn_txt::lang::Gc<syn_txt::lang::Value>>()
     );
     println!(
         "{}",
-        std::mem::size_of::<Option<syn_txt::lang2::Gc<syn_txt::lang2::Value>>>()
+        std::mem::size_of::<Option<syn_txt::lang::Gc<syn_txt::lang::Value>>>()
     );
 
     run_test(input)

@@ -1,11 +1,12 @@
 use super::heap;
 use super::span::Span;
-use std::{collections::HashMap, rc::Rc};
+use std::collections::HashMap;
+use std::sync::Arc;
 
 /// Location referring to a source file.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SourceLocation {
-    pub file: Rc<str>,
+    pub file: Arc<str>,
     pub span: Span,
 }
 
@@ -13,7 +14,7 @@ pub struct SourceLocation {
 /// associated with a specific heap.
 pub struct DebugTable {
     value_info: HashMap<heap::Id, DebugInfo>,
-    sources: HashMap<Rc<str>, Rc<str>>,
+    sources: HashMap<Arc<str>, Arc<str>>,
 }
 
 impl DebugTable {
@@ -36,7 +37,7 @@ impl DebugTable {
         self.value_info.insert(value, info);
     }
 
-    pub fn insert_source(&mut self, filename: Rc<str>, source: Rc<str>) {
+    pub fn insert_source(&mut self, filename: Arc<str>, source: Arc<str>) {
         self.sources.insert(filename, source);
     }
 }

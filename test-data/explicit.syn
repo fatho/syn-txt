@@ -1,0 +1,8 @@
+(define melody
+    (list
+        (note :start 0 :length 1/4 :pitch "a4")
+        (note :start 1/4 :length 1/4 :pitch "b4")
+        (note :start 2/4 :length 1/4 :pitch "c5")
+    ))
+
+(song :bpm 120 :notes (sequence (transpose-all melody -12) melody :rest 1/4))

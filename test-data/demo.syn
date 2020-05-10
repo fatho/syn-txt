@@ -10,40 +10,27 @@
     (define vel 0.5)
     ; Compute note pitches by transposing base note
     (define pitches (map (lambda (off) (transpose base-note off)) seq))
+    
+    (imap 
+        (lambda (i p)
+            (note :start (* i len) :pitch p :length len :velocity vel))
+        pitches
+    ))
 
-    ; A piano roll is a set of notes that are played in sequence
-    ; It accepts single notes, other piano rolls and flattens lists recursively
-    (piano-roll
-        (map 
-            (lambda (p)
-                (note :pitch p :length len :velocity vel)
-            )
-            pitches
-        )
-    )
-)
-
-; Plays `note-1`, `note-2`, `note-1`, `note-3` alternating with `base-note`.
+; Plays the two notes alternatingly n times
 ; Each note is a 1/4.
-(define (alternating-bass base-note note-1 note-2 note-3)
-    (define len 1/4)
-    (define vel 0.5)
-
-    (piano-roll
-        (note :pitch base-note :length len :velocity vel)
-        (note :pitch note-1 :length len :velocity vel)
-        (note :pitch base-note :length len :velocity vel)
-        (note :pitch note-2 :length len :velocity vel)
-        (note :pitch base-note :length len :velocity vel)
-        (note :pitch note-1 :length len :velocity vel)
-        (note :pitch base-note :length len :velocity vel)
-        (note :pitch note-3 :length len :velocity vel)
-    )
-)
+(define (alternating-bass n note-1 note-2 :length (len 1/4) :velocity (vel 0.5))
+    (map
+        (lambda (i)
+            (define pitch (if (even? i) note-1 note-2))
+            (note :start (* i len) :length len :pitch pitch :velocity vel)
+        )
+        (range 0 (- n 1))
+    ))
 
 ; Define the melody for the (virtual) right hand
 (define right-hand
-    (piano-roll
+    (sequence-all
         (map arpeggio 
             (list
                 "c3" "c3" "c3" "c3"
@@ -56,16 +43,16 @@
 
 ; Define the melody for the (virtual) left hand
 (define left-hand
-    (piano-roll
-        (alternating-bass "c2" "e2" "g2" "g1")
-        (alternating-bass "c2" "e3" "g3" "g2")
-        (alternating-bass "c2" "e2" "g2" "g1")
-    )
-)
+    (sequence-all
+        (list
+            (alternating-bass 8 "c2" "g1")
+            (alternating-bass 8 "g2" "c2")
+            (alternating-bass 8 "c2" "g1")
+        )))
 
 ; Combine the final melody by playing the two melodies at the same time.
 (define melody
-    (piano-roll/stack
+    (concat
         right-hand
         left-hand
     )

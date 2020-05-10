@@ -6,14 +6,27 @@ use super::parser;
 use super::heap;
 use super::{debug, span::{Span, LineMap}, Value};
 
-use std::rc::Rc;
+use std::{fmt, sync::Arc};
 
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CompileError {
-    filename: Rc<str>,
+    filename: Arc<str>,
     lexer_errors: Vec<lexer::LexerError>,
     parse_errors: Vec<parser::ParseError>,
+}
+
+impl fmt::Display for CompileError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "failed to compile {}:", self.filename)?;
+        for l in self.lexer_errors.iter() {
+            writeln!(f, "{}", l.kind())?;
+        }
+        for p in self.parse_errors.iter() {
+            writeln!(f, "{}", p.info())?;
+        }
+        Ok(())
+    }
 }
 
 impl CompileError {
@@ -45,7 +58,7 @@ impl CompileError {
 pub struct Context<'a> {
     pub heap: &'a mut heap::Heap,
     pub debug_table: &'a mut debug::DebugTable,
-    pub filename: Rc<str>,
+    pub filename: Arc<str>,
 }
 
 impl<'a> Context<'a> {
@@ -85,7 +98,7 @@ impl<'a> Context<'a> {
 
     pub fn make_location(&self, span: Span) -> debug::SourceLocation {
         debug::SourceLocation {
-            file: Rc::clone(&self.filename),
+            file: Arc::clone(&self.filename),
             span,
         }
     }

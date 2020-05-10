@@ -200,9 +200,17 @@ impl Velocity {
     /// assert_eq!(Velocity::from_f64(1.0), Velocity::MAX);
     /// ```
     pub fn from_f64(velocity: f64) -> Velocity {
-        if velocity.is_nan() || velocity < 0.0 || velocity > 1.0 {
+        if let Some(v) = Self::try_from_f64(velocity) {
+            v
+        } else {
             panic!("{} out of range", velocity);
         }
-        Velocity(velocity)
+    }
+
+    pub fn try_from_f64(velocity: f64) -> Option<Velocity> {
+        if velocity.is_nan() || velocity < 0.0 || velocity > 1.0 {
+            return None
+        }
+        Some(Velocity(velocity))
     }
 }

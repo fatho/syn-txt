@@ -446,7 +446,7 @@ mod test {
     }
 
     #[test]
-    fn test_arithmetic() {
+    fn arithmetic() {
         expect_values("(+ 1 2)", vec![Value::Int(3)]);
         expect_values("(- 8 12)", vec![Value::Int(-4)]);
 
@@ -468,7 +468,7 @@ mod test {
     }
 
     #[test]
-    fn test_defines() {
+    fn defines() {
         expect_values(
             r#"
             (define pi 3.14)
@@ -491,7 +491,7 @@ mod test {
     }
 
     #[test]
-    fn test_scopes() {
+    fn scopes() {
         expect_values_or_errors(
             r#"
             (define pi 3.14)
@@ -526,7 +526,7 @@ mod test {
     }
 
     #[test]
-    fn test_closure_stateless() {
+    fn closure_stateless() {
         expect_values(
             r#"
             (define plus-one
@@ -541,7 +541,7 @@ mod test {
     /// Test that closures can capture global state and any mutations
     /// from either inside or outside the closure can be seen elsewhere.
     #[test]
-    fn test_closure_global_state() {
+    fn closure_global_state() {
         expect_values(
             r#"
             (define global-state 0)
@@ -571,7 +571,7 @@ mod test {
     /// Test that closures can capture scopes that are subsequently popped,
     /// never to be seen again.
     #[test]
-    fn test_closure_hidden_state() {
+    fn closure_hidden_state() {
         expect_values(
             r#"
             ; A closure that, when called, creates a new fresh closure
@@ -609,7 +609,7 @@ mod test {
     }
 
     #[test]
-    fn test_list() {
+    fn list() {
         expect_values("(list)", vec![Value::Nil]);
 
         expect_values(
@@ -689,7 +689,7 @@ mod test {
     }
 
     #[test]
-    fn test_closure_keywords() {
+    fn closure_keywords() {
         expect_values(
             r#"
             (define (frob x y :frob-factor f :flux-compensation (comp -1))
@@ -756,7 +756,7 @@ mod test {
     }
 
     #[test]
-    fn test_dict() {
+    fn dict() {
         let mut heap = Heap::new();
         expect_values("(dict)", vec![Value::Dict(HashMap::new())]);
         expect_values(
@@ -797,7 +797,7 @@ mod test {
     }
 
     #[test]
-    fn test_relational() {
+    fn relational() {
         expect_values("(< 1 2)", vec![Value::Bool(true)]);
 
         expect_values("(< 1/2 1/4)", vec![Value::Bool(false)]);

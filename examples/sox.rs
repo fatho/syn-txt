@@ -16,7 +16,7 @@ use syn_txt;
 fn main() -> io::Result<()> {
     let sample_rate = 44100;
 
-    syn_txt::output::sox::with_sox_player(sample_rate, |audio_stream| {
+    syn_txt::output::sox::with_sox(sample_rate, syn_txt::output::sox::SoxTarget::Play, |audio_stream| {
         let mut test_buffer: Vec<u8> = Vec::new();
         for i in 0..sample_rate {
             let phase = (i as f64 / sample_rate as f64) * 440.0 * 2.0 * std::f64::consts::PI;

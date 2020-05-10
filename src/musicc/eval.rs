@@ -13,18 +13,16 @@
 use log::error;
 use std::io;
 
-use crate::lang::interpreter::Interpreter;
-use crate::lang::value::Value;
-use crate::lang::heap::{Heap, GcPin};
-use crate::lang::debug::{DebugTable, SourceLocation};
 use crate::lang::compiler;
-use crate::lang::span::LineMap;
+use crate::lang::debug::{DebugTable, SourceLocation};
+use crate::lang::heap::{GcPin, Heap};
+use crate::lang::interpreter::Interpreter;
 use crate::lang::marshal;
 use crate::lang::pretty::pretty;
+use crate::lang::span::LineMap;
+use crate::lang::value::Value;
 
 use super::{langext, output};
-use crate::pianoroll::{PlayedNote, PianoRoll};
-use crate::note::Velocity;
 
 use std::path::Path;
 
@@ -44,14 +42,17 @@ pub fn eval(input_name: &str, input: &str, dump_value: Option<&Path>) -> io::Res
     }
 
     static MUSIC_PRELUDE: &str = include_str!("Music.syn");
-    int.source_prelude("<music-prelude>", MUSIC_PRELUDE).expect("music prelude should compile");
+    int.source_prelude("<music-prelude>", MUSIC_PRELUDE)
+        .expect("music prelude should compile");
 
     let mut final_value = int.heap_alloc_value(Value::Void).pin();
     for v in values {
         match int.eval(v) {
             Ok(val) => final_value = val.pin(),
             Err(err) => {
-                let source = err.location().and_then(|loc| int.debug_info().get_source(&loc.file));
+                let source = err
+                    .location()
+                    .and_then(|loc| int.debug_info().get_source(&loc.file));
                 let lines = source.map(LineMap::new);
                 log_error(lines.as_ref(), err.location(), err.info());
                 return Err(io::Error::new(io::ErrorKind::InvalidData, err));
@@ -72,31 +73,9 @@ pub fn eval(input_name: &str, input: &str, dump_value: Option<&Path>) -> io::Res
     build_song(final_value).ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "not a song"))
 }
 
-pub fn song_parser() -> impl marshal::ParseValue<Repr=output::Song> {
-    use marshal::ParseValue;
-    let note_parser = marshal::record("note", |fields| {
-        Some(PlayedNote {
-            note: fields.get(":pitch", langext::note_parser())?,
-            velocity: fields.get_or(":velocity", Velocity::MAX, marshal::float_coercing().and_then(Velocity::try_from_f64))?,
-            start: fields.get(":start", marshal::ratio_coercing())?,
-            duration: fields.get(":length", marshal::ratio_coercing())?,
-        })
-    });
-    let note_list_parser = marshal::list(note_parser);
-    marshal::record("song", move |fields| {
-        let bpm = fields.get(":bpm", marshal::int())?;
-        let note_list = fields.get(":notes", &note_list_parser)?;
-        let notes = Some(PianoRoll::with_notes(note_list))?;
-        Some(output::Song {
-            bpm,
-            notes,
-        })
-    })
-}
-
 fn build_song(value: GcPin<Value>) -> Option<output::Song> {
     use marshal::ParseValue;
-    song_parser().parse(value)
+    parsers::song().parse(value)
 }
 
 fn log_error<E: std::fmt::Display>(
@@ -114,8 +93,150 @@ fn log_error<E: std::fmt::Display>(
             writeln!(&mut buf, "({} {}-{})", location.file, start, end).unwrap();
             writeln!(&mut buf, "{}", lines.highlight(start, end, true)).unwrap();
         } else {
-            writeln!(&mut buf, "({} {}-{})", location.file, location.span.begin, location.span.end).unwrap();
+            writeln!(
+                &mut buf,
+                "({} {}-{})",
+                location.file, location.span.begin, location.span.end
+            )
+            .unwrap();
         }
     }
     error!("{}", buf);
+}
+
+// ============================ VALUE PARSERS ============================
+
+pub mod parsers {
+    use super::{langext, output};
+    use crate::lang::{
+        marshal::{self, ParseValue},
+        Gc, Value,
+    };
+    use crate::note::Velocity;
+    use crate::pianoroll::{PianoRoll, PlayedNote};
+    use crate::synth;
+
+    fn update_if_valid<T, P: ParseValue<Repr = T>>(
+        target: &mut T,
+        value: Gc<Value>,
+        context: &str,
+        parser: P,
+    ) {
+        if let Some(value) = parser.parse(value.pin()) {
+            *target = value;
+        } else {
+            log::warn!("ignoring invalid value for {}", context)
+        }
+    }
+
+    pub fn wave_shape() -> impl marshal::ParseValue<Repr = synth::oscillator::WaveShape> {
+        marshal::string().and_then(|mut name| {
+            name.make_ascii_lowercase();
+            match name.as_str() {
+                "sine" => Some(synth::oscillator::WaveShape::Sine),
+                "saw" => Some(synth::oscillator::WaveShape::Saw),
+                "supersaw" => Some(synth::oscillator::WaveShape::SuperSaw),
+                "twosidedsaw" => Some(synth::oscillator::WaveShape::TwoSidedSaw),
+                "alternatingsaw" => Some(synth::oscillator::WaveShape::AlternatingSaw),
+                other => {
+                    log::error!("unknown wave shape {}", other);
+                    None
+                }
+            }
+        })
+    }
+
+    pub fn test_synth_params() -> impl marshal::ParseValue<Repr = synth::test::Params> {
+        marshal::dict().and_then(|dict| {
+            let mut params = synth::test::Params::default();
+            for (key, value) in dict.into_iter() {
+                match key.as_str() {
+                    ":gain" => update_if_valid(
+                        &mut params.gain,
+                        value,
+                        "test.gain",
+                        marshal::float_coercing(),
+                    ),
+                    ":pan" => update_if_valid(
+                        &mut params.pan,
+                        value,
+                        "test.pan",
+                        marshal::float_coercing(),
+                    ),
+                    ":unison" => update_if_valid(
+                        &mut params.unison,
+                        value,
+                        "test.unison",
+                        marshal::int().map(|i| i as usize),
+                    ),
+                    ":unison-detune-cents" => update_if_valid(
+                        &mut params.unison_detune_cents,
+                        value,
+                        "test.unison-detune-cents",
+                        marshal::float_coercing(),
+                    ),
+                    ":unison-falloff" => update_if_valid(
+                        &mut params.unison_falloff,
+                        value,
+                        "test.unison-falloff",
+                        marshal::float_coercing(),
+                    ),
+                    ":wave-shape" => update_if_valid(
+                        &mut params.wave_shape,
+                        value,
+                        "test.wave-shape",
+                        wave_shape(),
+                    ),
+                    other => log::warn!("unused test synth parameter {}", other),
+                }
+            }
+            Some(params)
+        })
+    }
+
+    pub fn synth() -> impl marshal::ParseValue<Repr = output::Instrument> {
+        marshal::record("synth", |fields| {
+            let name = fields.get(":name", marshal::string())?;
+            match name.as_ref() {
+                "test" => fields
+                    .get(":params", test_synth_params())
+                    .map(output::Instrument::TestSynth),
+                _ => {
+                    log::error!("unknown synth {:?}", name);
+                    None
+                }
+            }
+        })
+    }
+
+    pub fn instrument() -> impl marshal::ParseValue<Repr = output::Instrument> {
+        synth()
+    }
+
+    pub fn song() -> impl marshal::ParseValue<Repr = output::Song> {
+        let note_parser = marshal::record("note", |fields| {
+            Some(PlayedNote {
+                note: fields.get(":pitch", langext::note_parser())?,
+                velocity: fields.get_or(
+                    ":velocity",
+                    Velocity::MAX,
+                    marshal::float_coercing().and_then(Velocity::try_from_f64),
+                )?,
+                start: fields.get(":start", marshal::ratio_coercing())?,
+                duration: fields.get(":length", marshal::ratio_coercing())?,
+            })
+        });
+        let note_list_parser = marshal::list(note_parser);
+        marshal::record("song", move |fields| {
+            let bpm = fields.get(":bpm", marshal::int())?;
+            let note_list = fields.get(":notes", &note_list_parser)?;
+            let notes = Some(PianoRoll::with_notes(note_list))?;
+            let instrument = fields.get(":instrument", instrument())?;
+            Some(output::Song {
+                bpm,
+                notes,
+                instrument,
+            })
+        })
+    }
 }

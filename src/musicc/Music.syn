@@ -4,15 +4,24 @@
 ;   - a `melody` is a list of notes with absolute timings
 ;   - concatenating two melodies plays both at the same time (as the absolute timings don't change)
 
-; Create a song object
-(define (song :bpm bpm :notes notes)
-    ; The convention is that objects have a :__type__ key indicating its type.
-    ; This type annotation is used when parsing the values in the host.
-    (dict :__type__ "song" :bpm bpm :notes notes))
-
 ; Create a note object with absolute timing.
 (define (note :start start :length length :pitch pitch :velocity (velocity 1.0))
     (dict :__type__ "note" :start start :length length :pitch pitch :velocity velocity))
+
+; Instantiate a synthesizer of type `name`, with the given synthesizer specific settings.
+(define (synth :name name :params (param-dict (dict)))
+    (dict :__type__ "synth" :name name :params param-dict))
+
+(define __default-synth__
+    (synth :name "test" :params (dict)))
+
+; Create a song object
+(define (song :bpm bpm :notes notes :instrument (instrument __default-synth__))
+    ; The convention is that objects have a :__type__ key indicating its type.
+    ; This type annotation is used when parsing the values in the host.
+    (dict :__type__ "song" :bpm bpm :notes notes :instrument instrument))
+
+
 
 ; Compute the time when the last note of the given melody ends.
 (define (last-note-end melody)

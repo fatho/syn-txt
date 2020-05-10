@@ -27,18 +27,9 @@ pub struct TestSynth {
     /// Evenlope for played notes
     envelope: ADSR,
 
-    /// Output gain of the synthesizer
-    gain: f64,
-
-    /// Pan of the center unison voice
-    pan: f64,
-
-    /// Number of voices per note
-    unison: usize,
-    /// Maximum detune factor the outermost unison voices.
-    unison_detune_cents: f64,
-    /// Gain falloff exponent for the more detuned noises.
-    unison_falloff: f64,
+    /// The public parameters influencing the sound.
+    /// TODO: these are eventually automatable
+    parameters: Params,
 
     // low-pass filter
     filter_coefficients: filter::BiquadCoefficients,
@@ -49,19 +40,51 @@ pub struct TestSynth {
     active_notes: Vec<NoteState>,
 }
 
+/// Parameters of the synthesizer.
+/// TODO: Add filter settings
+pub struct Params {
+    /// Output gain of the synthesizer
+    pub gain: f64,
+
+    /// Pan of the center unison voice
+    pub pan: f64,
+
+    /// Number of voices per note
+    pub unison: usize,
+    /// Maximum detune factor the outermost unison voices.
+    pub unison_detune_cents: f64,
+    /// Gain falloff exponent for the more detuned noises.
+    pub unison_falloff: f64,
+
+    /// Oscillator shape
+    pub wave_shape: WaveShape,
+}
+
+impl Default for Params {
+    fn default() -> Self {
+        Self {
+            gain: 0.5,
+            pan: 0.0,
+            unison: 3,
+            unison_detune_cents: 15.0,
+            unison_falloff: 0.0,
+            wave_shape: WaveShape::SuperSaw,
+        }
+    }
+}
+
 /// Opaque handle indicating a playing voice.
 #[derive(Debug, PartialEq, Eq)]
 pub struct PlayHandle(usize);
 
 impl TestSynth {
     pub fn new(sample_rate: f64) -> Self {
+        Self::with_params(sample_rate, Params::default())
+    }
+    pub fn with_params(sample_rate: f64, params: Params) -> Self {
         let filter_coefficients = filter::BiquadCoefficients::lowpass(sample_rate, 2000.0, 0.7071);
         TestSynth {
-            // voice settings
-            pan: 0.0,
-            unison: 3,
-            unison_detune_cents: 15.0,
-            unison_falloff: 0.0,
+            parameters: params,
             tuning: Tuning::default(),
             // volume
             envelope: ADSR {
@@ -70,7 +93,6 @@ impl TestSynth {
                 sustain: 1.0,
                 release: 0.1,
             },
-            gain: 0.5,
             filter_coefficients,
             biquad: Stereo {
                 left: filter::Biquad::new(),
@@ -100,22 +122,22 @@ impl TestSynth {
         let frequency = self.tuning.frequency(note);
         let handle = self.next_play_handle();
 
-        let midpoint = (self.unison as f64 - 1.0) / 2.0;
-        let mut voices = (0..self.unison)
+        let midpoint = (self.parameters.unison as f64 - 1.0) / 2.0;
+        let mut voices = (0..self.parameters.unison)
             .map(|index| {
-                let offset = if self.unison > 1 {
+                let offset = if self.parameters.unison > 1 {
                     (index as f64 - midpoint) / midpoint
                 } else {
                     0.0
                 };
-                let detune = crate::util::from_cents(offset * self.unison_detune_cents);
-                let pan = self.pan;
+                let detune = crate::util::from_cents(offset * self.parameters.unison_detune_cents);
+                let pan = self.parameters.pan;
                 Voice {
                     // normalized in the next step
-                    gain: (-self.unison_falloff * offset.powi(2)).exp(),
+                    gain: (-self.parameters.unison_falloff * offset.powi(2)).exp(),
                     pan,
                     oscillator: Oscillator::new(
-                        WaveShape::SuperSaw,
+                        self.parameters.wave_shape,
                         self.sample_rate,
                         frequency * detune,
                     ),
@@ -174,7 +196,7 @@ impl TestSynth {
                     self.active_notes.swap_remove(voice_index);
                 }
             }
-            wave *= self.gain;
+            wave *= self.parameters.gain;
             wave = Stereo {
                 left: self.biquad.left.step(&self.filter_coefficients, wave.left),
                 right: self

@@ -24,6 +24,11 @@ use std::path::Path;
 pub struct Song {
     pub bpm: i64,
     pub notes: PianoRoll,
+    pub instrument: Instrument,
+}
+
+pub enum Instrument {
+    TestSynth(synth::test::Params),
 }
 
 /// Play a song on the default speakers.
@@ -67,7 +72,11 @@ pub fn play(song: Song, outfile: Option<&Path>) -> io::Result<()> {
     // 10 ms buffer at 44100 Hz
     let buffer_size = 441;
 
-    let mut synth = synth::test::TestSynth::new(sample_rate as f64);
+    let mut synth = match song.instrument {
+        Instrument::TestSynth(params) =>
+            synth::test::TestSynth::with_params(sample_rate as f64, params)
+    };
+
     let target = match outfile {
         None => output::sox::SoxTarget::Play,
         Some(path) => output::sox::SoxTarget::File(path),

@@ -12,20 +12,14 @@ jobs:
         run: |
           curl https://nixos.org/nix/install | sh
           . $HOME/.nix-profile/etc/profile.d/nix.sh
-      - name: devenv
-        run: |
-          . $HOME/.nix-profile/etc/profile.d/nix.sh
           LOCALE_ARCHIVE=$(nix-build --no-out-link nix/nixpkgs-pinned.nix -A glibcLocales)/lib/locale/locale-archive
           export LOCALE_ARCHIVE
-          TOOL_PATH=$(nix-build --no-out-link ci.nix)/bin
-
-          echo "::add-path::$TOOL_PATH"
           echo "::set-env name=LOCALE_ARCHIVE::$LOCALE_ARCHIVE"
       - name: build
         run: |
           . $HOME/.nix-profile/etc/profile.d/nix.sh
-          cargo build
-      - name: test
+          nix-build
+      - name: version
         run: |
           . $HOME/.nix-profile/etc/profile.d/nix.sh
-          cargo test
+          ./result/bin/musicc --version

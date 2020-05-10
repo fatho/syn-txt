@@ -21,8 +21,8 @@ use syn_txt::musicc;
 #[derive(Debug, StructOpt)]
 #[structopt(name = "musicc", about = "Compiling code into music")]
 struct Opt {
-    #[structopt(short = "v", long = "verbose")]
-    verbose: bool,
+    #[structopt(short = "v", long = "verbose", parse(from_occurrences))]
+    verbose: usize,
 
     /// The source code of the music.
     #[structopt(parse(from_os_str))]
@@ -40,10 +40,10 @@ struct Opt {
 fn main() -> io::Result<()> {
     let opt = Opt::from_args();
 
-    let level = if opt.verbose {
-        log::Level::Trace
-    } else {
-        log::Level::Info
+    let level = match opt.verbose {
+        0 => log::Level::Info,
+        1 => log::Level::Debug,
+        _ => log::Level::Trace,
     };
     simple_logger::init_with_level(level).unwrap();
 

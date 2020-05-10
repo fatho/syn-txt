@@ -123,7 +123,11 @@ pub fn compile_str<'a>(
 
     let mut lex_errs = Vec::new();
 
-    log::info!("lexing {}", filename);
+    // Prevent log spam when compiling internal modules. They are expected to work.
+    let is_internal = filename.starts_with('<') && filename.ends_with('>');
+    let status_level = if is_internal { log::Level::Debug } else { log::Level::Info };
+
+    log::log!(status_level, "lexing {}", filename);
     while let Some(token_or_error) = lex.next_token() {
         match token_or_error {
             Ok(tok) => tokens.push(tok),
@@ -138,7 +142,7 @@ pub fn compile_str<'a>(
         return Err(CompileError::new(filename, lex_errs, vec![]));
     }
 
-    log::info!("parsing {}", filename);
+    log::log!(status_level, "parsing {}", filename);
     let mut parser = parser::Parser::new(source, &tokens);
 
     let ast = match parser.parse() {
@@ -149,6 +153,7 @@ pub fn compile_str<'a>(
         }
     };
 
+    log::log!(status_level, "compiling {}", filename);
     // TODO: make debug info configurable
     debug_table.insert_source(filename.into(), source.into());
     let mut context = Context {

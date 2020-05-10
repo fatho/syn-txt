@@ -360,7 +360,7 @@ mod test {
     }
 
     #[test]
-    fn test_string() {
+    fn string() {
         expect_single_token(r#""hello""#, Span { begin: 0, end: 7 }, Token::String);
         expect_single_token(
             r#""hello\"world""#,
@@ -381,7 +381,7 @@ mod test {
     }
 
     #[test]
-    fn test_int() {
+    fn int() {
         expect_single_token("123", Span { begin: 0, end: 3 }, Token::Int);
         expect_single_token("+123", Span { begin: 0, end: 4 }, Token::Int);
         expect_single_token("-123", Span { begin: 0, end: 4 }, Token::Int);
@@ -399,7 +399,7 @@ mod test {
     }
 
     #[test]
-    fn test_float() {
+    fn float() {
         expect_single_token("123.", Span { begin: 0, end: 4 }, Token::Float);
         expect_single_token("+123.412", Span { begin: 0, end: 8 }, Token::Float);
         expect_single_token("-123.4 ", Span { begin: 0, end: 6 }, Token::Float);
@@ -412,7 +412,7 @@ mod test {
     }
 
     #[test]
-    fn test_rational() {
+    fn rational() {
         expect_single_token("123/31", Span { begin: 0, end: 6 }, Token::Rational);
         expect_single_token("+1/3 ", Span { begin: 0, end: 4 }, Token::Rational);
         expect_single_token("-5/2", Span { begin: 0, end: 4 }, Token::Rational);
@@ -430,7 +430,7 @@ mod test {
     }
 
     #[test]
-    fn test_ident() {
+    fn ident() {
         expect_single_token("-", Span { begin: 0, end: 1 }, Token::Ident);
         expect_single_token("+", Span { begin: 0, end: 1 }, Token::Ident);
         expect_single_token(

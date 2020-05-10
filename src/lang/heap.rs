@@ -306,7 +306,7 @@ mod test {
     }
 
     #[test]
-    fn test_simple() {
+    fn simple() {
         let mut heap = Heap::new();
 
         let drop_notifier = Rc::new(Cell::new(false));
@@ -333,7 +333,7 @@ mod test {
     }
 
     #[test]
-    fn test_cycle() {
+    fn cycle() {
         let mut heap = Heap::new();
 
         let drop_notifier = Rc::new(Cell::new(false));
@@ -381,7 +381,7 @@ mod test {
     }
 
     #[test]
-    fn test_pin() {
+    fn pin() {
         let mut heap = Heap::new();
 
         let drop_notifier = Rc::new(Cell::new(false));

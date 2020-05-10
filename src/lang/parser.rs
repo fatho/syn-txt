@@ -366,26 +366,26 @@ mod test {
     }
 
     #[test]
-    fn test_int() {
+    fn int() {
         expect_single_expression("123", SymExp::Int(123));
         expect_single_expression("-123", SymExp::Int(-123));
         expect_single_expression("+123", SymExp::Int(123));
     }
 
     #[test]
-    fn test_ratio() {
+    fn ratio() {
         expect_single_expression("12/4", SymExp::Ratio(Rational::new(12, 4)));
         expect_single_expression("-3/7", SymExp::Ratio(Rational::new(-3, 7)));
     }
 
     #[test]
-    fn test_float() {
+    fn float() {
         expect_single_expression("12.125", SymExp::Float(12.125));
         expect_single_expression("-3.", SymExp::Float(-3.0));
     }
 
     #[test]
-    fn test_string() {
+    fn string() {
         expect_single_expression(r#""hello world""#, SymExp::Str("hello world".into()));
         expect_single_expression(r#""""#, SymExp::Str("".into()));
         expect_single_expression(
@@ -397,13 +397,13 @@ mod test {
     }
 
     #[test]
-    fn test_ident() {
+    fn ident() {
         expect_single_expression("a-variable", SymExp::Variable(Ident("a-variable".into())));
         expect_single_expression(":a-keyword", SymExp::Keyword(Ident(":a-keyword".into())));
     }
 
     #[test]
-    fn test_list() {
+    fn list() {
         expect_single_expression(
             r#"(a-list "that \"really\"" :contains 12. -4 3/2 (everything at-once))"#,
             SymExp::List(vec![
@@ -467,7 +467,7 @@ mod test {
     }
 
     #[test]
-    fn test_eof() {
+    fn eof() {
         expect_error(
             "(foo",
             ParseError::new(Span { begin: 4, end: 4 }, ParseErrorInfo::EOF),

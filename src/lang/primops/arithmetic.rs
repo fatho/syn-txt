@@ -179,7 +179,7 @@ fn widen(v1: Number, v2: Number) -> (Number, Number) {
 }
 
 #[test]
-fn test_widening() {
+fn test_widen() {
     let ix = 1;
     let iy = 2;
     let fx = 1.0;

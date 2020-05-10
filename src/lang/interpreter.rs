@@ -735,6 +735,12 @@ mod test {
 
             (frob 1 2 :frob-factor 4)
             (frob 1 2 :flux-compensation 1 :frob-factor 4)
+
+            ; Default values are evaluated at definition time
+            (define the-default 10)
+            (define (foo :bar (x the-default)) x)
+            (foo :bar 0)
+            (foo)
             "#,
             vec![
                 Err(EvalErrorKind::DuplicateKeyword(":frob-factor".into())),
@@ -751,6 +757,10 @@ mod test {
                 Err(EvalErrorKind::NotEnoughArguments),
                 Ok(Value::Int(12)),
                 Ok(Value::Int(11)),
+                Ok(Value::Void),
+                Ok(Value::Void),
+                Ok(Value::Int(0)),
+                Ok(Value::Int(10)),
             ],
         )
     }

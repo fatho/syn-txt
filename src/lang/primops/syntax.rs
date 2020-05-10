@@ -71,7 +71,7 @@ pub fn lambda_impl(
                     // without producing a mess like this.
                     Value::Cons(var, default_tail) => match (&*var.pin(), &*default_tail.pin()) {
                         (Value::Symbol(var), Value::Cons(default, arg_tail)) => match &*arg_tail.pin() {
-                            Value::Nil => Ok((key.clone(), var.clone(), Some(Gc::clone(default)))),
+                            Value::Nil => Ok((key.clone(), var.clone(), Some(int.eval(default.pin())?))),
                             _ => Err(next.id()),
                         },
                         _ => Err(next.id()),

@@ -10,9 +10,23 @@
 
         (sequence-all
             (list
-                (repeat-note 8 :pitch "a3" :length 1/16)
-                (repeat-note 4 :pitch "a3" :length 1/4)
-                (repeat-note 2 :pitch "a3" :length 1/2)
+                (repeat-note 4 :pitch "a4" :length 1/16)
+                (repeat-note 3 :pitch "c5" :length 1/16)
+                (repeat-note 4 :pitch "a4" :length 1/16)
+                (repeat-note 3 :pitch "c5" :length 1/16)
             ))))
 
-(song :bpm 90 :notes melody)
+(define instrument 
+    (synth  
+        :name "test" ; currently, there is only the "test" synthesizer
+        :params
+        (dict
+            :gain 2.0
+            :unison 3
+            :unison-detune-cents 10
+            :wave-shape "sine"
+            :envelope (envelope :attack 0.1 :decay 1.0 :sustain 0.2 :release 0.1)
+        )
+    ))
+
+(song :bpm 90 :notes melody :instrument instrument)

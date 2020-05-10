@@ -65,19 +65,19 @@ pub struct Params {
 impl Default for Params {
     fn default() -> Self {
         Self {
-            gain: 0.5,
+            gain: 1.0,
             pan: 0.0,
-            unison: 3,
-            unison_detune_cents: 15.0,
+            unison: 1,
+            unison_detune_cents: 0.0,
             unison_falloff: 0.0,
-            wave_shape: WaveShape::SuperSaw,
+            wave_shape: WaveShape::Sine,
             envelope: ADSR {
                 attack: 0.01,
                 decay: 0.0,
                 sustain: 1.0,
                 release: 0.1,
             },
-            filter: filter::BiquadType::Lowpass { cutoff: 2000.0, q: 0.7071 },
+            filter: filter::BiquadType::Allpass,
         }
     }
 }

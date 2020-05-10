@@ -24,8 +24,9 @@
         :params
         (dict
             :gain 1.0
-            :unison-detune-cents 10
-            :wave-shape "supersaw"
+            :unison 3
+            :unison-detune-cents 7
+            :wave-shape "twosidedsaw"
             :envelope (envelope :attack 1.0 :decay 1.0 :sustain 0.2 :release 0.1)
         )
     ))

@@ -14,15 +14,19 @@ use std::io;
 
 use log::{info, trace};
 
-use crate::musicc::langext::SongValue;
 use crate::note::{Note, Velocity};
 use crate::output;
-use crate::pianoroll::Time;
+use crate::pianoroll::{PianoRoll, Time};
 use crate::synth;
 use crate::wave;
 
+pub struct Song {
+    pub bpm: i64,
+    pub notes: PianoRoll,
+}
+
 /// Play a song on the default speakers.
-pub fn play(song: SongValue) -> io::Result<()> {
+pub fn play(song: Song) -> io::Result<()> {
     let bpm = song.bpm;
 
     // hard-coded denominator of measures (for now)
@@ -38,7 +42,7 @@ pub fn play(song: SongValue) -> io::Result<()> {
             / bpm as f64
     };
 
-    let roll = &song.notes.0;
+    let roll = &song.notes;
     // iterate the notes in the piano roll in order, and convert timing to samples
     let mut note_iter: std::iter::Peekable<_> = roll
         .iter()

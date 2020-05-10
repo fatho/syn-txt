@@ -1,100 +1,167 @@
 //! Arithmetic primitive operations.
 
+use crate::lang::heap::*;
 use crate::lang::interpreter::*;
-use crate::lang::span::*;
+use crate::lang::value::*;
 use crate::rational::Rational;
 
 /// Add all the arguments. If no arguments are passed, a zero int is returned.
-pub fn add(intp: &mut Interpreter, mut args: ArgParser) -> InterpreterResult<Value> {
-    let mut accum = Value::Int(0);
-    while !args.is_empty() {
-        accum = match widen(accum, args.value(intp)?) {
-            (Value::Int(x), Value::Int(y)) => Value::Int(x + y),
-            (Value::Ratio(x), Value::Ratio(y)) => Value::Ratio(x + y),
-            (Value::Float(x), Value::Float(y)) => Value::Float(x + y),
-            _ => return Err(IntpErr::new(args.list_span(), IntpErrInfo::Type)),
+pub fn add(int: &mut Interpreter, mut args: Gc<Value>) -> Result<Gc<Value>> {
+    let mut accum = Number::Int(0);
+    while let Some((next, id)) = Number::try_pop(int, &mut args)? {
+        accum = match widen(accum, next) {
+            (Number::Int(x), Number::Int(y)) => Number::Int(x + y),
+            (Number::Ratio(x), Number::Ratio(y)) => Number::from_rational(x + y),
+            (Number::Float(x), Number::Float(y)) => Number::Float(x + y),
+            _ => return Err(int.make_error(id, EvalErrorKind::Type)),
         };
     }
-    Ok(accum)
+    Ok(int.heap_alloc_value(accum.to_value()))
 }
 
 /// Add subtract all arguments after the first from the first argument.
-pub fn sub(intp: &mut Interpreter, mut args: ArgParser) -> InterpreterResult<Value> {
-    let mut accum = args.value(intp)?;
-    while !args.is_empty() {
-        accum = match widen(accum, args.value(intp)?) {
-            (Value::Int(x), Value::Int(y)) => Value::Int(x - y),
-            (Value::Ratio(x), Value::Ratio(y)) => Value::Ratio(x - y),
-            (Value::Float(x), Value::Float(y)) => Value::Float(x - y),
-            _ => return Err(IntpErr::new(args.list_span(), IntpErrInfo::Type)),
+pub fn sub(int: &mut Interpreter, mut args: Gc<Value>) -> Result<Gc<Value>> {
+    let mut accum = Number::pop(int, &mut args)?.0;
+    let mut has_more = false;
+    while let Some((next, id)) = Number::try_pop(int, &mut args)? {
+        has_more = true;
+        accum = match widen(accum, next) {
+            (Number::Int(x), Number::Int(y)) => Number::Int(x - y),
+            (Number::Ratio(x), Number::Ratio(y)) => Number::from_rational(x - y),
+            (Number::Float(x), Number::Float(y)) => Number::Float(x - y),
+            _ => return Err(int.make_error(id, EvalErrorKind::Type)),
         };
     }
-    Ok(accum)
+    if !has_more {
+        accum = match accum {
+            Number::Float(x) => Number::Float(-x),
+            Number::Ratio(x) => Number::from_rational(-x),
+            Number::Int(x) => Number::Int(-x),
+        };
+    }
+    Ok(int.heap_alloc_value(accum.to_value()))
 }
 
 /// Add all the arguments. If no arguments are passed, a `1` int is returned.
-pub fn mul(intp: &mut Interpreter, mut args: ArgParser) -> InterpreterResult<Value> {
-    let mut accum = Value::Int(1);
-    while !args.is_empty() {
-        accum = match widen(accum, args.value(intp)?) {
-            (Value::Int(x), Value::Int(y)) => Value::Int(x * y),
-            (Value::Ratio(x), Value::Ratio(y)) => Value::Ratio(x * y),
-            (Value::Float(x), Value::Float(y)) => Value::Float(x * y),
-            _ => return Err(IntpErr::new(args.list_span(), IntpErrInfo::Type)),
+pub fn mul(int: &mut Interpreter, mut args: Gc<Value>) -> Result<Gc<Value>> {
+    let mut accum = Number::Int(1);
+    while let Some((next, id)) = Number::try_pop(int, &mut args)? {
+        accum = match widen(accum, next) {
+            (Number::Int(x), Number::Int(y)) => Number::Int(x * y),
+            (Number::Ratio(x), Number::Ratio(y)) => Number::from_rational(x * y),
+            (Number::Float(x), Number::Float(y)) => Number::Float(x * y),
+            _ => return Err(int.make_error(id, EvalErrorKind::Type)),
         };
     }
-    Ok(accum)
+    Ok(int.heap_alloc_value(accum.to_value()))
 }
 
 /// Divide the first argument by all other arguments.
 /// If just one argument is given, the reciprocal is returned.
-pub fn div(intp: &mut Interpreter, mut args: ArgParser) -> InterpreterResult<Value> {
-    let mut accum = if args.remaining() == 1 {
-        // compute reciprocal by using `1` as initial numerator
-        Value::Int(1)
-    } else {
-        args.value(intp)?
-    };
-
-    while !args.is_empty() {
-        let rhs = args.value(intp)?;
-        div_by_zero_check(args.list_span(), &rhs)?;
-
-        accum = match widen(accum, rhs) {
-            // NOTE: contrary to the other arithmetic operations, int and int is not an int again.
-            (Value::Int(x), Value::Int(y)) => Value::Ratio(Rational::new(x, y)),
-            (Value::Ratio(x), Value::Ratio(y)) => Value::Ratio(x / y),
-            (Value::Float(x), Value::Float(y)) => Value::Float(x / y),
-            _ => return Err(IntpErr::new(args.list_span(), IntpErrInfo::Type)),
+pub fn div(int: &mut Interpreter, mut args: Gc<Value>) -> Result<Gc<Value>> {
+    let (mut accum, initial_id) = Number::pop(int, &mut args)?;
+    let mut has_more = false;
+    while let Some((next, id)) = Number::try_pop(int, &mut args)? {
+        has_more = true;
+        if next.is_zero() {
+            return Err(int.make_error(id, EvalErrorKind::DivisionByZero));
+        }
+        accum = match widen(accum, next) {
+            (Number::Int(x), Number::Int(y)) => Number::from_rational(Rational::new(x, y)),
+            (Number::Ratio(x), Number::Ratio(y)) => Number::from_rational(x / y),
+            (Number::Float(x), Number::Float(y)) => Number::Float(x / y),
+            _ => return Err(int.make_error(args.id(), EvalErrorKind::Type)),
         };
     }
-    Ok(accum)
+    if !has_more {
+        if accum.is_zero() {
+            return Err(int.make_error(initial_id, EvalErrorKind::DivisionByZero));
+        }
+        accum = match accum {
+            Number::Float(x) => Number::Float(1.0 / x),
+            Number::Ratio(x) => Number::Ratio(x.recip()),
+            Number::Int(x) => Number::Ratio(Rational::new(1, x)),
+        };
+    }
+    Ok(int.heap_alloc_value(accum.to_value()))
+}
+
+#[derive(Debug, PartialEq, Clone, Copy)]
+enum Number {
+    /// A float
+    Float(f64),
+    /// A rational number
+    Ratio(Rational),
+    /// An integer
+    Int(i64),
+}
+
+impl Number {
+    /// Convert from rational, downgrading a rational with denominator one back to int.
+    pub fn from_rational(r: Rational) -> Self {
+        if r.denominator() == 1 {
+            Number::Int(r.numerator())
+        } else {
+            Number::Ratio(r)
+        }
+    }
+
+    pub fn to_value(self) -> Value {
+        match self {
+            Number::Float(x) => Value::Float(x),
+            Number::Ratio(x) => Value::Ratio(x),
+            Number::Int(x) => Value::Int(x),
+        }
+    }
+
+    pub fn try_from_value(value: &Value) -> Option<Number> {
+        match value {
+            Value::Int(i) => Some(Number::Int(*i)),
+            Value::Float(i) => Some(Number::Float(*i)),
+            Value::Ratio(i) => Some(Number::Ratio(*i)),
+            _ => None,
+        }
+    }
+
+    pub fn pop(int: &mut Interpreter, args: &mut Gc<Value>) -> Result<(Number, Id)> {
+        let arg = int.pop_argument(args)?;
+        let arg_id = arg.id();
+        let value = int.eval(arg.pin())?;
+        if let Some(number) = Number::try_from_value(&*value.pin()) {
+            Ok((number, arg_id))
+        } else {
+            Err(int.make_error(arg_id, EvalErrorKind::Type))
+        }
+    }
+
+    pub fn try_pop(int: &mut Interpreter, args: &mut Gc<Value>) -> Result<Option<(Number, Id)>> {
+        if let Value::Nil = &*args.pin() {
+            Ok(None)
+        } else {
+            Number::pop(int, args).map(Some)
+        }
+    }
+
+    pub fn is_zero(&self) -> bool {
+        match self {
+            Number::Int(0) => true,
+            Number::Float(f) => *f == 0.0,
+            Number::Ratio(r) => r.is_zero(),
+            _ => false,
+        }
+    }
 }
 
 /// Widen numeric types if necessary if the values don't have the same type.
 /// The only case where this happens is if one of the values is an integer
 /// and the other is a float or rational.
-fn widen(v1: Value, v2: Value) -> (Value, Value) {
+fn widen(v1: Number, v2: Number) -> (Number, Number) {
     match (v1, v2) {
-        (Value::Int(x), y @ Value::Ratio(_)) => (Value::Ratio(Rational::from_int(x)), y),
-        (x @ Value::Ratio(_), Value::Int(y)) => (x, Value::Ratio(Rational::from_int(y))),
-        (Value::Int(x), y @ Value::Float(_)) => (Value::Float(x as f64), y),
-        (x @ Value::Float(_), Value::Int(y)) => (x, Value::Float(y as f64)),
+        (Number::Int(x), y @ Number::Ratio(_)) => (Number::Ratio(Rational::from_int(x)), y),
+        (x @ Number::Ratio(_), Number::Int(y)) => (x, Number::Ratio(Rational::from_int(y))),
+        (Number::Int(x), y @ Number::Float(_)) => (Number::Float(x as f64), y),
+        (x @ Number::Float(_), Number::Int(y)) => (x, Number::Float(y as f64)),
         other => other,
-    }
-}
-
-fn div_by_zero_check(location: Span, denom: &Value) -> InterpreterResult<()> {
-    let is_zero = match denom {
-        Value::Int(0) => true,
-        Value::Float(f) => *f == 0.0,
-        Value::Ratio(r) => r.is_zero(),
-        _ => false,
-    };
-    if is_zero {
-        Err(IntpErr::new(location, IntpErrInfo::DivisionByZero))
-    } else {
-        Ok(())
     }
 }
 
@@ -109,25 +176,25 @@ fn test_widening() {
 
     // behaves as identity when types are the same
     assert_eq!(
-        widen(Value::Int(ix), Value::Int(iy)),
-        (Value::Int(ix), Value::Int(iy))
+        widen(Number::Int(ix), Number::Int(iy)),
+        (Number::Int(ix), Number::Int(iy))
     );
     assert_eq!(
-        widen(Value::Ratio(rx), Value::Ratio(ry)),
-        (Value::Ratio(rx), Value::Ratio(ry))
+        widen(Number::Ratio(rx), Number::Ratio(ry)),
+        (Number::Ratio(rx), Number::Ratio(ry))
     );
     assert_eq!(
-        widen(Value::Float(fx), Value::Float(fy)),
-        (Value::Float(fx), Value::Float(fy))
+        widen(Number::Float(fx), Number::Float(fy)),
+        (Number::Float(fx), Number::Float(fy))
     );
 
     // Widens where necessary
     assert_eq!(
-        widen(Value::Int(ix), Value::Ratio(ry)),
-        (Value::Ratio(rx), Value::Ratio(ry))
+        widen(Number::Int(ix), Number::Ratio(ry)),
+        (Number::Ratio(rx), Number::Ratio(ry))
     );
     assert_eq!(
-        widen(Value::Float(fx), Value::Int(iy)),
-        (Value::Float(fx), Value::Float(fy))
+        widen(Number::Float(fx), Number::Int(iy)),
+        (Number::Float(fx), Number::Float(fy))
     );
 }

@@ -1,6 +1,6 @@
-use crate::lang2::heap::*;
-use crate::lang2::interpreter::*;
-use crate::lang2::value::*;
+use crate::lang::heap::*;
+use crate::lang::interpreter::*;
+use crate::lang::value::*;
 
 use std::cmp::Ordering;
 

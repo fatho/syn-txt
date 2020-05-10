@@ -11,6 +11,10 @@ impl Symbol {
     pub fn as_str(&self) -> &str {
         &self.0
     }
+
+    pub fn to_name(&self) -> String {
+        self.as_str().into()
+    }
 }
 
 // TODO: eventually, only allow symbol creation by interning.

@@ -3,7 +3,7 @@
 use crate::lang::heap::*;
 use crate::lang::interpreter::*;
 use crate::lang::value::*;
-use std::collections::{HashSet, HashMap};
+use std::collections::{HashMap, HashSet};
 
 /// Interprets the `(begin ...)` construct that creates a new scope and executes a series of expressions,
 /// returning the value of the last one.
@@ -30,7 +30,6 @@ pub fn lambda(int: &mut Interpreter, mut args: Gc<Value>) -> Result<Gc<Value>> {
     lambda_impl(int, arg_parameters, args)
 }
 
-
 pub fn lambda_impl(
     int: &mut Interpreter,
     mut params: Gc<Value>,
@@ -44,8 +43,10 @@ pub fn lambda_impl(
         match &*param.pin() {
             Value::Symbol(var) => {
                 let var = var.clone();
-                if ! seen_vars.insert(var.clone()) {
-                    return Err(int.make_error(param.id(), EvalErrorKind::Redefinition(var.to_name())));
+                if !seen_vars.insert(var.clone()) {
+                    return Err(
+                        int.make_error(param.id(), EvalErrorKind::Redefinition(var.to_name()))
+                    );
                 }
                 parameters.push(var);
             }
@@ -70,10 +71,14 @@ pub fn lambda_impl(
                     // TODO: find a suitable abstraction for parsing complex syntactic forms
                     // without producing a mess like this.
                     Value::Cons(var, default_tail) => match (&*var.pin(), &*default_tail.pin()) {
-                        (Value::Symbol(var), Value::Cons(default, arg_tail)) => match &*arg_tail.pin() {
-                            Value::Nil => Ok((key.clone(), var.clone(), Some(Gc::clone(default)))),
-                            _ => Err(next.id()),
-                        },
+                        (Value::Symbol(var), Value::Cons(default, arg_tail)) => {
+                            match &*arg_tail.pin() {
+                                Value::Nil => {
+                                    Ok((key.clone(), var.clone(), Some(int.eval(default.pin())?)))
+                                }
+                                _ => Err(next.id()),
+                            }
+                        }
                         _ => Err(next.id()),
                     },
                     _ => Err(next.id()),
@@ -83,11 +88,18 @@ pub fn lambda_impl(
         };
         match result {
             Ok((key, var, default)) => {
-                if ! seen_vars.insert(var.clone()) {
-                    return Err(int.make_error(param.id(), EvalErrorKind::Redefinition(var.to_name())));
+                if !seen_vars.insert(var.clone()) {
+                    return Err(
+                        int.make_error(param.id(), EvalErrorKind::Redefinition(var.to_name()))
+                    );
                 }
-                if named_parameters.insert(key.clone(), (var, default)).is_some() {
-                    return Err(int.make_error(param.id(), EvalErrorKind::DuplicateKeyword(key.to_name())));
+                if named_parameters
+                    .insert(key.clone(), (var, default))
+                    .is_some()
+                {
+                    return Err(
+                        int.make_error(param.id(), EvalErrorKind::DuplicateKeyword(key.to_name()))
+                    );
                 }
             }
             Err(id) => return Err(int.make_error(id, EvalErrorKind::IncompatibleArguments)),
@@ -95,7 +107,6 @@ pub fn lambda_impl(
     }
 
     int.expect_no_more_arguments(&params)?;
-
 
     let closure = Closure {
         captured_scope: int.scope_stack().clone(),
@@ -180,7 +191,6 @@ pub fn cond(int: &mut Interpreter, args: Gc<Value>) -> Result<Gc<Value>> {
     }
     Err(int.make_error(args.id(), EvalErrorKind::Other("no match".to_string())))
 }
-
 
 fn is_true(value: Gc<Value>) -> bool {
     match &*value.pin() {

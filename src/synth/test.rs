@@ -24,29 +24,62 @@ pub struct TestSynth {
     /// Reference note and frequency, determining the pitch of all other notes.
     tuning: Tuning,
 
-    /// Evenlope for played notes
-    envelope: ADSR,
+    /// The public parameters influencing the sound.
+    /// TODO: these are eventually automatable
+    parameters: Params,
 
-    /// Output gain of the synthesizer
-    gain: f64,
-
-    /// Pan of the center unison voice
-    pan: f64,
-
-    /// Number of voices per note
-    unison: usize,
-    /// Maximum detune factor the outermost unison voices.
-    unison_detune_cents: f64,
-    /// Gain falloff exponent for the more detuned noises.
-    unison_falloff: f64,
-
-    // low-pass filter
-    filter_coefficients: filter::BiquadCoefficients,
     biquad: Stereo<filter::Biquad>,
 
     /// Monotoneously increasing id used for identifying playing notes.
     next_play_handle: usize,
     active_notes: Vec<NoteState>,
+}
+
+/// Parameters of the synthesizer.
+/// TODO: Add filter settings
+pub struct Params {
+    /// Output gain of the synthesizer
+    pub gain: f64,
+
+    /// Pan of the center unison voice
+    pub pan: f64,
+
+    /// Number of voices per note
+    pub unison: usize,
+    /// Maximum detune factor the outermost unison voices.
+    pub unison_detune_cents: f64,
+    /// Gain falloff exponent for the more detuned noises.
+    pub unison_falloff: f64,
+
+    /// Oscillator shape
+    pub wave_shape: WaveShape,
+
+    /// Evenlope for played notes
+    pub envelope: ADSR,
+
+    /// The type of filter to apply to the synthesizer output.
+    /// Currently limited to biquadratic filters.
+    pub filter: filter::BiquadType,
+}
+
+impl Default for Params {
+    fn default() -> Self {
+        Self {
+            gain: 1.0,
+            pan: 0.0,
+            unison: 1,
+            unison_detune_cents: 0.0,
+            unison_falloff: 0.0,
+            wave_shape: WaveShape::Sine,
+            envelope: ADSR {
+                attack: 0.01,
+                decay: 0.0,
+                sustain: 1.0,
+                release: 0.1,
+            },
+            filter: filter::BiquadType::Allpass,
+        }
+    }
 }
 
 /// Opaque handle indicating a playing voice.
@@ -55,23 +88,12 @@ pub struct PlayHandle(usize);
 
 impl TestSynth {
     pub fn new(sample_rate: f64) -> Self {
-        let filter_coefficients = filter::BiquadCoefficients::lowpass(sample_rate, 2000.0, 0.7071);
+        Self::with_params(sample_rate, Params::default())
+    }
+    pub fn with_params(sample_rate: f64, params: Params) -> Self {
         TestSynth {
-            // voice settings
-            pan: 0.0,
-            unison: 3,
-            unison_detune_cents: 15.0,
-            unison_falloff: 0.0,
+            parameters: params,
             tuning: Tuning::default(),
-            // volume
-            envelope: ADSR {
-                attack: 0.01,
-                decay: 0.0,
-                sustain: 1.0,
-                release: 0.1,
-            },
-            gain: 0.5,
-            filter_coefficients,
             biquad: Stereo {
                 left: filter::Biquad::new(),
                 right: filter::Biquad::new(),
@@ -100,22 +122,22 @@ impl TestSynth {
         let frequency = self.tuning.frequency(note);
         let handle = self.next_play_handle();
 
-        let midpoint = (self.unison as f64 - 1.0) / 2.0;
-        let mut voices = (0..self.unison)
+        let midpoint = (self.parameters.unison as f64 - 1.0) / 2.0;
+        let mut voices = (0..self.parameters.unison)
             .map(|index| {
-                let offset = if self.unison > 1 {
+                let offset = if self.parameters.unison > 1 {
                     (index as f64 - midpoint) / midpoint
                 } else {
                     0.0
                 };
-                let detune = crate::util::from_cents(offset * self.unison_detune_cents);
-                let pan = self.pan;
+                let detune = crate::util::from_cents(offset * self.parameters.unison_detune_cents);
+                let pan = self.parameters.pan;
                 Voice {
                     // normalized in the next step
-                    gain: (-self.unison_falloff * offset.powi(2)).exp(),
+                    gain: (-self.parameters.unison_falloff * offset.powi(2)).exp(),
                     pan,
                     oscillator: Oscillator::new(
-                        WaveShape::SuperSaw,
+                        self.parameters.wave_shape,
                         self.sample_rate,
                         frequency * detune,
                     ),
@@ -139,7 +161,7 @@ impl TestSynth {
             release_delay_samples: std::usize::MAX,
             voices,
             // volume
-            envelope: self.envelope.instantiate(self.sample_rate),
+            envelope: self.parameters.envelope.instantiate(self.sample_rate),
         });
         handle
     }
@@ -174,13 +196,16 @@ impl TestSynth {
                     self.active_notes.swap_remove(voice_index);
                 }
             }
-            wave *= self.gain;
+            wave *= self.parameters.gain;
+            // It's inefficient to compute these every sample, but once
+            // we get to automation, we'd have to do that anyway.
+            let filter_coefficients = self.parameters.filter.to_coefficients(self.sample_rate);
             wave = Stereo {
-                left: self.biquad.left.step(&self.filter_coefficients, wave.left),
+                left: self.biquad.left.step(&filter_coefficients, wave.left),
                 right: self
                     .biquad
                     .right
-                    .step(&self.filter_coefficients, wave.right),
+                    .step(&filter_coefficients, wave.right),
             };
 
             *out_sample += wave;

@@ -47,7 +47,11 @@ impl PianoRoll {
     pub fn with_notes(mut notes: Vec<PlayedNote>) -> Self {
         notes.sort_by_key(|p| p.start);
         Self {
-            length: notes.iter().map(|n| n.start + n.duration).max().unwrap_or(Rational::ZERO),
+            length: notes
+                .iter()
+                .map(|n| n.start + n.duration)
+                .max()
+                .unwrap_or(Rational::ZERO),
             notes,
         }
     }
@@ -143,9 +147,7 @@ impl Default for PianoRoll {
 
 impl std::iter::FromIterator<PlayedNote> for PianoRoll {
     fn from_iter<T: IntoIterator<Item = PlayedNote>>(iter: T) -> Self {
-        let notes: Vec<PlayedNote> = iter
-            .into_iter()
-            .collect();
+        let notes: Vec<PlayedNote> = iter.into_iter().collect();
         Self::with_notes(notes)
     }
 }

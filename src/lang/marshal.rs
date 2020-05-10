@@ -1,6 +1,6 @@
 //! Converting between `Value` and Rust values.
 
-use super::{Gc, GcPin, Value, Symbol};
+use super::{Gc, GcPin, Symbol, Value};
 use crate::rational::Rational;
 use std::collections::HashMap;
 
@@ -10,16 +10,34 @@ pub trait ParseValue {
     // TODO: add context for better error messages
     fn parse(&self, value: GcPin<Value>) -> Option<Self::Repr>;
 
-    fn map<R, F: Fn(Self::Repr) -> R>(self, f: F) -> Map<Self, F> where Self: Sized {
-        Map { fun: f, parser: self }
+    fn map<R, F: Fn(Self::Repr) -> R>(self, f: F) -> Map<Self, F>
+    where
+        Self: Sized,
+    {
+        Map {
+            fun: f,
+            parser: self,
+        }
     }
 
-    fn and_then<R, F: Fn(Self::Repr) -> Option<R>>(self, f: F) -> AndThen<Self, F> where Self: Sized {
-        AndThen { fun: f, parser: self }
+    fn and_then<R, F: Fn(Self::Repr) -> Option<R>>(self, f: F) -> AndThen<Self, F>
+    where
+        Self: Sized,
+    {
+        AndThen {
+            fun: f,
+            parser: self,
+        }
     }
 
-    fn or<Q: ParseValue<Repr=Self::Repr>>(self, other: Q) -> Or<Self, Q> where Self: Sized {
-        Or { first: self, second: other }
+    fn or<Q: ParseValue<Repr = Self::Repr>>(self, other: Q) -> Or<Self, Q>
+    where
+        Self: Sized,
+    {
+        Or {
+            first: self,
+            second: other,
+        }
     }
 }
 
@@ -32,7 +50,7 @@ impl<P: ParseValue> ParseValue for &P {
 }
 
 #[derive(Debug, Copy, Clone)]
-pub struct PrimParser<T>(fn (value: GcPin<Value>) -> Option<T>);
+pub struct PrimParser<T>(fn(value: GcPin<Value>) -> Option<T>);
 
 impl<T> ParseValue for PrimParser<T> {
     type Repr = T;
@@ -63,13 +81,13 @@ prim_parser_impl!(string : Str => String);
 prim_parser_impl!(bool : Bool => bool);
 prim_parser_impl!(dict : Dict => HashMap<Symbol, Gc<Value>>);
 
-pub fn float_coercing() -> impl ParseValue<Repr=f64> {
+pub fn float_coercing() -> impl ParseValue<Repr = f64> {
     float()
-    .or(int().map(|i| i as f64))
-    .or(ratio().map(|r| r.numerator() as f64 / r.denominator() as f64))
+        .or(int().map(|i| i as f64))
+        .or(ratio().map(|r| r.numerator() as f64 / r.denominator() as f64))
 }
 
-pub fn ratio_coercing() -> impl ParseValue<Repr=Rational> {
+pub fn ratio_coercing() -> impl ParseValue<Repr = Rational> {
     ratio().or(int().map(|i| Rational::from_int(i)))
 }
 
@@ -88,7 +106,7 @@ impl<I: ParseValue> ParseValue for ListParser<I> {
                 Value::Cons(head, tail) => {
                     out.push(self.item_parser.parse(head.pin())?);
                     current = tail.pin();
-                },
+                }
                 Value::Nil => break,
                 _ => return None,
             }
@@ -101,14 +119,13 @@ pub fn list<I: ParseValue>(item_parser: I) -> ListParser<I> {
     ListParser { item_parser }
 }
 
-
 pub struct RecordParser<F> {
-    type_id: String,
+    type_id: Option<String>,
     field_parser: F,
 }
 
 pub struct RecordFields {
-    fields: HashMap<Symbol, Gc<Value>>
+    fields: HashMap<Symbol, Gc<Value>>,
 }
 
 impl RecordFields {
@@ -131,10 +148,14 @@ impl<R, F: Fn(RecordFields) -> Option<R>> ParseValue for RecordParser<F> {
 
     fn parse(&self, value: GcPin<Value>) -> Option<Self::Repr> {
         let fields = RecordFields {
-            fields: dict().parse(value)?
+            fields: dict().parse(value)?,
         };
         let record_type = fields.get(":__type__", string())?;
-        if record_type != self.type_id {
+        if self
+            .type_id
+            .as_deref()
+            .map_or(false, |tid| record_type != tid)
+        {
             return None;
         }
         let parser = &self.field_parser;
@@ -142,9 +163,19 @@ impl<R, F: Fn(RecordFields) -> Option<R>> ParseValue for RecordParser<F> {
     }
 }
 
-pub fn record<R, F: Fn(RecordFields) -> Option<R>>(type_id: &str, field_parser: F) -> RecordParser<F> {
+pub fn record<R, F: Fn(RecordFields) -> Option<R>>(
+    type_id: &str,
+    field_parser: F,
+) -> RecordParser<F> {
     RecordParser {
-        type_id: type_id.to_string(),
+        type_id: Some(type_id.to_string()),
+        field_parser,
+    }
+}
+
+pub fn typed_dict<R, F: Fn(RecordFields) -> Option<R>>(field_parser: F) -> RecordParser<F> {
+    RecordParser {
+        type_id: None,
         field_parser,
     }
 }
@@ -180,10 +211,12 @@ pub struct Or<P, Q> {
     second: Q,
 }
 
-impl<P: ParseValue, Q: ParseValue<Repr=P::Repr>> ParseValue for Or<P, Q> {
+impl<P: ParseValue, Q: ParseValue<Repr = P::Repr>> ParseValue for Or<P, Q> {
     type Repr = P::Repr;
 
     fn parse(&self, value: GcPin<Value>) -> Option<Self::Repr> {
-        self.first.parse(GcPin::clone(&value)).or_else(|| self.second.parse(value))
+        self.first
+            .parse(GcPin::clone(&value))
+            .or_else(|| self.second.parse(value))
     }
 }

@@ -1,13 +1,16 @@
 //! The compiler turns the AST into values.
 
 use super::ast;
+use super::heap;
 use super::lexer;
 use super::parser;
-use super::heap;
-use super::{debug, span::{Span, LineMap}, Value};
+use super::{
+    debug,
+    span::{LineMap, Span},
+    Value,
+};
 
 use std::{fmt, sync::Arc};
-
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CompileError {
@@ -30,7 +33,11 @@ impl fmt::Display for CompileError {
 }
 
 impl CompileError {
-    pub fn new(filename: &str, lexer_errors: Vec<lexer::LexerError>, parse_errors: Vec<parser::ParseError>) -> Self {
+    pub fn new(
+        filename: &str,
+        lexer_errors: Vec<lexer::LexerError>,
+        parse_errors: Vec<parser::ParseError>,
+    ) -> Self {
         Self {
             filename: filename.into(),
             lexer_errors,
@@ -40,8 +47,8 @@ impl CompileError {
 
     pub fn location(&self, span: Span) -> debug::SourceLocation {
         debug::SourceLocation {
-                file: self.filename.clone(),
-                span,
+            file: self.filename.clone(),
+            span,
         }
     }
 
@@ -104,7 +111,6 @@ impl<'a> Context<'a> {
     }
 }
 
-
 pub fn compile_str<'a>(
     heap: &mut heap::Heap,
     debug_table: &mut debug::DebugTable,
@@ -124,11 +130,11 @@ pub fn compile_str<'a>(
             Err(err) => {
                 log_error(&lines, filename, err.location(), err.kind());
                 lex_errs.push(err)
-            },
+            }
         }
     }
 
-    if ! lex_errs.is_empty() {
+    if !lex_errs.is_empty() {
         return Err(CompileError::new(filename, lex_errs, vec![]));
     }
 
@@ -152,7 +158,6 @@ pub fn compile_str<'a>(
     };
     Ok(ast.iter().map(|exp| context.compile(exp).pin()).collect())
 }
-
 
 fn log_error<E: std::fmt::Display>(lines: &LineMap, input_name: &str, location: Span, message: E) {
     let start = lines.offset_to_pos(location.begin);

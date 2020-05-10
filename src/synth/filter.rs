@@ -10,6 +10,26 @@
 
 //! Digital filters galore
 
+
+/// Pre-define types of biquad filters that can be used for deriving
+/// various combinations of `BiquadCoefficients`.
+#[derive(Debug, Clone)]
+pub enum BiquadType {
+    /// The identity filter that lets the signal pass unchanged.
+    Allpass,
+    /// Lowpass filter with the given cutoff frequency and Q factor (controls resonance)
+    Lowpass { cutoff: f64, q: f64 }
+}
+
+impl BiquadType {
+    pub fn to_coefficients(&self, sample_rate: f64) -> BiquadCoefficients {
+        match self {
+            BiquadType::Allpass => BiquadCoefficients::allpass(),
+            BiquadType::Lowpass { cutoff, q} => BiquadCoefficients::lowpass(sample_rate, *cutoff, *q),
+        }
+    }
+}
+
 /// Filter coefficients for a biquadratic filter,
 /// based on https://www.w3.org/2011/audio/audio-eq-cookbook.html.
 #[derive(Debug, Clone)]

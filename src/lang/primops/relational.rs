@@ -1,6 +1,6 @@
 use crate::lang::heap::*;
 use crate::lang::interpreter::*;
-use crate::{rational::Rational, lang::value::*};
+use crate::{lang::value::*, rational::Rational};
 
 use std::cmp::Ordering;
 

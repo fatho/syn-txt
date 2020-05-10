@@ -63,7 +63,7 @@ pub enum EvalErrorKind {
     /// Miscellaneous errors that shouldn't happen, but might.
     Other(String),
     /// Interpreter failed to compile a nested document.
-    Compile(super::compiler::CompileError)
+    Compile(super::compiler::CompileError),
 }
 
 impl fmt::Display for EvalErrorKind {
@@ -77,7 +77,9 @@ impl fmt::Display for EvalErrorKind {
             EvalErrorKind::TooManyArguments => write!(f, "too many arguments in function call"),
             EvalErrorKind::UnknownKeyword(var) => write!(f, "unknown keyword `{}`", var.as_str()),
             EvalErrorKind::MissingKeyword(var) => write!(f, "missing keyword `{}`", var.as_str()),
-            EvalErrorKind::DuplicateKeyword(var) => write!(f, "duplicate keyword `{}`", var.as_str()),
+            EvalErrorKind::DuplicateKeyword(var) => {
+                write!(f, "duplicate keyword `{}`", var.as_str())
+            }
             EvalErrorKind::DivisionByZero => write!(f, "division by zero"),
             EvalErrorKind::Redefinition(var) => write!(f, "redefined variable `{}`", var.as_str()),
             EvalErrorKind::Type => write!(f, "type error"),
@@ -169,7 +171,8 @@ impl<'a> Interpreter<'a> {
         };
         this.push_scope();
         static PRELUDE: &str = include_str!("prelude.syn");
-        this.source_prelude("<prelude>", PRELUDE).expect("prelude should compile");
+        this.source_prelude("<prelude>", PRELUDE)
+            .expect("prelude should compile");
         this
     }
 
@@ -179,14 +182,21 @@ impl<'a> Interpreter<'a> {
         let actual_scope = self.scope_stack.pin();
         self.scope_stack = Gc::clone(&self.builtins);
 
-        let prelude_vals = super::compiler::compile_str(&mut self.heap, &mut self.debug_info, name, source);
+        let prelude_vals =
+            super::compiler::compile_str(&mut self.heap, &mut self.debug_info, name, source);
         let mut result = Ok(());
         match prelude_vals {
-            Ok(prelude_vals) => for value in prelude_vals {
-                result = self.eval(value).map(|_| ());
-                if result.is_err() { break }
-            },
-            Err(compile_err) => result = Err(EvalError::new(None, EvalErrorKind::Compile(compile_err))),
+            Ok(prelude_vals) => {
+                for value in prelude_vals {
+                    result = self.eval(value).map(|_| ());
+                    if result.is_err() {
+                        break;
+                    }
+                }
+            }
+            Err(compile_err) => {
+                result = Err(EvalError::new(None, EvalErrorKind::Compile(compile_err)))
+            }
         }
 
         self.scope_stack = actual_scope.unpin();
@@ -204,7 +214,10 @@ impl<'a> Interpreter<'a> {
         let val = self.heap.alloc(Value::PrimOp(PrimOp(op)));
         if let Some((var, _val)) = self.builtins.pin().define(var, val) {
             // TODO: allow None as location
-            Err(EvalError::new(None, EvalErrorKind::Redefinition(var.to_name())))
+            Err(EvalError::new(
+                None,
+                EvalErrorKind::Redefinition(var.to_name()),
+            ))
         } else {
             Ok(())
         }
@@ -280,7 +293,7 @@ impl<'a> Interpreter<'a> {
                     let arg = self.pop_argument(&mut tail)?;
                     let value = self.eval(arg.pin())?;
                     if value.pin().is_keyword() {
-                        return Err(self.make_error(arg.id(), EvalErrorKind::NotEnoughArguments))
+                        return Err(self.make_error(arg.id(), EvalErrorKind::NotEnoughArguments));
                     }
                     let redefined = scope_stack.define(param_var.clone(), value);
                     debug_assert!(redefined.is_none(), "closure invariant violated");
@@ -292,32 +305,43 @@ impl<'a> Interpreter<'a> {
                     let key_arg = self.pop_argument(&mut tail)?;
                     if let Value::Keyword(key) = &*key_arg.pin() {
                         let value = self.pop_argument_eval(&mut tail)?;
-                        if ! provided_keywords.insert(key.clone()) {
-                            return Err(self.make_error(key_arg.id(), EvalErrorKind::DuplicateKeyword(key.to_name())))
+                        if !provided_keywords.insert(key.clone()) {
+                            return Err(self.make_error(
+                                key_arg.id(),
+                                EvalErrorKind::DuplicateKeyword(key.to_name()),
+                            ));
                         }
                         if value.pin().is_keyword() {
-                            return Err(self.make_error(key_arg.id(), EvalErrorKind::NotEnoughArguments))
+                            return Err(
+                                self.make_error(key_arg.id(), EvalErrorKind::NotEnoughArguments)
+                            );
                         }
                         if let Some((var, _)) = clos.named_parameters.get(key) {
                             let redefined = scope_stack.define(var.clone(), value);
                             debug_assert!(redefined.is_none(), "closure invariant violated");
                         } else {
-                            return Err(self.make_error(key_arg.id(), EvalErrorKind::UnknownKeyword(key.to_name())))
+                            return Err(self.make_error(
+                                key_arg.id(),
+                                EvalErrorKind::UnknownKeyword(key.to_name()),
+                            ));
                         }
                     } else {
                         // Either too many positional arguments, or too many arguments for one keyword.
-                        return Err(self.make_error(key_arg.id(), EvalErrorKind::TooManyArguments))
+                        return Err(self.make_error(key_arg.id(), EvalErrorKind::TooManyArguments));
                     }
                 }
 
                 // 3. Fill in default values for omitted arguments
                 for (key, (var, default)) in clos.named_parameters.iter() {
-                    if ! provided_keywords.contains(key) {
+                    if !provided_keywords.contains(key) {
                         if let Some(default) = default {
                             let redefined = scope_stack.define(var.clone(), Gc::clone(default));
                             debug_assert!(redefined.is_none(), "closure invariant violated");
                         } else {
-                            return Err(self.make_error(head.id(), EvalErrorKind::MissingKeyword(key.to_name())))
+                            return Err(self.make_error(
+                                head.id(),
+                                EvalErrorKind::MissingKeyword(key.to_name()),
+                            ));
                         }
                     }
                 }
@@ -362,7 +386,11 @@ impl<'a> Interpreter<'a> {
         self.eval(arg.pin())
     }
 
-    pub fn pop_argument_eval_parse<P: marshal::ParseValue>(&mut self, args: &mut Gc<Value>, parser: P) -> Result<P::Repr> {
+    pub fn pop_argument_eval_parse<P: marshal::ParseValue>(
+        &mut self,
+        args: &mut Gc<Value>,
+        parser: P,
+    ) -> Result<P::Repr> {
         let arg = self.pop_argument(args)?;
         let value = self.eval(arg.pin())?;
         if let Some(parsed) = parser.parse(value.pin()) {
@@ -419,7 +447,8 @@ mod test {
 
     fn expect_values(input: &str, expected: Vec<Value>) {
         let (vals, mut heap, mut debug) = compile(input);
-        let expected: Vec<GcPin<Value>> = expected.into_iter().map(|v| heap.alloc(v).pin()).collect();
+        let expected: Vec<GcPin<Value>> =
+            expected.into_iter().map(|v| heap.alloc(v).pin()).collect();
         let mut interp = Interpreter::new(&mut heap, &mut debug);
 
         assert_eq!(vals.len(), expected.len());
@@ -434,7 +463,10 @@ mod test {
         expected: Vec<std::result::Result<Value, EvalErrorKind>>,
     ) {
         let (vals, mut heap, mut debug) = compile(input);
-        let expected: Vec<_> = expected.into_iter().map(|e| e.map(|v| heap.alloc(v).pin())).collect();
+        let expected: Vec<_> = expected
+            .into_iter()
+            .map(|e| e.map(|v| heap.alloc(v).pin()))
+            .collect();
         let mut interp = Interpreter::new(&mut heap, &mut debug);
 
         assert_eq!(vals.len(), expected.len());
@@ -735,6 +767,12 @@ mod test {
 
             (frob 1 2 :frob-factor 4)
             (frob 1 2 :flux-compensation 1 :frob-factor 4)
+
+            ; Default values are evaluated at definition time
+            (define the-default 10)
+            (define (foo :bar (x the-default)) x)
+            (foo :bar 0)
+            (foo)
             "#,
             vec![
                 Err(EvalErrorKind::DuplicateKeyword(":frob-factor".into())),
@@ -751,6 +789,10 @@ mod test {
                 Err(EvalErrorKind::NotEnoughArguments),
                 Ok(Value::Int(12)),
                 Ok(Value::Int(11)),
+                Ok(Value::Void),
+                Ok(Value::Void),
+                Ok(Value::Int(0)),
+                Ok(Value::Int(10)),
             ],
         )
     }

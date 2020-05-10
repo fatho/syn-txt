@@ -27,6 +27,10 @@ struct Opt {
     /// The source code of the music.
     #[structopt(parse(from_os_str))]
     source: PathBuf,
+
+    /// Output file (any sox-supported format). Music is played directly if not given.
+    #[structopt(short, long, parse(from_os_str))]
+    output: Option<PathBuf>,
 }
 
 fn main() -> io::Result<()> {
@@ -41,5 +45,5 @@ fn main() -> io::Result<()> {
 
     let source = std::fs::read_to_string(&opt.source)?;
     let song = musicc::eval::eval(&opt.source.to_string_lossy(), &source)?;
-    musicc::output::play(song)
+    musicc::output::play(song, opt.output.as_deref())
 }

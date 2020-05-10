@@ -64,7 +64,9 @@ prim_parser_impl!(bool : Bool => bool);
 prim_parser_impl!(dict : Dict => HashMap<Symbol, Gc<Value>>);
 
 pub fn float_coercing() -> impl ParseValue<Repr=f64> {
-    float().or(int().map(|i| i as f64))
+    float()
+    .or(int().map(|i| i as f64))
+    .or(ratio().map(|r| r.numerator() as f64 / r.denominator() as f64))
 }
 
 pub fn ratio_coercing() -> impl ParseValue<Repr=Rational> {

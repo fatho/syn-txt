@@ -19,6 +19,7 @@ use crate::output;
 use crate::pianoroll::{PianoRoll, Time};
 use crate::synth;
 use crate::wave;
+use std::path::Path;
 
 pub struct Song {
     pub bpm: i64,
@@ -26,7 +27,7 @@ pub struct Song {
 }
 
 /// Play a song on the default speakers.
-pub fn play(song: Song) -> io::Result<()> {
+pub fn play(song: Song, outfile: Option<&Path>) -> io::Result<()> {
     let bpm = song.bpm;
 
     // hard-coded denominator of measures (for now)
@@ -67,8 +68,11 @@ pub fn play(song: Song) -> io::Result<()> {
     let buffer_size = 441;
 
     let mut synth = synth::test::TestSynth::new(sample_rate as f64);
-
-    output::sox::with_sox_player(sample_rate as i32, |audio_stream| {
+    let target = match outfile {
+        None => output::sox::SoxTarget::Play,
+        Some(path) => output::sox::SoxTarget::File(path),
+    };
+    output::sox::with_sox(sample_rate as i32, target, |audio_stream| {
         let mut audio_buffer = AudioBuffer::new(buffer_size);
         let mut byte_buffer = vec![0u8; audio_buffer.byte_len()];
 

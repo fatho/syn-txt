@@ -27,21 +27,22 @@ following code snippet (chords.syn_):
 
   (define melody
       (begin
-          (define (chord length a b c)
+          (define (chord len a b c)
+              (define vel (/ 1 3))
               (list
-                  (note :start 0 :pitch a :length length :velocity (/ 1.0 3))
-                  (note :start 0 :pitch b :length length :velocity (/ 1.0 3))
-                  (note :start 0 :pitch c :length length :velocity (/ 1.0 3))
+                  (note :start 0 :pitch a :length len :velocity vel)
+                  (note :start 0 :pitch b :length len :velocity vel)
+                  (note :start 0 :pitch c :length len :velocity vel)
               )
           )
 
           (sequence-all
               (list
-                  (chord 1/1 "a2" "c3" "e3")
-                  (chord 1/1 "a2" "d3" "f3")
+                  (chord 1/1 "a2"  "c3" "e3")
+                  (chord 1/1 "a2"  "d3" "f3")
                   (chord 1/2 "g#2" "b3" "e3")
                   (chord 1/2 "g#2" "b3" "d3")
-                  (chord 1/1 "a2" "c3" "e3")
+                  (chord 1/1 "a2"  "c3" "e3")
               ))))
 
   (song :bpm 120 :notes melody)

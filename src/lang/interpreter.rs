@@ -3,7 +3,7 @@ use std::{collections::HashSet, fmt};
 use super::debug;
 use super::heap::*;
 use super::primops;
-use super::value::*;
+use super::{marshal, value::*};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EvalError {
@@ -344,6 +344,16 @@ impl<'a> Interpreter<'a> {
     pub fn pop_argument_eval(&mut self, args: &mut Gc<Value>) -> Result<Gc<Value>> {
         let arg = self.pop_argument(args)?;
         self.eval(arg.pin())
+    }
+
+    pub fn pop_argument_eval_parse<P: marshal::ParseValue>(&mut self, args: &mut Gc<Value>, parser: P) -> Result<P::Repr> {
+        let arg = self.pop_argument(args)?;
+        let value = self.eval(arg.pin())?;
+        if let Some(parsed) = parser.parse(value.pin()) {
+            Ok(parsed)
+        } else {
+            Err(self.make_error(args.id(), EvalErrorKind::Type))
+        }
     }
 
     pub fn as_symbol(&self, arg: &Gc<Value>) -> Result<Symbol> {

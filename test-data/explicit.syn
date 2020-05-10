@@ -11,4 +11,26 @@
         (note :start 2/4 :duration 1/4 :pitch "c5")
     ))
 
-(song :bpm 90 :notes melody)
+(define (last-note-end melody)
+    (if (cons? melody)
+        (begin
+            (define note (head melody))
+            (define this-end (+ (get note :start) (get note :duration)))
+            (define rest-end (last-note-end (tail melody)))
+            (if (> this-end rest-end) this-end rest-end)
+        )
+        0))
+
+(define (sequence first next :rest (rest 0))
+    (define first-end (last-note-end first))
+    (print first-end)
+    (define (shift note) (update note :start (+ (get note :start) first-end rest)))
+    (concat first (map shift next)))
+
+(define (transpose-note note amount)
+    (update note :pitch (transpose (get note :pitch) amount)))
+
+(define (transpose-all melody amount)
+    (map (lambda (n) (transpose-note n amount)) melody))
+
+(song :bpm 120 :notes (sequence (transpose-all melody -12) melody :rest 1/4))

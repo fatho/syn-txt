@@ -12,7 +12,7 @@
 
 use crate::lang::heap::*;
 use crate::lang::interpreter::*;
-use crate::lang::value::*;
+use crate::lang::{marshal, value::*};
 use crate::note::Note;
 
 pub static PRIMOPS: &[(&str, PrimOp)] = &[
@@ -21,15 +21,22 @@ pub static PRIMOPS: &[(&str, PrimOp)] = &[
 ];
 
 pub fn prim_transpose(int: &mut Interpreter, mut args: Gc<Value>) -> Result<Gc<Value>> {
-    todo!()
-    // let note = args.extract::<NotePitch>(intp)?;
-    // let amount = args.extract::<i64>(intp)?;
-    // if let Some(new_note) = Note::try_from_midi(note.0.to_midi() as i64 + amount) {
-    //     Ok(NotePitch(new_note).to_value())
-    // } else {
-    //     Err(IntpErr::new(
-    //         args.list_span(),
-    //         IntpErrInfo::Other(format!("transposed pitch exceeds MIDI range")),
-    //     ))
-    // }
+    let note = int.pop_argument_eval_parse(&mut args, note_parser())?;
+    let amount =  int.pop_argument_eval_parse(&mut args, marshal::int())?;
+    int.expect_no_more_arguments(&args)?;
+
+    if let Some(new_note) = Note::try_from_midi(note.to_midi() as i64 + amount) {
+        Ok(int.heap_alloc_value(Value::Int(new_note.to_midi() as i64)))
+    } else {
+        Err(int.make_error(
+            args.id(),
+            EvalErrorKind::Other(format!("transposed pitch exceeds MIDI range")),
+        ))
+    }
+}
+
+
+pub fn note_parser() -> impl marshal::ParseValue<Repr=Note> {
+    use marshal::ParseValue;
+    marshal::string().and_then(|s| Note::named_str(&s)).or(marshal::int().and_then(Note::try_from_midi))
 }

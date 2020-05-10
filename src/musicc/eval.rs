@@ -63,7 +63,7 @@ fn build_song(value: GcPin<Value>) -> Option<output::Song> {
     use marshal::ParseValue;
     let note_parser = marshal::record("note", |fields| {
         Some(PlayedNote {
-            note: fields.get(":pitch", marshal::string().and_then(|s| Note::named_str(&s)).or(marshal::int().and_then(Note::try_from_midi)))?,
+            note: fields.get(":pitch", langext::note_parser())?,
             velocity: fields.get_or(":velocity", Velocity::MAX, marshal::float_coercing().and_then(Velocity::try_from_f64))?,
             start: fields.get(":start", marshal::ratio_coercing())?,
             duration: fields.get(":duration", marshal::ratio_coercing())?,

@@ -65,7 +65,7 @@
         (dict
             :gain 1.0
             :unison 3
-            :unison-detune-cents 10
+            :unison-detune  10
             :wave-shape "supersaw"
             :envelope (envelope :attack 0.1 :decay 1.0 :sustain 0.2 :release 0.1)
             :filter (biquad/lowpass :cutoff 8000.0)

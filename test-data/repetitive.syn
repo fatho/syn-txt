@@ -23,7 +23,7 @@
         (dict
             :gain 2.0
             :unison 3
-            :unison-detune-cents 10
+            :unison-detune  10
             :wave-shape "sine"
             :envelope (envelope :attack 0.1 :decay 1.0 :sustain 0.2 :release 0.1)
         )

@@ -169,10 +169,10 @@ pub mod parsers {
                         "test.unison",
                         marshal::int().map(|i| i as usize),
                     ),
-                    ":unison-detune-cents" => update_if_valid(
+                    ":unison-detune" => update_if_valid(
                         &mut params.unison_detune_cents,
                         value,
-                        "test.unison-detune-cents",
+                        "test.unison-detune",
                         marshal::float_coercing(),
                     ),
                     ":unison-falloff" => update_if_valid(

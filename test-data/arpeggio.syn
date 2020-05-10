@@ -22,7 +22,7 @@
         (dict
             :gain 2.0 ; compensate for lost power in high frequencies
             :unison 3
-            :unison-detune-cents 3
+            :unison-detune  3
             :wave-shape "saw"
             :envelope (envelope :attack 0.01 :decay 1.0 :sustain 0.0 :release 0.2)
             :filter (biquad/lowpass :cutoff 800.0)

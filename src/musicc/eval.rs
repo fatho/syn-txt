@@ -20,15 +20,18 @@ use crate::lang::debug::{DebugTable, SourceLocation};
 use crate::lang::compiler;
 use crate::lang::span::LineMap;
 use crate::lang::marshal;
+use crate::lang::pretty::pretty;
 
 use super::{langext, output};
 use crate::pianoroll::{PlayedNote, PianoRoll};
 use crate::note::Velocity;
 
+use std::path::Path;
+
 /// Evaluate syn.txt source code into a song description.
 ///
 /// TODO: allow including other files.
-pub fn eval(input_name: &str, input: &str) -> io::Result<output::Song> {
+pub fn eval(input_name: &str, input: &str, dump_value: Option<&Path>) -> io::Result<output::Song> {
     let mut heap = Heap::new();
     let mut debug = DebugTable::new();
     let values = compiler::compile_str(&mut heap, &mut debug, input_name, input).unwrap();
@@ -59,10 +62,17 @@ pub fn eval(input_name: &str, input: &str) -> io::Result<output::Song> {
     drop(int);
     heap.gc_cycles();
 
+    if let Some(dump_out) = dump_value {
+        use io::Write;
+        let mut outfile = std::fs::File::create(dump_out)?;
+        writeln!(&mut outfile, "{}", pretty(&final_value))?;
+        drop(outfile);
+    }
+
     build_song(final_value).ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "not a song"))
 }
 
-fn build_song(value: GcPin<Value>) -> Option<output::Song> {
+pub fn song_parser() -> impl marshal::ParseValue<Repr=output::Song> {
     use marshal::ParseValue;
     let note_parser = marshal::record("note", |fields| {
         Some(PlayedNote {
@@ -73,7 +83,7 @@ fn build_song(value: GcPin<Value>) -> Option<output::Song> {
         })
     });
     let note_list_parser = marshal::list(note_parser);
-    let parser = marshal::record("song", move |fields| {
+    marshal::record("song", move |fields| {
         let bpm = fields.get(":bpm", marshal::int())?;
         let note_list = fields.get(":notes", &note_list_parser)?;
         let notes = Some(PianoRoll::with_notes(note_list))?;
@@ -81,8 +91,12 @@ fn build_song(value: GcPin<Value>) -> Option<output::Song> {
             bpm,
             notes,
         })
-    });
-    parser.parse(value)
+    })
+}
+
+fn build_song(value: GcPin<Value>) -> Option<output::Song> {
+    use marshal::ParseValue;
+    song_parser().parse(value)
 }
 
 fn log_error<E: std::fmt::Display>(

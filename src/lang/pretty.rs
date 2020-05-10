@@ -64,7 +64,10 @@ impl PrettyPrinter {
         self.output.push_str("(dict");
         self.indent += 2;
 
-        for (key, value) in d.iter() {
+        let mut sorted_entries: Vec<_> = d.iter().collect();
+        sorted_entries.sort_by_key(|(k, _)| k.as_str());
+
+        for (key, value) in sorted_entries {
             self.output.push('\n');
             self.print_indent();
             self.output.push_str(key.as_str());

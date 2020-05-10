@@ -36,6 +36,9 @@
       in
         blacklistedSrc;
 
+    buildInputs = [sox];
+    NIX_SOX_BIN = "${sox}/bin";
+
     cargoSha256 = "0342vns1krnkkbgzzbsfqhixcfk0qgc79xsajb6g2cbrlhxa4bhz";
   };
 

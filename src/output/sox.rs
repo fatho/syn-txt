@@ -34,14 +34,25 @@ pub fn with_sox<R, F: FnOnce(&mut dyn io::Write) -> io::Result<R>>(
         "f64",
         "/dev/stdin",
     ];
+
+    // For properly recording the sox dependency on nix:
+    let (play, sox) = if let Some(sox_bin) = option_env!("NIX_SOX_BIN") {
+        log::debug!("using sox from nix store {}", sox_bin);
+        let play = Path::new(sox_bin).join("play");
+        let sox = Path::new(sox_bin).join("sox");
+        (play, sox)
+    } else {
+        ("play".into(), "sox".into())
+    };
+
     let mut player = match target {
-        SoxTarget::Play => Command::new("play")
+        SoxTarget::Play => Command::new(&play)
             .args(input_args)
             .stdin(Stdio::piped())
             .stdout(Stdio::null())
             .stderr(Stdio::null())
             .spawn()?,
-        SoxTarget::File(outfile) => Command::new("sox")
+        SoxTarget::File(outfile) => Command::new(&sox)
             .args(input_args)
             .arg(outfile)
             .stdin(Stdio::piped())

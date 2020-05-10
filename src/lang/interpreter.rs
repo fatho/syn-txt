@@ -750,4 +750,17 @@ mod test {
             ],
         );
     }
+
+    #[test]
+    fn test_relational() {
+        expect_values("(< 1 2)", vec![Value::Bool(true)]);
+
+        expect_values("(< 1/2 1/4)", vec![Value::Bool(false)]);
+        expect_values("(> 1/2 1/4)", vec![Value::Bool(true)]);
+        expect_values("(> 3 1/4)", vec![Value::Bool(true)]);
+        expect_values("(<= -3 1/4)", vec![Value::Bool(true)]);
+
+        expect_values("(<= 1.0 1)", vec![Value::Bool(true)]);
+        expect_values("(>= 3.0 2.1)", vec![Value::Bool(true)]);
+    }
 }

@@ -12,6 +12,7 @@ nixpkgs.mkShell {
     rust-analyzer
     clippy
     rustfmt
+    cargo-audit
     # For running the examples
     sox
     # Allows running the update script right from this shell

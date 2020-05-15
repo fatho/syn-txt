@@ -20,7 +20,7 @@
         :name "test"
         :params
         (dict
-            :gain 2.0 ; compensate for lost power in high frequencies
+            :gain 0.9
             :unison 3
             :unison-detune  3
             :wave-shape "saw"

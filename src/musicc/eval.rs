@@ -113,7 +113,6 @@ pub mod parsers {
         Gc, Value,
     };
     use crate::note::Velocity;
-    use crate::pianoroll::{PianoRoll, PlayedNote};
     use crate::synth;
 
     fn update_if_valid<T, P: ParseValue<Repr = T>>(
@@ -249,9 +248,9 @@ pub mod parsers {
         synth()
     }
 
-    pub fn note() -> impl marshal::ParseValue<Repr = PlayedNote> {
+    pub fn note() -> impl marshal::ParseValue<Repr = song::PlayedNote> {
         marshal::record("note", |fields| {
-            Some(PlayedNote {
+            Some(song::PlayedNote {
                 note: fields.get(":pitch", langext::note_parser())?,
                 velocity: fields.get_or(
                     ":velocity",
@@ -266,8 +265,7 @@ pub mod parsers {
 
     pub fn track() -> impl marshal::ParseValue<Repr = song::Track> {
         marshal::record("track", move |fields| {
-            let note_list = fields.get(":notes", &marshal::list(note()))?;
-            let notes = Some(PianoRoll::with_notes(note_list))?;
+            let notes = fields.get(":notes", &marshal::list(note()))?;
             let instrument = fields.get(":instrument", instrument())?;
             Some(song::Track { notes, instrument })
         })

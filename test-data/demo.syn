@@ -46,7 +46,7 @@
     (sequence-all
         (list
             (alternating-bass 8 "c2" "g1" :velocity 0.4)
-            (alternating-bass 8 "c2" "c2" :velocity 0.4)
+            (alternating-bass 8 "g2" "c2" :velocity 0.4)
             (alternating-bass 8 "c2" "g1" :velocity 0.4)
         )))
 

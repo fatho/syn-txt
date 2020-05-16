@@ -120,9 +120,9 @@ impl TrackPlayer {
                 synth::test::TestSynth::with_params(sample_rate as f64, params)
             }
         };
-        let notes: Vec<_> = track
+        let mut notes: Vec<_> = track
             .notes
-            .iter()
+            .into_iter()
             .map(|note| QueuedPlay {
                 begin_sample: time_sig.samples(note.start, sample_rate) as usize,
                 end_sample: time_sig.samples(note.start + note.duration, sample_rate) as usize,
@@ -130,6 +130,9 @@ impl TrackPlayer {
                 velocity: note.velocity,
             })
             .collect();
+        // The notes must be sorted in the order they are played for `fill_buffer` to work correctly.
+        notes.sort_by_key(|n| n.begin_sample);
+
         let samples_total = notes.iter().map(|p| p.end_sample).max().unwrap_or(0);
 
         Self {

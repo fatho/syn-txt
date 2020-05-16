@@ -10,7 +10,9 @@
 
 //! High-level description of a song that can be turned into audio.
 
-use crate::{pianoroll::PianoRoll, synth};
+use crate::synth;
+use crate::rational::Rational;
+use crate::note::{Note, Velocity};
 
 /// A description of a complete song.
 pub struct Song {
@@ -29,5 +31,21 @@ pub enum Instrument {
 /// A single track generating sound by playing notes on an instrument.
 pub struct Track {
     pub instrument: Instrument,
-    pub notes: PianoRoll,
+    pub notes: Vec<PlayedNote>,
+}
+
+/// Time in measures, can be fractional, e.g. a note taking 1/4.
+/// The time is relative until the music is put into a song with a specific measure.
+pub type Time = Rational;
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct PlayedNote {
+    /// Which key was pressed
+    pub note: Note,
+    /// How hard the key was pressed
+    pub velocity: Velocity,
+    /// Time when the key was pressed
+    pub start: Time,
+    /// Time when the key was released
+    pub duration: Time,
 }

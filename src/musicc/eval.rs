@@ -22,14 +22,14 @@ use crate::lang::pretty::pretty;
 use crate::lang::span::LineMap;
 use crate::lang::value::Value;
 
-use super::{langext, output};
+use super::{langext, song};
 
 use std::path::Path;
 
 /// Evaluate syn.txt source code into a song description.
 ///
 /// TODO: allow including other files.
-pub fn eval(input_name: &str, input: &str, dump_value: Option<&Path>) -> io::Result<output::Song> {
+pub fn eval(input_name: &str, input: &str, dump_value: Option<&Path>) -> io::Result<song::Song> {
     let mut heap = Heap::new();
     let mut debug = DebugTable::new();
     let values = compiler::compile_str(&mut heap, &mut debug, input_name, input).unwrap();
@@ -73,7 +73,7 @@ pub fn eval(input_name: &str, input: &str, dump_value: Option<&Path>) -> io::Res
     build_song(final_value).ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "not a song"))
 }
 
-fn build_song(value: GcPin<Value>) -> Option<output::Song> {
+fn build_song(value: GcPin<Value>) -> Option<song::Song> {
     use marshal::ParseValue;
     parsers::song().parse(value)
 }
@@ -107,7 +107,7 @@ fn log_error<E: std::fmt::Display>(
 // ============================ VALUE PARSERS ============================
 
 pub mod parsers {
-    use super::{langext, output};
+    use super::{langext, song};
     use crate::lang::{
         marshal::{self, ParseValue},
         Gc, Value,
@@ -187,18 +187,12 @@ pub mod parsers {
                         "test.wave-shape",
                         wave_shape(),
                     ),
-                    ":envelope" => update_if_valid(
-                        &mut params.envelope,
-                        value,
-                        "test.envelope",
-                        envelope(),
-                    ),
-                    ":filter" => update_if_valid(
-                        &mut params.filter,
-                        value,
-                        "test.filter",
-                        biquad_filter(),
-                    ),
+                    ":envelope" => {
+                        update_if_valid(&mut params.envelope, value, "test.envelope", envelope())
+                    }
+                    ":filter" => {
+                        update_if_valid(&mut params.filter, value, "test.filter", biquad_filter())
+                    }
                     other => log::warn!("unused test synth parameter {}", other),
                 }
             }
@@ -206,13 +200,13 @@ pub mod parsers {
         })
     }
 
-    pub fn synth() -> impl marshal::ParseValue<Repr = output::Instrument> {
+    pub fn synth() -> impl marshal::ParseValue<Repr = song::Instrument> {
         marshal::record("synth", |fields| {
             let name = fields.get(":name", marshal::string())?;
             match name.as_ref() {
                 "test" => fields
                     .get(":params", test_synth_params())
-                    .map(output::Instrument::TestSynth),
+                    .map(song::Instrument::TestSynth),
                 _ => {
                     log::error!("unknown synth {:?}", name);
                     None
@@ -242,7 +236,7 @@ pub mod parsers {
                     let cutoff = fields.get(":cutoff", marshal::float_coercing())?;
                     let q = fields.get(":q", marshal::float_coercing())?;
                     Some(BiquadType::Lowpass { cutoff, q })
-                },
+                }
                 _ => {
                     log::error!("unknown synth {:?}", name);
                     None
@@ -251,12 +245,12 @@ pub mod parsers {
         })
     }
 
-    pub fn instrument() -> impl marshal::ParseValue<Repr = output::Instrument> {
+    pub fn instrument() -> impl marshal::ParseValue<Repr = song::Instrument> {
         synth()
     }
 
-    pub fn song() -> impl marshal::ParseValue<Repr = output::Song> {
-        let note_parser = marshal::record("note", |fields| {
+    pub fn note() -> impl marshal::ParseValue<Repr = PlayedNote> {
+        marshal::record("note", |fields| {
             Some(PlayedNote {
                 note: fields.get(":pitch", langext::note_parser())?,
                 velocity: fields.get_or(
@@ -267,18 +261,23 @@ pub mod parsers {
                 start: fields.get(":start", marshal::ratio_coercing())?,
                 duration: fields.get(":length", marshal::ratio_coercing())?,
             })
-        });
-        let note_list_parser = marshal::list(note_parser);
-        marshal::record("song", move |fields| {
-            let bpm = fields.get(":bpm", marshal::int())?;
-            let note_list = fields.get(":notes", &note_list_parser)?;
+        })
+    }
+
+    pub fn track() -> impl marshal::ParseValue<Repr = song::Track> {
+        marshal::record("track", move |fields| {
+            let note_list = fields.get(":notes", &marshal::list(note()))?;
             let notes = Some(PianoRoll::with_notes(note_list))?;
             let instrument = fields.get(":instrument", instrument())?;
-            Some(output::Song {
-                bpm,
-                notes,
-                instrument,
-            })
+            Some(song::Track { notes, instrument })
+        })
+    }
+
+    pub fn song() -> impl marshal::ParseValue<Repr = song::Song> {
+        marshal::record("song", move |fields| {
+            let bpm = fields.get(":bpm", marshal::int())?;
+            let tracks = fields.get(":tracks", &marshal::list(track()))?;
+            Some(song::Song { bpm, tracks })
         })
     }
 }

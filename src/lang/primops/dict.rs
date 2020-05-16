@@ -69,7 +69,7 @@ pub fn dict_get(int: &mut Interpreter, mut args: Gc<Value>) -> Result<Gc<Value>>
             } else {
                 return Err(int.make_error(arg.id(), EvalErrorKind::IncompatibleArguments));
             };
-            int.expect_no_more_arguments(&mut args)?;
+            int.expect_no_more_arguments(&args)?;
 
             let value = dict.get(key).ok_or_else(|| {
                 int.make_error(arg.id(), EvalErrorKind::UnknownKeyword(key.to_name()))

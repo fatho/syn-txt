@@ -15,8 +15,8 @@
             (arpeggio/maj "c2" 1/4)
         )))
 
-(define instrument 
-    (synth  
+(define instrument
+    (synth
         :name "test"
         :params
         (dict
@@ -29,4 +29,4 @@
         )
     ))
 
-(song :bpm 90 :notes melody :instrument instrument)
+(song/simple :bpm 90 :notes melody :instrument instrument)

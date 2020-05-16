@@ -10,7 +10,6 @@
 
 //! Digital filters galore
 
-
 /// Pre-define types of biquad filters that can be used for deriving
 /// various combinations of `BiquadCoefficients`.
 #[derive(Debug, Clone)]
@@ -18,14 +17,16 @@ pub enum BiquadType {
     /// The identity filter that lets the signal pass unchanged.
     Allpass,
     /// Lowpass filter with the given cutoff frequency and Q factor (controls resonance)
-    Lowpass { cutoff: f64, q: f64 }
+    Lowpass { cutoff: f64, q: f64 },
 }
 
 impl BiquadType {
     pub fn to_coefficients(&self, sample_rate: f64) -> BiquadCoefficients {
         match self {
             BiquadType::Allpass => BiquadCoefficients::allpass(),
-            BiquadType::Lowpass { cutoff, q} => BiquadCoefficients::lowpass(sample_rate, *cutoff, *q),
+            BiquadType::Lowpass { cutoff, q } => {
+                BiquadCoefficients::lowpass(sample_rate, *cutoff, *q)
+            }
         }
     }
 }
@@ -98,6 +99,12 @@ impl Biquad {
         self.y2 = self.y1;
         self.y1 = output;
         output
+    }
+}
+
+impl Default for Biquad {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

@@ -30,7 +30,7 @@ pub fn prim_transpose(int: &mut Interpreter, mut args: Gc<Value>) -> Result<Gc<V
     } else {
         Err(int.make_error(
             args.id(),
-            EvalErrorKind::Other(format!("transposed pitch exceeds MIDI range")),
+            EvalErrorKind::Other("transposed pitch exceeds MIDI range".to_string()),
         ))
     }
 }

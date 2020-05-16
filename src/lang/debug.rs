@@ -54,6 +54,12 @@ impl DebugTable {
     }
 }
 
+impl Default for DebugTable {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 pub struct DebugInfo {
     pub location: Option<SourceLocation>,
 }

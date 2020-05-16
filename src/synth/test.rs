@@ -196,19 +196,16 @@ impl TestSynth {
                     self.active_notes.swap_remove(voice_index);
                 }
             }
-            wave *= self.parameters.gain;
+
             // It's inefficient to compute these every sample, but once
             // we get to automation, we'd have to do that anyway.
             let filter_coefficients = self.parameters.filter.to_coefficients(self.sample_rate);
             wave = Stereo {
                 left: self.biquad.left.step(&filter_coefficients, wave.left),
-                right: self
-                    .biquad
-                    .right
-                    .step(&filter_coefficients, wave.right),
+                right: self.biquad.right.step(&filter_coefficients, wave.right),
             };
 
-            *out_sample += wave;
+            *out_sample += wave * self.parameters.gain;
         }
     }
 }

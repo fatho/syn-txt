@@ -42,7 +42,7 @@ impl Rational {
     /// # Examples
     ///
     /// ```
-    /// use syn_txt::rational::*;
+    /// # use syn_txt::rational::*;
     ///
     /// assert_eq!(Rational::new(10, 5), Rational::new(2, 1));
     /// assert_eq!(Rational::new(-10, -5), Rational::new(6, 3));
@@ -82,6 +82,39 @@ impl Rational {
             num: self.denom,
             denom: self.num,
         }
+    }
+
+    /// Round towards zero.
+    ///
+    /// ```
+    /// # use syn_txt::rational::*;
+    ///
+    /// assert_eq!(Rational::new(10, 5).truncate(), 2);
+    /// assert_eq!(Rational::new(-10, 6).truncate(), -1);
+    /// assert_eq!(Rational::new(13, 7).truncate(), 1);
+    /// ```
+    pub fn truncate(self) -> i64 {
+        self.num / self.denom
+    }
+
+    /// Round to closed integer, half up.
+    ///
+    /// ```
+    /// # use syn_txt::rational::*;
+    ///
+    /// assert_eq!(Rational::new(10, 5).round(), 2);
+    /// assert_eq!(Rational::new(-10, 5).round(), -2);
+    ///
+    /// assert_eq!(Rational::new(10, 4).round(), 3);
+    /// assert_eq!(Rational::new(-10, 4).round(), -3);
+    ///
+    /// assert_eq!(Rational::new(3, 7).round(), 0);
+    /// assert_eq!(Rational::new(4, 7).round(), 1);
+    /// assert_eq!(Rational::new(-3, 7).round(), 0);
+    /// assert_eq!(Rational::new(-4, 7).round(), -1);
+    /// ```
+    pub fn round(self) -> i64 {
+        (self.num + self.num.signum() * self.denom / 2) / self.denom
     }
 
     // ==================== Predicates ====================
@@ -150,7 +183,7 @@ impl ops::Div for Rational {
 /// # Examples
 ///
 /// ```
-/// use syn_txt::rational::*;
+/// # use syn_txt::rational::*;
 ///
 /// assert_eq!(Rational::new(5, 1) % Rational::new(3, 1), Rational::new(2, 1));
 /// assert_eq!(Rational::new(-5, 1) % Rational::new(3, 1), Rational::new(-2, 1));
@@ -177,11 +210,17 @@ impl ops::Mul<Int> for Rational {
     }
 }
 
+/// ```
+/// # use syn_txt::rational::*;
+/// assert_eq!(Rational::new(1, 4) / 2, Rational::new(1, 8));
+/// assert_eq!(Rational::new(9, 13) / 3, Rational::new(3, 13));
+/// ```
 impl ops::Div<Int> for Rational {
     type Output = Rational;
 
+    #[allow(clippy::suspicious_arithmetic_impl)]
     fn div(self, rhs: Int) -> Self::Output {
-        Rational::new(self.num, self.denom / rhs)
+        Rational::new(self.num, self.denom * rhs)
     }
 }
 

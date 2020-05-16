@@ -13,3 +13,4 @@
 pub mod eval;
 pub mod langext;
 pub mod output;
+pub mod song;

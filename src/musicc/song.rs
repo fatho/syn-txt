@@ -22,3 +22,8 @@ pub struct Song {
 pub enum Instrument {
     TestSynth(synth::test::Params),
 }
+
+pub struct Track {
+    pub instrument: Instrument,
+    pub notes: PianoRoll,
+}

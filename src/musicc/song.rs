@@ -13,16 +13,21 @@
 
 use crate::{synth, pianoroll::PianoRoll};
 
+/// A description of a complete song.
 pub struct Song {
+    /// The speed of the song measured in beats per minute.
     pub bpm: i64,
-    pub notes: PianoRoll,
-    pub instrument: Instrument,
+    /// The tracks of the song, playing simultaneously.
+    pub tracks: Vec<Track>,
 }
 
+/// The instrument used for playing a track.
 pub enum Instrument {
+    /// The built-in test synthesizer.
     TestSynth(synth::test::Params),
 }
 
+/// A single track generating sound by playing notes on an instrument.
 pub struct Track {
     pub instrument: Instrument,
     pub notes: PianoRoll,

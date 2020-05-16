@@ -255,8 +255,8 @@ pub mod parsers {
         synth()
     }
 
-    pub fn song() -> impl marshal::ParseValue<Repr = song::Song> {
-        let note_parser = marshal::record("note", |fields| {
+    pub fn note() -> impl marshal::ParseValue<Repr = PlayedNote> {
+        marshal::record("note", |fields| {
             Some(PlayedNote {
                 note: fields.get(":pitch", langext::note_parser())?,
                 velocity: fields.get_or(
@@ -267,17 +267,28 @@ pub mod parsers {
                 start: fields.get(":start", marshal::ratio_coercing())?,
                 duration: fields.get(":length", marshal::ratio_coercing())?,
             })
-        });
-        let note_list_parser = marshal::list(note_parser);
-        marshal::record("song", move |fields| {
-            let bpm = fields.get(":bpm", marshal::int())?;
-            let note_list = fields.get(":notes", &note_list_parser)?;
+        })
+    }
+
+    pub fn track() -> impl marshal::ParseValue<Repr = song::Track> {
+        marshal::record("track", move |fields| {
+            let note_list = fields.get(":notes", &marshal::list(note()))?;
             let notes = Some(PianoRoll::with_notes(note_list))?;
             let instrument = fields.get(":instrument", instrument())?;
-            Some(song::Song {
-                bpm,
+            Some(song::Track {
                 notes,
                 instrument,
+            })
+        })
+    }
+
+    pub fn song() -> impl marshal::ParseValue<Repr = song::Song> {
+        marshal::record("song", move |fields| {
+            let bpm = fields.get(":bpm", marshal::int())?;
+            let tracks = fields.get(":tracks", &marshal::list(track()))?;
+            Some(song::Song {
+                bpm,
+                tracks,
             })
         })
     }

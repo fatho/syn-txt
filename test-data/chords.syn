@@ -18,7 +18,7 @@
                 (chord 1/1 "a2" "c3" "e3")
             ))))
 
-(define pad 
+(define pad
     (synth
         ; The name determines which synthesizer to instantiate, but
         ; currently, there is only the "test" synthesizer.
@@ -43,4 +43,4 @@
                     :release 0.1  ; seconds
                     ))))
 
-(song :bpm 120 :notes melody :instrument pad)
+(song/simple :bpm 120 :notes melody :instrument pad)

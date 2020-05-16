@@ -29,12 +29,9 @@ pub fn play(song: Song, outfile: Option<&Path>) -> io::Result<()> {
 
     let sig = TimeSig { beats_per_minute: song.bpm, beat_unit: 4 };
 
-    let mut player = TrackPlayer::new(sample_rate, sig, Track {
-        instrument: song.instrument,
-        notes: song.notes,
-    });
+    let mut players: Vec<_> = song.tracks.into_iter().map(|track| TrackPlayer::new(sample_rate, sig, track)).collect();
 
-    let max_samples = player.samples_total() + 2 * sample_rate as usize;
+    let max_samples = players.iter().map(|p| p.samples_total()).max().unwrap_or(0) + 2 * sample_rate as usize;
 
     info!("playing at {} bpm at {} Hz", song.bpm, sample_rate);
     info!(
@@ -57,7 +54,9 @@ pub fn play(song: Song, outfile: Option<&Path>) -> io::Result<()> {
         let mut samples_total = 0;
         while samples_total < max_samples {
             audio_buffer.fill_zero();
-            player.fill_buffer(audio_buffer.samples_mut());
+            for player in players.iter_mut() {
+                player.fill_buffer(audio_buffer.samples_mut());
+            }
 
             let n = audio_buffer.copy_bytes_to(&mut byte_buffer);
             assert_eq!(n, audio_buffer.len());
@@ -74,6 +73,7 @@ pub fn play(song: Song, outfile: Option<&Path>) -> io::Result<()> {
 /// - the length of a single beat
 /// Note that this omits the number of beats per bar,
 /// which is not needed for computing time from beats.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct TimeSig {
     /// How many beats per minute
     pub beats_per_minute: i64,

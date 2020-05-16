@@ -16,8 +16,8 @@
                 (repeat-note 3 :pitch "c5" :length 1/16)
             ))))
 
-(define instrument 
-    (synth  
+(define instrument
+    (synth
         :name "test" ; currently, there is only the "test" synthesizer
         :params
         (dict
@@ -29,4 +29,4 @@
         )
     ))
 
-(song :bpm 90 :notes melody :instrument instrument)
+(song/simple :bpm 90 :notes melody :instrument instrument)

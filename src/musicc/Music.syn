@@ -6,6 +6,8 @@
 
 ; Create a note object with absolute timing.
 (define (note :start start :length length :pitch pitch :velocity (velocity 1.0))
+    ; The convention is that objects have a :__type__ key indicating its type.
+    ; This type annotation is used when parsing the values in the host.
     (dict :__type__ "note" :start start :length length :pitch pitch :velocity velocity))
 
 ; Instantiate a synthesizer of type `name`, with the given synthesizer specific settings.
@@ -15,11 +17,17 @@
 (define __default-synth__
     (synth :name "test" :params (dict)))
 
+; Create a track object
+(define (track :notes notes :instrument (instrument __default-synth__))
+    (dict :__type__ "track" :notes notes :instrument instrument))
+
 ; Create a song object
-(define (song :bpm bpm :notes notes :instrument (instrument __default-synth__))
-    ; The convention is that objects have a :__type__ key indicating its type.
-    ; This type annotation is used when parsing the values in the host.
-    (dict :__type__ "song" :bpm bpm :notes notes :instrument instrument))
+(define (song :bpm bpm :tracks tracks)
+    (dict :__type__ "song" :bpm bpm :tracks tracks))
+
+; Create a simple song with just one track
+(define (song/simple :bpm bpm :notes notes :instrument (instrument __default-synth__))
+    (song :bpm bpm :tracks (list (track :notes notes :instrument instrument))))
 
 ; Create an ASDR envelope, or just an AR envelope.
 (define (envelope :attack attack :decay (decay 0.0) :sustain (sustain 1.0) :release release)

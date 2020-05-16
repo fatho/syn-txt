@@ -10,8 +10,7 @@
 
 //! High-level description of a song that can be turned into audio.
 
-
-use crate::{synth, pianoroll::PianoRoll};
+use crate::{pianoroll::PianoRoll, synth};
 
 /// A description of a complete song.
 pub struct Song {

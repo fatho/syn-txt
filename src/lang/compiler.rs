@@ -135,7 +135,11 @@ pub fn compile_str<'a>(
 
     // Prevent log spam when compiling internal modules. They are expected to work.
     let is_internal = filename.starts_with('<') && filename.ends_with('>');
-    let status_level = if is_internal { log::Level::Debug } else { log::Level::Info };
+    let status_level = if is_internal {
+        log::Level::Debug
+    } else {
+        log::Level::Info
+    };
 
     log::log!(status_level, "lexing {}", filename);
     while let Some(token_or_error) = lex.next_token() {

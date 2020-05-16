@@ -14,24 +14,31 @@ use std::io;
 
 use log::{info, trace};
 
+use super::song::{Instrument, Song, Track};
 use crate::note::{Note, Velocity};
 use crate::output;
 use crate::synth;
 use crate::{rational::Rational, wave};
 use std::{collections::BinaryHeap, path::Path};
-use super::song::{Instrument, Song, Track};
 use wave::Stereo;
-
 
 /// Play a song on the default speakers.
 pub fn play(song: Song, outfile: Option<&Path>) -> io::Result<()> {
     let sample_rate = 44100;
 
-    let sig = TimeSig { beats_per_minute: song.bpm, beat_unit: 4 };
+    let sig = TimeSig {
+        beats_per_minute: song.bpm,
+        beat_unit: 4,
+    };
 
-    let mut players: Vec<_> = song.tracks.into_iter().map(|track| TrackPlayer::new(sample_rate, sig, track)).collect();
+    let mut players: Vec<_> = song
+        .tracks
+        .into_iter()
+        .map(|track| TrackPlayer::new(sample_rate, sig, track))
+        .collect();
 
-    let max_samples = players.iter().map(|p| p.samples_total()).max().unwrap_or(0) + 2 * sample_rate as usize;
+    let max_samples =
+        players.iter().map(|p| p.samples_total()).max().unwrap_or(0) + 2 * sample_rate as usize;
 
     info!("playing at {} bpm at {} Hz", song.bpm, sample_rate);
     info!(
@@ -109,10 +116,12 @@ pub struct TrackPlayer {
 impl TrackPlayer {
     pub fn new(sample_rate: i64, time_sig: TimeSig, track: Track) -> Self {
         let instrument = match track.instrument {
-            Instrument::TestSynth(params) =>
+            Instrument::TestSynth(params) => {
                 synth::test::TestSynth::with_params(sample_rate as f64, params)
+            }
         };
-        let notes: Vec<_> = track.notes
+        let notes: Vec<_> = track
+            .notes
             .iter()
             .map(|note| QueuedPlay {
                 begin_sample: time_sig.samples(note.start, sample_rate) as usize,
@@ -145,10 +154,15 @@ impl TrackPlayer {
         let buffer_end = self.samples_processed + buffer.len();
 
         // process all notes that are due in the current window
-        while self.next_note < self.notes.len() && self.notes[self.next_note].begin_sample < buffer_end {
+        while self.next_note < self.notes.len()
+            && self.notes[self.next_note].begin_sample < buffer_end
+        {
             let note = &self.notes[self.next_note];
-            let handle =
-                self.instrument.play_note(note.begin_sample - buffer_start, note.note, note.velocity);
+            let handle = self.instrument.play_note(
+                note.begin_sample - buffer_start,
+                note.note,
+                note.velocity,
+            );
             trace!(
                 "{:7}: play {:?} as {:?}",
                 note.begin_sample,
@@ -166,9 +180,14 @@ impl TrackPlayer {
         // to catch notes that last shorter than one buffer window.
         while let Some(release) = self.note_releases.peek() {
             if release.end_sample < buffer_end {
-                trace!("{:7}: release {:?}", release.end_sample, release.note_handle);
+                trace!(
+                    "{:7}: release {:?}",
+                    release.end_sample,
+                    release.note_handle
+                );
                 let release = self.note_releases.pop().unwrap();
-                self.instrument.release_note(release.end_sample - buffer_start, release.note_handle)
+                self.instrument
+                    .release_note(release.end_sample - buffer_start, release.note_handle)
             } else {
                 break;
             }

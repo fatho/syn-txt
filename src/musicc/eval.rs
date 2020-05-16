@@ -187,18 +187,12 @@ pub mod parsers {
                         "test.wave-shape",
                         wave_shape(),
                     ),
-                    ":envelope" => update_if_valid(
-                        &mut params.envelope,
-                        value,
-                        "test.envelope",
-                        envelope(),
-                    ),
-                    ":filter" => update_if_valid(
-                        &mut params.filter,
-                        value,
-                        "test.filter",
-                        biquad_filter(),
-                    ),
+                    ":envelope" => {
+                        update_if_valid(&mut params.envelope, value, "test.envelope", envelope())
+                    }
+                    ":filter" => {
+                        update_if_valid(&mut params.filter, value, "test.filter", biquad_filter())
+                    }
                     other => log::warn!("unused test synth parameter {}", other),
                 }
             }
@@ -242,7 +236,7 @@ pub mod parsers {
                     let cutoff = fields.get(":cutoff", marshal::float_coercing())?;
                     let q = fields.get(":q", marshal::float_coercing())?;
                     Some(BiquadType::Lowpass { cutoff, q })
-                },
+                }
                 _ => {
                     log::error!("unknown synth {:?}", name);
                     None
@@ -275,10 +269,7 @@ pub mod parsers {
             let note_list = fields.get(":notes", &marshal::list(note()))?;
             let notes = Some(PianoRoll::with_notes(note_list))?;
             let instrument = fields.get(":instrument", instrument())?;
-            Some(song::Track {
-                notes,
-                instrument,
-            })
+            Some(song::Track { notes, instrument })
         })
     }
 
@@ -286,10 +277,7 @@ pub mod parsers {
         marshal::record("song", move |fields| {
             let bpm = fields.get(":bpm", marshal::int())?;
             let tracks = fields.get(":tracks", &marshal::list(track()))?;
-            Some(song::Song {
-                bpm,
-                tracks,
-            })
+            Some(song::Song { bpm, tracks })
         })
     }
 }

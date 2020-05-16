@@ -17,18 +17,17 @@ The goal is to have a DSL based on S-Expressions for
 - allow configuring the synthesizer from within the language
 - add list value and combinators to language (useful for defining chords on the fly)
 - add record accessors (in the form of dicts)
+- allow multiple tracks to play at once on separate instruments
 
 ## Now
 
-- document existing functionality
-- implement useful combinators as built-ins
+- design interface for composing tracks both vertically (playing multiple tracks at once)
+  and horizontally (sequencing tracks and stacks of tracks), like it is possible with notes already.
 - refactor syn_txt::pianoroll interface to be less ad-hoc (or get rid of it completely?)
-- allow multiple tracks to play at once on separate instruments
 
 ## Later
 
-- design interface for composing tracks both vertically (playing multiple tracks at once)
-  and horizontally (sequencing tracks and stacks of tracks), like it is possible with notes already.
+- document existing functionality
 - implement sample tracks (playing samples directly, without going through notes)
 - implement more instruments
 

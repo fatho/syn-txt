@@ -60,10 +60,30 @@
     (define (shift note) (update note :start (+ (get note :start) first-end rest)))
     (concat first (map shift next)))
 
-; Play a list of melodies in sequence.
-(define (sequence-all melodies)
-    ; TODO: inefficient O(n^2)
-    (reduce-left sequence nil melodies))
+; ; Play a list of melodies in sequence.
+(define sequence-all
+    (begin
+        (define (go-next melodies offset)
+            (if (cons? melodies)
+                ; process next melody
+                (go-one (head melodies) offset offset (tail melodies))
+                nil
+            ))
+        (define (go-one melody cur-offset max-offset melodies)
+            (if (cons? melody)
+                (begin
+                    (define note (head melody))
+                    (define shifted-note (update note :start (+ (get note :start) cur-offset)))
+                    (define this-end (+ (get shifted-note :start) (get note :length)))
+                    (cons
+                        ; shift the current note
+                        (update note :start (+ (get note :start) cur-offset))
+                        ; and shift the remaining notes
+                        (go-one (tail melody) cur-offset (max max-offset this-end) melodies)
+                    ))
+                ; call the continuation
+                (go-next melodies max-offset)))
+        (lambda (melodies) (go-next melodies 0))))
 
 ; Transpose a single note by the given amount of semitones.
 (define (transpose-note note semitones)

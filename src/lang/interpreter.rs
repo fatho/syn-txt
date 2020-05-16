@@ -687,6 +687,11 @@ mod test {
             (reduce-right - (list 1 1 1) 4)
 
             (= (imap * (list 1 2 3)) (list 0 2 6))
+
+            (max -3 5)
+            (max 5 -3)
+            (min -3 5)
+            (min 5 -3)
             "#,
             vec![
                 Value::Void,
@@ -706,6 +711,10 @@ mod test {
                 Value::Int(1),
                 Value::Int(-3),
                 Value::Bool(true),
+                Value::Int(5),
+                Value::Int(5),
+                Value::Int(-3),
+                Value::Int(-3),
             ],
         );
         // expect_values(

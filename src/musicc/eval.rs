@@ -22,14 +22,14 @@ use crate::lang::pretty::pretty;
 use crate::lang::span::LineMap;
 use crate::lang::value::Value;
 
-use super::{langext, output};
+use super::{langext, song};
 
 use std::path::Path;
 
 /// Evaluate syn.txt source code into a song description.
 ///
 /// TODO: allow including other files.
-pub fn eval(input_name: &str, input: &str, dump_value: Option<&Path>) -> io::Result<output::Song> {
+pub fn eval(input_name: &str, input: &str, dump_value: Option<&Path>) -> io::Result<song::Song> {
     let mut heap = Heap::new();
     let mut debug = DebugTable::new();
     let values = compiler::compile_str(&mut heap, &mut debug, input_name, input).unwrap();
@@ -73,7 +73,7 @@ pub fn eval(input_name: &str, input: &str, dump_value: Option<&Path>) -> io::Res
     build_song(final_value).ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "not a song"))
 }
 
-fn build_song(value: GcPin<Value>) -> Option<output::Song> {
+fn build_song(value: GcPin<Value>) -> Option<song::Song> {
     use marshal::ParseValue;
     parsers::song().parse(value)
 }
@@ -107,7 +107,7 @@ fn log_error<E: std::fmt::Display>(
 // ============================ VALUE PARSERS ============================
 
 pub mod parsers {
-    use super::{langext, output};
+    use super::{langext, song};
     use crate::lang::{
         marshal::{self, ParseValue},
         Gc, Value,
@@ -206,13 +206,13 @@ pub mod parsers {
         })
     }
 
-    pub fn synth() -> impl marshal::ParseValue<Repr = output::Instrument> {
+    pub fn synth() -> impl marshal::ParseValue<Repr = song::Instrument> {
         marshal::record("synth", |fields| {
             let name = fields.get(":name", marshal::string())?;
             match name.as_ref() {
                 "test" => fields
                     .get(":params", test_synth_params())
-                    .map(output::Instrument::TestSynth),
+                    .map(song::Instrument::TestSynth),
                 _ => {
                     log::error!("unknown synth {:?}", name);
                     None
@@ -251,11 +251,11 @@ pub mod parsers {
         })
     }
 
-    pub fn instrument() -> impl marshal::ParseValue<Repr = output::Instrument> {
+    pub fn instrument() -> impl marshal::ParseValue<Repr = song::Instrument> {
         synth()
     }
 
-    pub fn song() -> impl marshal::ParseValue<Repr = output::Song> {
+    pub fn song() -> impl marshal::ParseValue<Repr = song::Song> {
         let note_parser = marshal::record("note", |fields| {
             Some(PlayedNote {
                 note: fields.get(":pitch", langext::note_parser())?,
@@ -274,7 +274,7 @@ pub mod parsers {
             let note_list = fields.get(":notes", &note_list_parser)?;
             let notes = Some(PianoRoll::with_notes(note_list))?;
             let instrument = fields.get(":instrument", instrument())?;
-            Some(output::Song {
+            Some(song::Song {
                 bpm,
                 notes,
                 instrument,

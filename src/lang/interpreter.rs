@@ -248,7 +248,6 @@ impl<'a> Interpreter<'a> {
     }
 
     pub fn heap_alloc<T: Trace + std::fmt::Debug + 'static>(&mut self, value: T) -> Gc<T> {
-        // TODO: share heap allocation for small values
         self.heap.alloc(value)
     }
 

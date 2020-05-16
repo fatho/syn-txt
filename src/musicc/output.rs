@@ -16,20 +16,12 @@ use log::{info, trace};
 
 use crate::note::{Note, Velocity};
 use crate::output;
-use crate::pianoroll::{PianoRoll, Time};
+use crate::pianoroll::Time;
 use crate::synth;
 use crate::wave;
 use std::path::Path;
+use super::song::{Instrument, Song};
 
-pub struct Song {
-    pub bpm: i64,
-    pub notes: PianoRoll,
-    pub instrument: Instrument,
-}
-
-pub enum Instrument {
-    TestSynth(synth::test::Params),
-}
 
 /// Play a song on the default speakers.
 pub fn play(song: Song, outfile: Option<&Path>) -> io::Result<()> {

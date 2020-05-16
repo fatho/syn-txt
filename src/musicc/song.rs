@@ -8,9 +8,17 @@
 // A copy of the license can be found in the LICENSE file in the root of
 // this repository.
 
-//! Implementation of the music compiler (musicc).
+//! High-level description of a song that can be turned into audio.
 
-pub mod eval;
-pub mod langext;
-pub mod output;
-pub mod song;
+
+use crate::{synth, pianoroll::PianoRoll};
+
+pub struct Song {
+    pub bpm: i64,
+    pub notes: PianoRoll,
+    pub instrument: Instrument,
+}
+
+pub enum Instrument {
+    TestSynth(synth::test::Params),
+}

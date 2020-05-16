@@ -27,6 +27,12 @@ pub struct Heap {
     unique_id: usize,
 }
 
+impl Default for Heap {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Heap {
     pub fn new() -> Self {
         Self {

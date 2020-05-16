@@ -121,7 +121,7 @@ impl<'a> Context<'a> {
     }
 }
 
-pub fn compile_str<'a>(
+pub fn compile_str(
     heap: &mut heap::Heap,
     debug_table: &mut debug::DebugTable,
     filename: &str,

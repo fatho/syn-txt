@@ -102,6 +102,12 @@ impl Biquad {
     }
 }
 
+impl Default for Biquad {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 // Alternative form of the biquad filter:
 
 // #[derive(Debug, Clone)]

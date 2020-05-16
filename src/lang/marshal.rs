@@ -98,7 +98,7 @@ pub fn float_coercing() -> impl ParseValue<Repr = f64> {
 }
 
 pub fn ratio_coercing() -> impl ParseValue<Repr = Rational> {
-    ratio().or(int().map(|i| Rational::from_int(i)))
+    ratio().or(int().map(Rational::from_int))
 }
 
 pub struct ListParser<I> {

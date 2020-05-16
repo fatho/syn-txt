@@ -1,15 +1,15 @@
 self: super:
+let
+  upstream = builtins.fromJSON (builtins.readFile ./rust-analyzer.json);
+in
 {
-  rust-analyzer = self.stdenv.mkDerivation rec {
+  rust-analyzer = self.stdenv.mkDerivation {
     pname = "rust-analyzer";
-    version = "2020-05-04";
+    version = upstream.version;
     # We use the precompiled binary, because the latest rust-analyzer only
     # builds with the latest cargo version, which nixpkgs-unstable does not
     # provide yet.
-    src = self.fetchurl {
-      url = "https://github.com/rust-analyzer/rust-analyzer/releases/download/${version}/rust-analyzer-linux";
-      sha256 = "1bdmfcqgcddkbmpnv5v632zdvxp7q3nn81nr84nf1a225y4fzn8f";
-    };
+    src = self.fetchurl { inherit (upstream) url sha256; };
     phases = ["buildPhase" "installPhase" "fixupPhase"];
     # However, the precompiled binary is not expecting the path layout of NixOS,
     # therefore we first patch it to use the correct dynamic linker.

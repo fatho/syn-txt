@@ -1,15 +1,10 @@
-{ nixpkgs ? import ./nix/nixpkgs-pinned.nix {
-    overlays = [
-      (import ./nix/rust-analyzer.nix)
-    ];
-  }
+{ nixpkgs ? import ./nix/nixpkgs-pinned.nix {}
 }:
 nixpkgs.mkShell {
   name = "syntxt-dev";
   nativeBuildInputs = with nixpkgs; [
     rustc
     cargo
-    rust-analyzer
     clippy
     rustfmt
     cargo-audit

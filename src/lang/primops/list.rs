@@ -77,7 +77,7 @@ pub fn is_nil(int: &mut Interpreter, mut args: Gc<Value>) -> Result<Gc<Value>> {
     Ok(int.heap_alloc_value(Value::Bool(list.pin().is_nil())))
 }
 
-/// Map over a list with some function return a new value to take its place.
+/// Map over a list with some function to return a new value to take its place.
 pub fn map(int: &mut Interpreter, mut args: Gc<Value>) -> Result<Gc<Value>> {
     let fun = int.pop_argument_eval(&mut args)?;
     let mut list = int.pop_argument_eval(&mut args)?;
@@ -108,6 +108,29 @@ pub fn concat(int: &mut Interpreter, mut args: Gc<Value>) -> Result<Gc<Value>> {
             inner = inner_tail.pin();
         }
         args = Gc::clone(tail);
+    }
+
+    rev_list_from_iter(int, elems.into_iter().rev())
+}
+
+/// Map over a list with some function returning a list, concatenating all the results.
+pub fn concat_map(int: &mut Interpreter, mut args: Gc<Value>) -> Result<Gc<Value>> {
+    let fun = int.pop_argument_eval(&mut args)?;
+    let mut list = int.pop_argument_eval(&mut args)?;
+    int.expect_no_more_arguments(&args)?;
+
+    let mut elems = Vec::new();
+    let nil = int.heap_alloc_value(Value::Nil);
+
+    while let Value::Cons(head, tail) = &*list.pin() {
+        let value = int.eval(head.pin())?;
+        let fun_args = int.heap_alloc_value(Value::Cons(value, Gc::clone(&nil)));
+        let mut result = int.eval_call(Gc::clone(&fun), fun_args)?.pin();
+        while let Value::Cons(inner_head, inner_tail) = &*result {
+            elems.push(Gc::clone(inner_head));
+            result = inner_tail.pin();
+        }
+        list = Gc::clone(tail);
     }
 
     rev_list_from_iter(int, elems.into_iter().rev())

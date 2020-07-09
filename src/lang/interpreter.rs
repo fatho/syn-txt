@@ -150,6 +150,7 @@ impl<'a> Interpreter<'a> {
             ("reverse", PrimOp(primops::reverse)),
             ("for-each", PrimOp(primops::for_each)),
             ("map", PrimOp(primops::map)),
+            ("concat-map", PrimOp(primops::concat_map)),
             // ("range", PrimOp(primops::range)),
             // dicts
             ("dict", PrimOp(primops::dict)),
@@ -692,6 +693,10 @@ mod test {
             (max 5 -3)
             (min -3 5)
             (min 5 -3)
+
+            (=
+                (concat-map (lambda (x) (list x (+ 1 x))) (list 1 2 3))
+                (list 1 2 2 3 3 4))
             "#,
             vec![
                 Value::Void,
@@ -715,6 +720,7 @@ mod test {
                 Value::Int(5),
                 Value::Int(-3),
                 Value::Int(-3),
+                Value::Bool(true),
             ],
         );
         // expect_values(

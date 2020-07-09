@@ -54,6 +54,12 @@
         )
         0))
 
+; Move the start of a note by the given ofset
+(define (shift offset note) (update note :start (+ (get note :start) offset)))
+; Move all notes in this melody by the given offset 
+(define (shift-all offset melody)
+    (map (lambda (n) (shift offset n)) melody))
+
 ; Play two melodies in sequence.
 (define (sequence first next :rest (rest 0))
     (define first-end (last-note-end first))
@@ -92,3 +98,15 @@
 ; Transpose a whole melody by the given amount of semitones.
 (define (transpose-all melody semitones)
     (map (lambda (n) (transpose-note n semitones)) melody))
+
+; Repeat a given melody `n` times at multiples of `len`.
+(define (repeat n melody :length (len nil))
+    ; TODO: make if without else
+    (if (nil? len) 
+        (set! len (last-note-end melody))
+        (begin)
+    )
+    (concat-map 
+        (lambda (i)
+            (shift-all (* i len) melody))
+        (range 0 (- n 1))))

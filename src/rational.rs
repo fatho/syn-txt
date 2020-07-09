@@ -210,6 +210,14 @@ impl ops::Mul<Int> for Rational {
     }
 }
 
+impl ops::Mul<Rational> for Int {
+    type Output = Rational;
+
+    fn mul(self, rhs: Rational) -> Self::Output {
+        Rational::new(self * rhs.num, rhs.denom)
+    }
+}
+
 /// ```
 /// # use syn_txt::rational::*;
 /// assert_eq!(Rational::new(1, 4) / 2, Rational::new(1, 8));

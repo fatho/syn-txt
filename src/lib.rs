@@ -9,7 +9,6 @@
 // this repository.
 
 // Language implementation
-pub mod lang;
 pub mod musicc;
 
 // modules for making sounds

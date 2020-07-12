@@ -1,8 +1,4 @@
-{ nixpkgs ? import ./nix/nixpkgs-pinned.nix {
-    overlays = [
-      (import ./nix/rust-analyzer.nix)
-    ];
-  }
+{ nixpkgs ? import ./nix/nixpkgs-pinned.nix {}
 }:
 {
   syn-txt = with nixpkgs; rustPlatform.buildRustPackage rec {

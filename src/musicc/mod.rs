@@ -16,9 +16,7 @@ pub mod song;
 use std::io;
 use std::path::PathBuf;
 
-use simple_logger;
 use structopt::StructOpt;
-
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "musicc", about = "Compiling code into music")]

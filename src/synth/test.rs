@@ -10,12 +10,11 @@
 
 //! Exemplary implementation of a synthesizer.
 
-use super::envelope::*;
-use super::filter;
-use super::oscillator::*;
-use super::tuning::*;
-
+use crate::envelope::*;
+use crate::filter;
 use crate::note::*;
+use crate::oscillator::*;
+use crate::tuning::*;
 use crate::wave::*;
 
 pub struct TestSynth {

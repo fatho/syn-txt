@@ -10,9 +10,9 @@
 
 //! High-level description of a song that can be turned into audio.
 
-use crate::synth;
-use crate::rational::Rational;
 use crate::note::{Note, Velocity};
+use crate::rational::Rational;
+use crate::synth;
 
 /// A description of a complete song.
 #[derive(Debug)]

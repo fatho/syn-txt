@@ -17,7 +17,7 @@ use crate::note::*;
 ///
 /// ```
 /// use syn_txt::note::*;
-/// use syn_txt::synth::tuning::*;
+/// use syn_txt::tuning::*;
 /// assert_eq!(Tuning::default().frequency(Note::from_midi(57)), 220.0);
 /// assert_eq!(Tuning::default().frequency(Note::from_midi(81)), 880.0);
 /// ```

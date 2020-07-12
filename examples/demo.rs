@@ -1,14 +1,14 @@
-use syn_txt::musicc;
-use syn_txt::musicc::song::*;
 use syn_txt::note;
+use syn_txt::play;
 use syn_txt::rational::Rational;
+use syn_txt::song::*;
 use syn_txt::synth;
 
 use std::io;
 
 #[rustfmt::skip]
 fn main() -> io::Result<()> {
-    musicc::song_main(|| {
+    play::song_main(|| {
         let velocity = note::Velocity::from_f64(1.0);
         let eigth = Rational::new(1, 8);
         let song = Song {

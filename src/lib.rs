@@ -8,9 +8,6 @@
 // A copy of the license can be found in the LICENSE file in the root of
 // this repository.
 
-// Language implementation
-pub mod musicc;
-
 // modules for making sounds
 pub mod envelope;
 pub mod filter;
@@ -20,6 +17,10 @@ pub mod synth;
 pub mod tuning;
 pub mod util;
 pub mod wave;
+
+// Building songs
+pub mod play;
+pub mod song;
 
 // audio I/O
 pub mod output;

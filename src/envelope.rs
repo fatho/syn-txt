@@ -17,7 +17,7 @@
 /// # Example
 ///
 /// ```
-/// use syn_txt::synth::envelope::*;
+/// use syn_txt::envelope::*;
 /// let e = ADSR {
 ///     attack: 0.25,
 ///     decay: 0.5,

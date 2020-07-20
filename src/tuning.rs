@@ -39,7 +39,7 @@ impl Tuning {
 impl Default for Tuning {
     fn default() -> Self {
         Tuning {
-            reference_note: Note::named(NoteName::A, NoteOffset::Base, 4),
+            reference_note: Note::named(NoteName::A, Accidental::Base, 4),
             reference_frequency: 440.0,
         }
     }

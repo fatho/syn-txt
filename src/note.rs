@@ -32,7 +32,7 @@ pub enum NoteName {
 }
 
 /// Any offset applied to a note in standard notation.
-pub enum NoteOffset {
+pub enum Accidental {
     /// The note is a half-tone lower then indicated by its name.
     Flat,
     /// The note is left unchanged.
@@ -51,11 +51,11 @@ impl Note {
     /// ```
     /// use syn_txt::note::*;
     ///
-    /// assert_eq!(Note::try_named(NoteName::A, NoteOffset::Base, 4), Some(Note::from_midi(69)));
-    /// assert_eq!(Note::try_named(NoteName::C, NoteOffset::Sharp, 6), Some(Note::from_midi(85)));
-    /// assert_eq!(Note::try_named(NoteName::G, NoteOffset::Flat, 2), Some(Note::from_midi(42)));
+    /// assert_eq!(Note::try_named(NoteName::A, Accidental::Base, 4), Some(Note::from_midi(69)));
+    /// assert_eq!(Note::try_named(NoteName::C, Accidental::Sharp, 6), Some(Note::from_midi(85)));
+    /// assert_eq!(Note::try_named(NoteName::G, Accidental::Flat, 2), Some(Note::from_midi(42)));
     /// ```
-    pub fn try_named(name: NoteName, offset: NoteOffset, octave: i32) -> Option<Note> {
+    pub fn try_named(name: NoteName, offset: Accidental, octave: i32) -> Option<Note> {
         let name_index = match name {
             NoteName::C => 0,
             NoteName::D => 2,
@@ -66,9 +66,9 @@ impl Note {
             NoteName::B => 11,
         };
         let offset_index = match offset {
-            NoteOffset::Base => 0,
-            NoteOffset::Flat => -1,
-            NoteOffset::Sharp => 1,
+            Accidental::Base => 0,
+            Accidental::Flat => -1,
+            Accidental::Sharp => 1,
         };
         // C4 is MIDI note number 60
         let normalize_index = 60 - 4 * 12;
@@ -92,11 +92,11 @@ impl Note {
     /// ```
     /// # use syn_txt::note::*;
     ///
-    /// assert_eq!(Note::named(NoteName::A, NoteOffset::Base, 4), Note::from_midi(69));
-    /// assert_eq!(Note::named(NoteName::C, NoteOffset::Sharp, 6), Note::from_midi(85));
-    /// assert_eq!(Note::named(NoteName::G, NoteOffset::Flat, 2), Note::from_midi(42));
+    /// assert_eq!(Note::named(NoteName::A, Accidental::Base, 4), Note::from_midi(69));
+    /// assert_eq!(Note::named(NoteName::C, Accidental::Sharp, 6), Note::from_midi(85));
+    /// assert_eq!(Note::named(NoteName::G, Accidental::Flat, 2), Note::from_midi(42));
     /// ```
-    pub fn named(name: NoteName, offset: NoteOffset, octave: i32) -> Note {
+    pub fn named(name: NoteName, offset: Accidental, octave: i32) -> Note {
         Note::try_named(name, offset, octave).expect("Note not representable in MIDI system.")
     }
 
@@ -131,9 +131,9 @@ impl Note {
             .as_str()
             .trim_end_matches(|ch: char| ch.is_ascii_digit());
         let offset = match offset_str {
-            "sharp" | "♯" | "#" => NoteOffset::Sharp,
-            "flat" | "♭" | "b" => NoteOffset::Flat,
-            "" => NoteOffset::Base,
+            "sharp" | "♯" | "#" => Accidental::Sharp,
+            "flat" | "♭" | "b" => Accidental::Flat,
+            "" => Accidental::Base,
             _ => return None,
         };
 

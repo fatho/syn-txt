@@ -33,6 +33,13 @@
         blacklistedSrc;
 
     buildInputs = [sox];
+
+    # Additionally include the examples in the output
+    postInstall = ''
+      mkdir -p $out/examples
+      cp target/release/examples/demo $out/examples
+    '';
+
     NIX_SOX_BIN = "${sox}/bin";
 
     cargoSha256 = "0342vns1krnkkbgzzbsfqhixcfk0qgc79xsajb6g2cbrlhxa4bhz";

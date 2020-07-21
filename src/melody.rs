@@ -104,6 +104,8 @@ impl<'a> Parser<'a> {
 
     /// Parse the notes and nested groups inside the current group as a stack (playing all at the same time).
     /// Returns the new time after the stack. The duration of the stack is determined by the last note in the stack.
+    ///
+    /// TODO: how to reduce clipping of stacks? automatically adjust velocity based on stack size? easier annotation of velocity?
     pub fn parse_stack(
         &mut self,
         start: Time,

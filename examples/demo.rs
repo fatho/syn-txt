@@ -27,7 +27,7 @@ fn main() -> io::Result<()> {
                         a3- c4- a3- d4- a3- e4- a3- d4-
                         a3- c4- a3- d4- a3- e4- a3- d4-
                         { { c4- d4- e4- d4- } a3+ } { { c4- d4- e4- d4- } a3+ }
-                        { a3 c4 e3 } { a3 d4 f3 } { a3 c4 e3 } r
+                        { a3 c4 } { a3 d4 } { a3 c4 } r
                     ").unwrap(),
                 }
             ],

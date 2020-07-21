@@ -59,7 +59,7 @@ impl Rational {
         }
     }
 
-    pub fn from_int(int: Int) -> Rational {
+    pub fn int(int: Int) -> Rational {
         Rational { num: int, denom: 1 }
     }
 
@@ -82,6 +82,42 @@ impl Rational {
             num: self.denom,
             denom: self.num,
         }
+    }
+
+    /// Compute an integer power of the rational.
+    ///
+    /// ```
+    /// # use syn_txt::rational::*;
+    /// assert_eq!(Rational::int(2).powi(0), Rational::int(1));
+    /// assert_eq!(Rational::int(2).powi(1), Rational::int(2));
+    /// assert_eq!(Rational::int(2).powi(2), Rational::int(4));
+    /// assert_eq!(Rational::int(2).powi(3), Rational::int(8));
+    /// assert_eq!(Rational::int(2).powi(5), Rational::int(32));
+    /// assert_eq!(Rational::int(2).powi(10), Rational::int(1024));
+    /// assert_eq!(Rational::int(2).powi(11), Rational::int(2048));
+    /// assert_eq!(Rational::int(2).powi(-1), Rational::new(1, 2));
+    /// assert_eq!(Rational::int(2).powi(-2), Rational::new(1, 4));
+    /// assert_eq!(Rational::int(2).powi(-3), Rational::new(1, 8));
+    /// assert_eq!(Rational::int(2).powi(-9), Rational::new(1, 512));
+    /// ```
+    pub fn powi(self, power: Int) -> Rational {
+        if power == 0 {
+            return Self::one();
+        }
+        let mut accum = if power > 0 { self } else { self.recip() };
+        let mut correction = Rational::one();
+        let mut remaining_power = power.abs();
+
+        while remaining_power > 1 {
+            if remaining_power % 2 == 1 {
+                correction *= accum;
+                remaining_power -= 1;
+            }
+            accum = accum * accum;
+            remaining_power /= 2;
+        }
+
+        accum * correction
     }
 
     /// Round towards zero.
@@ -207,6 +243,14 @@ impl ops::Mul<Int> for Rational {
 
     fn mul(self, rhs: Int) -> Self::Output {
         Rational::new(self.num * rhs, self.denom)
+    }
+}
+
+impl ops::Mul<Rational> for Int {
+    type Output = Rational;
+
+    fn mul(self, rhs: Rational) -> Self::Output {
+        Rational::new(self * rhs.num, rhs.denom)
     }
 }
 

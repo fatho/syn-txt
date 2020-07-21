@@ -10,11 +10,12 @@
 
 //! High-level description of a song that can be turned into audio.
 
-use crate::synth;
-use crate::rational::Rational;
 use crate::note::{Note, Velocity};
+use crate::rational::Rational;
+use crate::synth;
 
 /// A description of a complete song.
+#[derive(Debug)]
 pub struct Song {
     /// The speed of the song measured in beats per minute.
     pub bpm: i64,
@@ -23,12 +24,14 @@ pub struct Song {
 }
 
 /// The instrument used for playing a track.
+#[derive(Debug)]
 pub enum Instrument {
     /// The built-in test synthesizer.
     TestSynth(synth::test::Params),
 }
 
 /// A single track generating sound by playing notes on an instrument.
+#[derive(Debug)]
 pub struct Track {
     pub instrument: Instrument,
     pub notes: Vec<PlayedNote>,

@@ -11,16 +11,56 @@
 //! Translate an abstract description of music into waveforms
 
 use std::io;
+use std::path::PathBuf;
 
 use log::{info, trace};
+use structopt::StructOpt;
 
-use super::song::{Instrument, Song, Track};
 use crate::note::{Note, Velocity};
 use crate::output;
+use crate::song::{Instrument, Song, Track};
 use crate::synth;
 use crate::{rational::Rational, wave};
 use std::{collections::BinaryHeap, path::Path};
-use wave::Stereo;
+use wave::{AudioBuffer, Stereo};
+
+#[derive(Debug, StructOpt)]
+#[structopt(name = "musicc", about = "Compiling code into music")]
+struct Opt {
+    #[structopt(short = "v", long = "verbose", parse(from_occurrences))]
+    verbose: usize,
+
+    /// Output file (any sox-supported format). Music is played directly if not given.
+    #[structopt(short, long, parse(from_os_str))]
+    output: Option<PathBuf>,
+
+    /// Dump the description of the song generated from evaluating the code.
+    #[structopt(long)]
+    #[allow(clippy::option_option)]
+    dump_description: Option<Option<PathBuf>>,
+}
+
+pub fn song_main<F: FnOnce() -> io::Result<crate::song::Song>>(compose: F) -> io::Result<()> {
+    let opt: Opt = Opt::from_args();
+
+    let level = match opt.verbose {
+        0 => log::Level::Info,
+        1 => log::Level::Debug,
+        _ => log::Level::Trace,
+    };
+    simple_logger::init_with_level(level).unwrap();
+
+    let dump_out = opt
+        .dump_description
+        .map(|path| path.unwrap_or_else(|| "/dev/stdout".into()));
+    let song = compose()?;
+    if let Some(dump_out_path) = dump_out {
+        use std::io::Write;
+        let mut f = std::fs::File::create(dump_out_path)?;
+        writeln!(f, "{:?}", song)?;
+    }
+    play(song, opt.output.as_deref())
+}
 
 /// Play a song on the default speakers.
 pub fn play(song: Song, outfile: Option<&Path>) -> io::Result<()> {
@@ -243,67 +283,5 @@ impl Ord for QueuedRelease {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         // the smallest release time is the largest queued release for the max heap
         other.end_sample.cmp(&self.end_sample)
-    }
-}
-
-/// A buffer holding floating point audio data.
-pub struct AudioBuffer {
-    samples: Vec<wave::Stereo<f64>>,
-}
-
-#[allow(clippy::len_without_is_empty)]
-impl AudioBuffer {
-    pub fn new(sample_count: usize) -> Self {
-        Self {
-            samples: vec![
-                wave::Stereo {
-                    left: 0.0,
-                    right: 0.0
-                };
-                sample_count
-            ],
-        }
-    }
-
-    /// Set all samples to zero.
-    pub fn fill_zero(&mut self) {
-        self.samples
-            .iter_mut()
-            .for_each(|s| *s = wave::Stereo::new(0.0, 0.0));
-    }
-
-    /// Size of the buffer in samples.
-    pub fn len(&self) -> usize {
-        self.samples.len()
-    }
-
-    /// Size of the buffer in bytes.
-    pub fn byte_len(&self) -> usize {
-        self.len() * 2 * std::mem::size_of::<f64>()
-    }
-
-    pub fn samples(&self) -> &[wave::Stereo<f64>] {
-        &self.samples
-    }
-
-    pub fn samples_mut(&mut self) -> &mut [wave::Stereo<f64>] {
-        &mut self.samples
-    }
-
-    /// Copy the stereo `f64` samples to bytes, interleaving the left and right samples.
-    ///
-    /// Could probably be implemented with some sort of unsafe transmute,
-    /// but copying is safe and likely not the bottleneck.
-    ///
-    /// Returns the number of samples that were actually copied.
-    /// Might be less than the number of input samples if the output buffer was not large enough.
-    pub fn copy_bytes_to(&self, bytes: &mut [u8]) -> usize {
-        let mut processed = 0;
-        for (sample, target) in self.samples.iter().zip(bytes.chunks_exact_mut(16)) {
-            target[0..8].copy_from_slice(&sample.left.to_le_bytes());
-            target[8..16].copy_from_slice(&sample.right.to_le_bytes());
-            processed += 1;
-        }
-        processed
     }
 }

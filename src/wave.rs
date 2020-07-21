@@ -12,6 +12,68 @@
 
 use std::ops;
 
+/// A buffer holding floating point audio data.
+pub struct AudioBuffer {
+    samples: Vec<Stereo<f64>>,
+}
+
+#[allow(clippy::len_without_is_empty)]
+impl AudioBuffer {
+    pub fn new(sample_count: usize) -> Self {
+        Self {
+            samples: vec![
+                Stereo {
+                    left: 0.0,
+                    right: 0.0
+                };
+                sample_count
+            ],
+        }
+    }
+
+    /// Set all samples to zero.
+    pub fn fill_zero(&mut self) {
+        self.samples
+            .iter_mut()
+            .for_each(|s| *s = Stereo::new(0.0, 0.0));
+    }
+
+    /// Size of the buffer in samples.
+    pub fn len(&self) -> usize {
+        self.samples.len()
+    }
+
+    /// Size of the buffer in bytes.
+    pub fn byte_len(&self) -> usize {
+        self.len() * 2 * std::mem::size_of::<f64>()
+    }
+
+    pub fn samples(&self) -> &[Stereo<f64>] {
+        &self.samples
+    }
+
+    pub fn samples_mut(&mut self) -> &mut [Stereo<f64>] {
+        &mut self.samples
+    }
+
+    /// Copy the stereo `f64` samples to bytes, interleaving the left and right samples.
+    ///
+    /// Could probably be implemented with some sort of unsafe transmute,
+    /// but copying is safe and likely not the bottleneck.
+    ///
+    /// Returns the number of samples that were actually copied.
+    /// Might be less than the number of input samples if the output buffer was not large enough.
+    pub fn copy_bytes_to(&self, bytes: &mut [u8]) -> usize {
+        let mut processed = 0;
+        for (sample, target) in self.samples.iter().zip(bytes.chunks_exact_mut(16)) {
+            target[0..8].copy_from_slice(&sample.left.to_le_bytes());
+            target[8..16].copy_from_slice(&sample.right.to_le_bytes());
+            processed += 1;
+        }
+        processed
+    }
+}
+
 /// Convenience type for making things stereo, e.g. individual samples or whole buffers.
 ///
 /// ```

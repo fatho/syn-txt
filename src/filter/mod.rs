@@ -8,9 +8,8 @@
 // A copy of the license can be found in the LICENSE file in the root of
 // this repository.
 
-//! Implementation of the music compiler (musicc).
+//! Implementations of various digital filters.
 
-pub mod eval;
-pub mod langext;
-pub mod output;
-pub mod song;
+pub mod biquad;
+
+pub use biquad::*;

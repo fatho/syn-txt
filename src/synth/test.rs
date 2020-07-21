@@ -10,12 +10,11 @@
 
 //! Exemplary implementation of a synthesizer.
 
-use super::envelope::*;
-use super::filter;
-use super::oscillator::*;
-use super::tuning::*;
-
+use crate::envelope::*;
+use crate::filter;
 use crate::note::*;
+use crate::oscillator::*;
+use crate::tuning::*;
 use crate::wave::*;
 
 pub struct TestSynth {
@@ -37,6 +36,7 @@ pub struct TestSynth {
 
 /// Parameters of the synthesizer.
 /// TODO: Add filter settings
+#[derive(Debug)]
 pub struct Params {
     /// Output gain of the synthesizer
     pub gain: f64,
@@ -67,10 +67,10 @@ impl Default for Params {
         Self {
             gain: 1.0,
             pan: 0.0,
-            unison: 1,
-            unison_detune_cents: 0.0,
+            unison: 3,
+            unison_detune_cents: 3.0,
             unison_falloff: 0.0,
-            wave_shape: WaveShape::Sine,
+            wave_shape: WaveShape::SuperSaw,
             envelope: ADSR {
                 attack: 0.01,
                 decay: 0.0,

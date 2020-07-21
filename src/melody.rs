@@ -56,7 +56,7 @@ impl<'a> Parser<'a> {
                         note: sym.note,
                         duration: sym.duration,
                         start: time,
-                        velocity: Velocity::MAX,
+                        velocity: Velocity::from_f64(0.5),
                     });
                     time += sym.duration;
                 }

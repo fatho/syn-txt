@@ -1,17 +1,17 @@
 
 <!DOCTYPE html>
 
-<html xmlns="http://www.w3.org/1999/xhtml">
+<html>
   <head>
     <meta charset="utf-8" />
     <title>A text-based synthesizer &#8212; syn.txt  documentation</title>
     <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
     <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
-    <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
-    <script type="text/javascript" src="_static/jquery.js"></script>
-    <script type="text/javascript" src="_static/underscore.js"></script>
-    <script type="text/javascript" src="_static/doctools.js"></script>
-    <script type="text/javascript" src="_static/language_data.js"></script>
+    <script id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script src="_static/jquery.js"></script>
+    <script src="_static/underscore.js"></script>
+    <script src="_static/doctools.js"></script>
+    <script src="_static/language_data.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
    
@@ -38,71 +38,48 @@
 At the moment, it is very much work in progress. The repository contains a <a class="reference external" href="https://github.com/fatho/syn-txt/blob/master/planning/roadmap.md">roadmap</a>
 with a rough outline of what is planned for the near future.</p>
 <p>However, there is already a working prototype that includes</p>
-<ul class="simple">
-<li><p>an interpreter for a very small subset of a scheme-like language
-that can be used for defining piano rolls (<a class="reference external" href="https://github.com/fatho/syn-txt/blob/master/test-data/">examples</a>)</p></li>
-<li><p>a synthesizer turning notes into waveforms</p></li>
-<li><p>an interpreter for that language to play piano rolls on the built-in synthesizer</p></li>
-</ul>
+<p>However, there is already a working prototype that includes
+- a simple textual format for writing melodies
+- a small embedded DSL for constructing simple songs
+- a synthesizer with multiple oscillators, several waveforms, and simple filters
+- a convenient function providing the main function for an executable generating the song (<a class="reference external" href="https://github.com/fatho/syn-txt/blob/master/examples/">examples</a>)</p>
+<p>Eventually, the idea is that song descriptions get a serialization format,
+making it possible to generate them from other programming languages as well.</p>
 <div class="section" id="example">
 <h2>Example<a class="headerlink" href="#example" title="Permalink to this headline">¶</a></h2>
-<p>To give you an example, a few simple chords on a customized synthesizer
-can be generated with the following code snippet (<a class="reference external" href="https://github.com/fatho/syn-txt/blob/master/test-data/chords.syn">chords.syn</a>):</p>
-<div class="highlight-scheme notranslate"><div class="highlight"><pre><span></span><span class="p">(</span><span class="k">define </span><span class="nv">melody</span>
-    <span class="p">(</span><span class="nf">begin</span>
-        <span class="p">(</span><span class="k">define </span><span class="p">(</span><span class="nf">chord</span> <span class="nv">len</span> <span class="nv">a</span> <span class="nv">b</span> <span class="nv">c</span><span class="p">)</span>
-            <span class="p">(</span><span class="k">define </span><span class="nv">vel</span> <span class="p">(</span><span class="nb">/ </span><span class="mi">1</span> <span class="mi">3</span><span class="p">))</span>
-            <span class="p">(</span><span class="nf">list</span>
-                <span class="p">(</span><span class="nf">note</span> <span class="nv">:start</span> <span class="mi">0</span> <span class="nv">:pitch</span> <span class="nv">a</span> <span class="nv">:length</span> <span class="nv">len</span> <span class="nv">:velocity</span> <span class="nv">vel</span><span class="p">)</span>
-                <span class="p">(</span><span class="nf">note</span> <span class="nv">:start</span> <span class="mi">0</span> <span class="nv">:pitch</span> <span class="nv">b</span> <span class="nv">:length</span> <span class="nv">len</span> <span class="nv">:velocity</span> <span class="nv">vel</span><span class="p">)</span>
-                <span class="p">(</span><span class="nf">note</span> <span class="nv">:start</span> <span class="mi">0</span> <span class="nv">:pitch</span> <span class="nv">c</span> <span class="nv">:length</span> <span class="nv">len</span> <span class="nv">:velocity</span> <span class="nv">vel</span><span class="p">)</span>
-            <span class="p">)</span>
-        <span class="p">)</span>
+<p>To give you an example, a simple melody on the built-in synthesizer with the default settings
+can be generated with the following code snippet (<a class="reference external" href="https://github.com/fatho/syn-txt/blob/master/examples/demo.rs">demo.rs</a>):</p>
+<div class="highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="k">use</span><span class="w"> </span><span class="n">syn_txt</span>::<span class="n">melody</span>::<span class="n">parse_melody</span><span class="p">;</span><span class="w"></span>
+<span class="k">use</span><span class="w"> </span><span class="n">syn_txt</span>::<span class="n">play</span><span class="p">;</span><span class="w"></span>
+<span class="k">use</span><span class="w"> </span><span class="n">syn_txt</span>::<span class="n">song</span>::<span class="o">*</span><span class="p">;</span><span class="w"></span>
+<span class="k">use</span><span class="w"> </span><span class="n">syn_txt</span>::<span class="n">synth</span><span class="p">;</span><span class="w"></span>
 
-        <span class="p">(</span><span class="nf">sequence-all</span>
-            <span class="p">(</span><span class="nf">list</span>
-                <span class="p">(</span><span class="nf">chord</span> <span class="mi">1</span><span class="nv">/1</span> <span class="s">&quot;a2&quot;</span> <span class="s">&quot;c3&quot;</span> <span class="s">&quot;e3&quot;</span><span class="p">)</span>
-                <span class="p">(</span><span class="nf">chord</span> <span class="mi">1</span><span class="nv">/1</span> <span class="s">&quot;a2&quot;</span> <span class="s">&quot;d3&quot;</span> <span class="s">&quot;f3&quot;</span><span class="p">)</span>
-                <span class="p">(</span><span class="nf">chord</span> <span class="mi">1</span><span class="nv">/2</span> <span class="s">&quot;g#2&quot;</span> <span class="s">&quot;b3&quot;</span> <span class="s">&quot;e3&quot;</span><span class="p">)</span>
-                <span class="p">(</span><span class="nf">chord</span> <span class="mi">1</span><span class="nv">/2</span> <span class="s">&quot;g#2&quot;</span> <span class="s">&quot;b3&quot;</span> <span class="s">&quot;d3&quot;</span><span class="p">)</span>
-                <span class="p">(</span><span class="nf">chord</span> <span class="mi">1</span><span class="nv">/1</span> <span class="s">&quot;a2&quot;</span> <span class="s">&quot;c3&quot;</span> <span class="s">&quot;e3&quot;</span><span class="p">)</span>
-            <span class="p">))))</span>
-
-<span class="p">(</span><span class="k">define </span><span class="nv">pad</span>
-    <span class="p">(</span><span class="nf">synth</span>
-        <span class="c1">; The name determines which synthesizer to instantiate, but</span>
-        <span class="c1">; currently, there is only the &quot;test&quot; synthesizer.</span>
-        <span class="nv">:name</span> <span class="s">&quot;test&quot;</span>
-        <span class="c1">; The available parameters depend on the synthesizer</span>
-        <span class="nv">:params</span>
-        <span class="p">(</span><span class="nf">dict</span>
-            <span class="nv">:gain</span> <span class="mf">1.0</span>
-            <span class="c1">; Use three oscillators</span>
-            <span class="nv">:unison</span> <span class="mi">3</span>
-            <span class="c1">; detuned from -7 to +7 cents, linearly distributed</span>
-            <span class="c1">; across all voices (so one -7, one 0 and one +7 cents)</span>
-            <span class="nv">:unison-detune</span> <span class="mi">7</span>
-            <span class="c1">; The basic shape generated by the oscillators</span>
-            <span class="nv">:wave-shape</span> <span class="s">&quot;twosidedsaw&quot;</span>
-            <span class="c1">; Envelopes give shape to the amplitude of each note.</span>
-            <span class="nv">:envelope</span>
-                <span class="p">(</span><span class="nf">envelope</span>
-                    <span class="nv">:attack</span> <span class="mf">1.0</span>   <span class="c1">; seconds</span>
-                    <span class="nv">:decay</span> <span class="mf">1.0</span>    <span class="c1">; seconds</span>
-                    <span class="nv">:sustain</span> <span class="mf">0.2</span>  <span class="c1">; linear gain</span>
-                    <span class="nv">:release</span> <span class="mf">0.1</span>  <span class="c1">; seconds</span>
-                    <span class="p">))))</span>
-
-<span class="p">(</span><span class="nf">song</span> <span class="nv">:bpm</span> <span class="mi">120</span> <span class="nv">:notes</span> <span class="nv">melody</span> <span class="nv">:instrument</span> <span class="nv">pad</span><span class="p">)</span>
+<span class="k">fn</span> <span class="nf">main</span><span class="p">()</span><span class="w"> </span>-&gt; <span class="nc">std</span>::<span class="n">io</span>::<span class="nb">Result</span><span class="o">&lt;</span><span class="p">()</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="n">play</span>::<span class="n">song_main</span><span class="p">(</span><span class="o">||</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="kd">let</span><span class="w"> </span><span class="n">song</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Song</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">            </span><span class="n">bpm</span>: <span class="mi">128</span><span class="p">,</span><span class="w"></span>
+<span class="w">            </span><span class="n">tracks</span>: <span class="nc">vec</span><span class="o">!</span><span class="p">[</span><span class="w"></span>
+<span class="w">                </span><span class="n">Track</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">                    </span><span class="n">instrument</span>: <span class="nc">Instrument</span>::<span class="n">TestSynth</span><span class="p">(</span><span class="n">synth</span>::<span class="n">test</span>::<span class="n">Params</span>::<span class="n">default</span><span class="p">()),</span><span class="w"></span>
+<span class="w">                    </span><span class="n">notes</span>: <span class="nc">parse_melody</span><span class="p">(</span><span class="n">r</span><span class="s">&quot;</span>
+<span class="s">                        a3- c4- a3- d4- a3- e4- a3- d4-</span>
+<span class="s">                        a3- c4- a3- d4- a3- e4- a3- d4-</span>
+<span class="s">                        { { c4- d4- e4- d4- } a3+ } { { c4- d4- e4- d4- } a3+ }</span>
+<span class="s">                        { a3 c4 } { a3 d4 } { a3 c4 } r</span>
+<span class="s">                    &quot;</span><span class="p">).</span><span class="n">unwrap</span><span class="p">(),</span><span class="w"></span>
+<span class="w">                </span><span class="p">}</span><span class="w"></span>
+<span class="w">            </span><span class="p">],</span><span class="w"></span>
+<span class="w">        </span><span class="p">};</span><span class="w"></span>
+<span class="w">        </span><span class="nb">Ok</span><span class="p">(</span><span class="n">song</span><span class="p">)</span><span class="w"></span>
+<span class="w">    </span><span class="p">})</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
 </pre></div>
 </div>
 <p>Compiling this program to a waveform results in this audio:</p>
 <audio controls="controls">
-      <source src="_static/chords.ogg" type="audio/ogg">
+      <source src="_static/demo.ogg" type="audio/ogg">
       Your browser does not support the <code>audio</code> element.
-</audio><p>Notes and melodies are first-class entities in syn.txt,
-and can be freely recombined and passed around.</p>
-</div>
+</audio></div>
 <div class="section" id="build-instructions">
 <h2>Build Instructions<a class="headerlink" href="#build-instructions" title="Permalink to this headline">¶</a></h2>
 <p>The project is written in <a class="reference external" href="https://www.rust-lang.org/">Rust</a> and all tooling is pulled in via <a class="reference external" href="https://nixos.org/nix/">Nix</a>,
@@ -111,7 +88,7 @@ That said, you can simply run <cite>nix-shell</cite> in the repository root to d
 into a shell where all dependencies are avaiable.
 Then, the normal <a class="reference external" href="https://doc.rust-lang.org/cargo/">Cargo</a> workflow applies.</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Play the included example melody</span>
-cargo run --bin musicc test-data/demo.syn
+cargo run --example demo
 </pre></div>
 </div>
 <p>At the moment, it depends on spawning a <a class="reference external" href="http://sox.sourceforge.net/">sox</a> subprocess and piping the audio data to it
@@ -173,7 +150,7 @@ If everything worked, it should produce something similar to the following audio
     </form>
     </div>
 </div>
-<script type="text/javascript">$('#searchbox').show(0);</script>
+<script>$('#searchbox').show(0);</script>
 
 
 

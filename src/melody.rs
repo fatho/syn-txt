@@ -13,9 +13,10 @@
 use crate::note::{Accidental, Note, NoteName, Velocity};
 use crate::song::{PlayedNote, Time};
 
+/// Parse a melody described in a textual format.
 pub fn parse_melody(input: &str) -> Result<Vec<PlayedNote>, ParseError> {
     let mut p = Parser::new(input);
-    p.parse_sequence()
+    p.parse_root()
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -29,6 +30,8 @@ pub struct NoteSym {
 pub enum Sym {
     Note(NoteSym),
     Rest(Time),
+    GroupStart,
+    GroupEnd,
 }
 
 struct Parser<'a> {
@@ -55,10 +58,23 @@ impl<'a> Parser<'a> {
         self.stream.is_eof()
     }
 
-    pub fn parse_sequence(&mut self) -> Result<Vec<PlayedNote>, ParseError> {
-        let mut time = Time::zero();
+    /// Parse the whole string as a melody, failing if not everything was consumed.
+    pub fn parse_root(&mut self) -> Result<Vec<PlayedNote>, ParseError> {
         let mut notes = Vec::new();
-        while !self.is_eof() {
+        self.parse_sequential(true, Time::zero(), &mut notes)?;
+        Ok(notes)
+    }
+
+    /// Parse the notes and nested groups inside the current group as a sequence.
+    pub fn parse_sequential(
+        &mut self,
+        top_level: bool,
+        start: Time,
+        notes: &mut Vec<PlayedNote>,
+    ) -> Result<Time, ParseError> {
+        let mut time = start;
+        // When parsing the top-level sequence, parse until EOF, otherwise, parse until group end symbol
+        while !top_level || !self.is_eof() {
             match self.parse_sym()? {
                 Sym::Rest(duration) => time += duration,
                 Sym::Note(sym) => {
@@ -70,9 +86,53 @@ impl<'a> Parser<'a> {
                     });
                     time += sym.duration;
                 }
+                Sym::GroupStart => {
+                    // A group inside a sequence becomes a stack
+                    time = self.parse_stack(time, notes)?;
+                }
+                Sym::GroupEnd => {
+                    if top_level {
+                        return Err(ParseError::Other("Unmatched group end symbol"));
+                    } else {
+                        break;
+                    }
+                }
             }
         }
-        Ok(notes)
+        Ok(time)
+    }
+
+    /// Parse the notes and nested groups inside the current group as a stack (playing all at the same time).
+    /// Returns the new time after the stack. The duration of the stack is determined by the last note in the stack.
+    pub fn parse_stack(
+        &mut self,
+        start: Time,
+        notes: &mut Vec<PlayedNote>,
+    ) -> Result<Time, ParseError> {
+        let mut time = start;
+        loop {
+            // Will fail on EOF because each nested sequence must be terminated by a group end,
+            // which exits the loop.
+            match self.parse_sym()? {
+                Sym::Rest(duration) => time = time.max(start + duration),
+                Sym::Note(sym) => {
+                    notes.push(PlayedNote {
+                        note: sym.note,
+                        duration: sym.duration,
+                        start: start,
+                        velocity: Velocity::from_f64(0.5),
+                    });
+                    time = time.max(start + sym.duration);
+                }
+                Sym::GroupStart => {
+                    // A group inside a stack becomes a sequence
+                    let new_time = self.parse_sequential(false, time, notes)?;
+                    time = time.max(new_time);
+                }
+                Sym::GroupEnd => break,
+            }
+        }
+        Ok(time)
     }
 
     pub fn parse_sym(&mut self) -> Result<Sym, ParseError> {
@@ -84,6 +144,16 @@ impl<'a> Parser<'a> {
                 Ok(Sym::Rest(duration))
             }
             'a'..='g' | 'A'..='G' => self.parse_note_sym().map(Sym::Note),
+            '{' => {
+                self.expect_char()?;
+                self.stream.skip_whitespace();
+                Ok(Sym::GroupStart)
+            }
+            '}' => {
+                self.expect_char()?;
+                self.stream.skip_whitespace();
+                Ok(Sym::GroupEnd)
+            }
             _ => Err(ParseError::Other("Unknown symbol")),
         }
     }
@@ -241,13 +311,15 @@ mod test {
 
     #[test]
     fn parser() {
-        let mel = parse_melody(r"
+        let mel = parse_melody(
+            r"
             c-d-e-f- g g
             a-a-a-a- g+
             a-a-a-a- g+
             f-f-f-f- e e
-            d-d-d-d- c+"
-        ).unwrap();
+            d-d-d-d- c+",
+        )
+        .unwrap();
         assert_eq!(mel.len(), 27);
     }
 

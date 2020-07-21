@@ -8,9 +8,9 @@
 // A copy of the license can be found in the LICENSE file in the root of
 // this repository.
 
+use syn_txt::melody::parse_melody;
 use syn_txt::play;
 use syn_txt::song::*;
-use syn_txt::melody::parse_melody;
 use syn_txt::synth;
 
 use std::io;
@@ -26,9 +26,8 @@ fn main() -> io::Result<()> {
                     notes: parse_melody(r"
                         a3- c4- a3- d4- a3- e4- a3- d4-
                         a3- c4- a3- d4- a3- e4- a3- d4-
-                        a3-. c4-- c4-- r-- a3-. d4-- d4-- r--
-                        a3-. e4-- e4-- r-- a3-. c4-- c4-- r--
-                        a3-. e4-- d#4-- d4-- c#4-- c4-- b3-- a#3-- a3-- r-- r
+                        { { c4- d4- e4- d4- } a3+ } { { c4- d4- e4- d4- } a3+ }
+                        { a3 c4 e3 } { a3 d4 f3 } { a3 c4 e3 } r
                     ").unwrap(),
                 }
             ],

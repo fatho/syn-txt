@@ -31,6 +31,7 @@ fn main() {
 
     let mut graph = builder.build(128);
     graph.step();
+    graph.step();
 }
 
 /// Add audio streams together.
@@ -77,6 +78,10 @@ impl Node for DebugSink {
 
     fn render(&mut self, rio: &RenderIo) {
         let input = rio.input(0);
+
+        println!("[{}]", rio.start());
+        println!("|{: ^41}|{: ^41}|", "left", "right");
+        println!("|-----------------------------------------|-----------------------------------------|");
         let half_width = 20;
         let width = half_width * 2;
         for s in input.samples() {

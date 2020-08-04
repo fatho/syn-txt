@@ -11,7 +11,7 @@ use crate::wave::AudioBuffer;
 /// Time measured in samples.
 pub type Sample = usize;
 
-#[derive(Debug, Eq, PartialEq, Clone, Copy)]
+#[derive(Debug, Eq, PartialEq, Clone, Copy, Hash)]
 pub struct NodeId(usize);
 
 impl NodeId {
@@ -36,6 +36,7 @@ pub struct OutputRef {
     index: usize,
 }
 
+/// Construct an audio graph.
 pub struct GraphBuilder {
     nodes: Vec<Box<dyn Node>>,
     edges: Vec<(OutputRef, InputRef)>,
@@ -64,28 +65,60 @@ impl GraphBuilder {
             .into_iter()
             .map(|node| NodeHolder::new(node, buffer_size))
             .collect();
-        // TODO: validate that there are no circles, otherwise, we might get runtime panics
 
-        // Connect the output buffers to the inputs
+        // Connect the output buffers to the inputs and prepare topological sorting
         for (output, input) in self.edges {
             nodes[input.node.0].input_buffers[input.index] =
                 Rc::clone(&nodes[output.node.0].output_buffers[output.index]);
+
+            if !nodes[input.node.0].incoming.contains(&output.node) {
+                nodes[input.node.0].incoming.push(output.node);
+            }
+            if !nodes[output.node.0].outgoing.contains(&input.node) {
+                nodes[output.node.0].outgoing.push(input.node);
+            }
         }
+
+        // Topological sort Kahn's algorithm
+        let mut sorted_nodes = Vec::new();
+        let mut nodes_without_incoming_edges: Vec<_> = nodes
+            .iter()
+            .enumerate()
+            .filter(|(_, holder)| holder.incoming.is_empty())
+            .map(|(id, _)| NodeId(id))
+            .collect();
+
+        while let Some(n) = nodes_without_incoming_edges.pop() {
+            sorted_nodes.push(n);
+
+            for m in std::mem::replace(&mut nodes[n.0].outgoing, Vec::new()) {
+                nodes[m.0].incoming.retain(|x| *x != n);
+                if nodes[m.0].incoming.is_empty() {
+                    nodes_without_incoming_edges.push(m);
+                }
+            }
+        }
+
+        // TODO: validate that there are no circles, otherwise, we might get runtime panics
+        // (Can we actually have circles based on how things are built?)
 
         Graph {
             nodes,
+            evaluation_order: sorted_nodes,
             time: 0,
             buffer_size,
         }
     }
 }
 
+/// Construct the connections between nodes.
 pub struct NodeBuilder<'a> {
     graph_builder: &'a mut GraphBuilder,
     node: NodeId,
 }
 
 impl<'a> NodeBuilder<'a> {
+    /// Feed the output of this node with the given index to the input of another node.
     pub fn output_to(self, output_index: usize, input: InputRef) -> NodeBuilder<'a> {
         self.graph_builder
             .edges
@@ -93,6 +126,7 @@ impl<'a> NodeBuilder<'a> {
         self
     }
 
+    /// Receive the output of another node at the given input of this node.
     pub fn input_from(self, input_index: usize, output: OutputRef) -> NodeBuilder<'a> {
         self.graph_builder
             .edges
@@ -100,6 +134,7 @@ impl<'a> NodeBuilder<'a> {
         self
     }
 
+    /// Stop building this node, returning its ID for future references.
     pub fn build(self) -> NodeId {
         self.node
     }
@@ -107,31 +142,25 @@ impl<'a> NodeBuilder<'a> {
 
 pub struct Graph {
     nodes: Vec<NodeHolder>,
+    evaluation_order: Vec<NodeId>,
     time: Sample,
     buffer_size: Sample,
 }
 
 impl Graph {
-    pub fn new() -> Self {
-        Self {
-            nodes: Vec::new(),
-            time: 0,
-            buffer_size: 1024,
-        }
-    }
-
     pub fn step(&mut self) {
-        for n in self.nodes.iter_mut() {
+        for id in self.evaluation_order.iter() {
+            let holder = &mut self.nodes[id.0];
+
             let rio = RenderIo {
                 start: self.time,
                 length: self.buffer_size,
                 events: &[],
-                inputs: &n.input_buffers,
-                outputs: &n.output_buffers,
+                inputs: &holder.input_buffers,
+                outputs: &holder.output_buffers,
             };
-            n.node.render(&rio);
+            holder.node.render(&rio);
         }
-
         self.time += self.buffer_size;
     }
 
@@ -144,6 +173,10 @@ struct NodeHolder {
     node: Box<dyn Node>,
     input_buffers: Vec<Rc<RefCell<AudioBuffer>>>,
     output_buffers: Vec<Rc<RefCell<AudioBuffer>>>,
+
+    // TODO: do we need those still? They are only used temporarily for topological sorting
+    incoming: Vec<NodeId>,
+    outgoing: Vec<NodeId>,
 }
 
 impl NodeHolder {
@@ -163,20 +196,34 @@ impl NodeHolder {
             node,
             input_buffers,
             output_buffers,
+            // TODO: These are only used during topological sorting
+            incoming: Vec::new(),
+            outgoing: Vec::new(),
         }
     }
 }
 
 pub trait Node {
+    /// Static description of the node inputs.
+    /// TODO: support dynamic number of inputs (useful for a mixer)
     fn inputs(&self) -> &'static [&'static str];
+
+    /// Static description of the node outputs.
     fn outputs(&self) -> &'static [&'static str];
+
     fn render(&mut self, rio: &RenderIo);
 }
 
+/// References to inputs and outputs while rendering a node.
 pub struct RenderIo<'a> {
+    /// Sample time of the first sample in these buffers.
     start: Sample,
+    /// Number of samples in these buffers
     length: Sample,
     events: &'a [Event],
+    /// One buffer for each input of the node.
+    /// TODO: make non-connected buffers `None` instead of the empty buffer,
+    /// so that the nodes can detect that.
     inputs: &'a [Rc<RefCell<AudioBuffer>>],
     outputs: &'a [Rc<RefCell<AudioBuffer>>],
 }
@@ -203,6 +250,8 @@ impl<'a> RenderIo<'a> {
     }
 }
 
+/// An event can influence a note at a discrete time.
+/// TODO: Actually do something with events
 pub struct Event {
     pub when: Sample,
     pub payload: EventPayload,

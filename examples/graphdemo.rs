@@ -7,6 +7,7 @@ fn main() {
     let sine = builder
         .add_node(Sine {
             samples_per_second: 44100,
+            amplitude: 0.5,
             frequency: 440.0,
         })
         .build();
@@ -14,11 +15,55 @@ fn main() {
         .add_node(DebugSink)
         .input_from(0, sine.output(0))
         .build();
+    let sine2 = builder
+        .add_node(Sine {
+            samples_per_second: 44100,
+            amplitude: 0.5,
+            frequency: 440.0 * 8.0,
+        })
+        .build();
+    let _sum = builder
+        .add_node(Sum)
+        .input_from(0, sine.output(0))
+        .input_from(1, sine2.output(0))
+        .output_to(0, sink.input(0))
+        .build();
 
-    let mut graph = builder.build(1024);
+    let mut graph = builder.build(128);
     graph.step();
 }
 
+/// Add two audio streams together.
+pub struct Sum;
+
+impl Node for Sum {
+    fn inputs(&self) -> &'static [&'static str] {
+        &["fx1", "fx2"]
+    }
+
+    fn outputs(&self) -> &'static [&'static str] {
+        &["main"]
+    }
+
+    fn render(&mut self, rio: &RenderIo) {
+        let in0 = rio.input(0);
+        let in1 = rio.input(1);
+        let in0samples = in0.samples();
+        let in1samples = in1.samples();
+
+        let mut out = rio.output(0);
+        let outsamples = out.samples_mut();
+
+        for (i1, (i2, o)) in in0samples
+            .iter()
+            .zip(in1samples.iter().zip(outsamples.iter_mut()))
+        {
+            *o = *i1 + *i2;
+        }
+    }
+}
+
+/// Render all the incoming audio data on the terminal.
 pub struct DebugSink;
 
 impl Node for DebugSink {
@@ -51,8 +96,10 @@ impl Node for DebugSink {
     }
 }
 
+/// Continuously generate a simple sine wave.
 pub struct Sine {
     samples_per_second: Sample,
+    amplitude: f64,
     frequency: f64,
 }
 
@@ -70,7 +117,9 @@ impl Node for Sine {
         let buf = out.samples_mut();
         for i in 0..rio.length() {
             let t = (i + rio.start()) as f64 / self.samples_per_second as f64;
-            buf[i] = Stereo::mono((2.0 * std::f64::consts::PI * t * self.frequency).sin());
+            buf[i] = Stereo::mono(
+                (2.0 * std::f64::consts::PI * t * self.frequency).sin() * self.amplitude,
+            );
         }
     }
 }

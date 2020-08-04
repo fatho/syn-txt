@@ -19,6 +19,7 @@ pub mod util;
 pub mod wave;
 
 // Building songs
+pub mod graph;
 pub mod melody;
 pub mod play;
 pub mod song;

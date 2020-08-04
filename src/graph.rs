@@ -185,11 +185,11 @@ impl NodeHolder {
         // immediately deallocated again when overwritten in the GraphBuilder
         let input_buffers =
             std::iter::repeat_with(|| Rc::new(RefCell::new(AudioBuffer::new(buffer_size))))
-                .take(node.inputs().len())
+                .take(node.num_inputs())
                 .collect();
         let output_buffers =
             std::iter::repeat_with(|| Rc::new(RefCell::new(AudioBuffer::new(buffer_size))))
-                .take(node.outputs().len())
+                .take(node.num_outputs())
                 .collect();
 
         Self {
@@ -204,12 +204,11 @@ impl NodeHolder {
 }
 
 pub trait Node {
-    /// Static description of the node inputs.
-    /// TODO: support dynamic number of inputs (useful for a mixer)
-    fn inputs(&self) -> &'static [&'static str];
+    /// Number of input nodes.
+    fn num_inputs(&self) -> usize;
 
-    /// Static description of the node outputs.
-    fn outputs(&self) -> &'static [&'static str];
+    /// Number of ouput nodes.
+    fn num_outputs(&self) -> usize;
 
     fn render(&mut self, rio: &RenderIo);
 }

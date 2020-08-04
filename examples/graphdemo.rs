@@ -23,7 +23,7 @@ fn main() {
         })
         .build();
     let _sum = builder
-        .add_node(Sum)
+        .add_node(Sum { num_inputs: 2 })
         .input_from(0, sine.output(0))
         .input_from(1, sine2.output(0))
         .output_to(0, sink.input(0))
@@ -33,32 +33,32 @@ fn main() {
     graph.step();
 }
 
-/// Add two audio streams together.
-pub struct Sum;
+/// Add audio streams together.
+pub struct Sum {
+    num_inputs: usize,
+}
 
 impl Node for Sum {
-    fn inputs(&self) -> &'static [&'static str] {
-        &["fx1", "fx2"]
+    fn num_inputs(&self) -> usize {
+        self.num_inputs
     }
 
-    fn outputs(&self) -> &'static [&'static str] {
-        &["main"]
+    fn num_outputs(&self) -> usize {
+        1
     }
 
     fn render(&mut self, rio: &RenderIo) {
-        let in0 = rio.input(0);
-        let in1 = rio.input(1);
-        let in0samples = in0.samples();
-        let in1samples = in1.samples();
-
         let mut out = rio.output(0);
+        out.fill_zero();
         let outsamples = out.samples_mut();
 
-        for (i1, (i2, o)) in in0samples
-            .iter()
-            .zip(in1samples.iter().zip(outsamples.iter_mut()))
-        {
-            *o = *i1 + *i2;
+        for i in 0..self.num_inputs {
+            let in_ref = rio.input(i);
+            let in_samples = in_ref.samples();
+
+            for (i, o) in in_samples.iter().zip(outsamples.iter_mut()) {
+                *o += *i;
+            }
         }
     }
 }
@@ -67,12 +67,12 @@ impl Node for Sum {
 pub struct DebugSink;
 
 impl Node for DebugSink {
-    fn outputs(&self) -> &'static [&'static str] {
-        &[]
+    fn num_outputs(&self) -> usize {
+        0
     }
 
-    fn inputs(&self) -> &'static [&'static str] {
-        &["main"]
+    fn num_inputs(&self) -> usize {
+        1
     }
 
     fn render(&mut self, rio: &RenderIo) {
@@ -104,12 +104,12 @@ pub struct Sine {
 }
 
 impl Node for Sine {
-    fn outputs(&self) -> &'static [&'static str] {
-        &["main"]
+    fn num_outputs(&self) -> usize {
+        1
     }
 
-    fn inputs(&self) -> &'static [&'static str] {
-        &[]
+    fn num_inputs(&self) -> usize {
+        0
     }
 
     fn render(&mut self, rio: &RenderIo) {

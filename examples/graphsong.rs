@@ -11,39 +11,39 @@
 //! Evaluating how the graph interface could be used
 
 use syn_txt::{graph::*, wave::Stereo};
+use syn_txt::melody::parse_melody;
+use syn_txt::play;
+use syn_txt::{song::Time, synth};
 
 fn main() {
+    let instrument = synth::test::TestSynth::with_params(44100.0, synth::test::Params::default());
+    let notes = parse_melody(r"
+            a3- c4- a3- d4- a3- e4- a3- d4-
+            a3- c4- a3- d4- a3- e4- a3- d4-
+            { { c4- d4- e4- d4- } a3+ } { { c4- d4- e4- d4- } a3+ }
+            { a3 c4 } { a3 d4 } { a3 c4 } r
+        ").unwrap();
+    let last_note_end = notes.iter().map(|n| n.start + n.duration).max().unwrap_or(Time::int(0));
+    let sig = play::TimeSig {
+        beats_per_minute: 128,
+        beat_unit: 4,
+    };
+
     let mut builder = GraphBuilder::new();
-    let sine = builder
-        .add_node(Sine {
-            samples_per_second: 44100,
-            amplitude: 0.5,
-            frequency: 440.0,
-        })
-        .build();
 
-    let debug_sink = builder.add_node(DebugSink).build();
-    let sink = builder
+    let source = builder.add_node(
+            instrument::InstrumentSource::new(44100, sig, instrument, notes)
+        ).build();
+
+    let _sink = builder
         .add_node(sox::SoxSink::new(44100, sox::SoxTarget::Play).unwrap())
+        .input_from(0, source.output(0))
         .build();
 
-    let sine2 = builder
-        .add_node(Sine {
-            samples_per_second: 44100,
-            amplitude: 0.5,
-            frequency: 440.0 * 2.0,
-        })
-        .build();
-    let _sum = builder
-        .add_node(Sum { num_inputs: 2 })
-        .input_from(0, sine.output(0))
-        .input_from(1, sine2.output(0))
-        .output_to(0, sink.input(0))
-        .output_to(0, debug_sink.input(0))
-        .build();
-
+    let buffer_size = 1024;
     let mut graph = builder.build(1024).unwrap();
-    for _ in 0..40 {
+    let total_samples = sig.samples(last_note_end + Time::int(2), 44100) + buffer_size - 1;
+    for _ in 0..(total_samples / buffer_size) {
         graph.step();
     }
 }

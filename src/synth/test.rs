@@ -210,6 +210,21 @@ impl TestSynth {
     }
 }
 
+impl crate::graph::instrument::Instrument for TestSynth {
+    type PlayHandle = PlayHandle;
+
+    fn play_note(&mut self, sample_delay: usize, note: Note, velocity: Velocity) -> Self::PlayHandle {
+        self.play_note(sample_delay, note, velocity)
+    }
+    fn release_note(&mut self, sample_delay: usize, handle: Self::PlayHandle) {
+        self.release_note(sample_delay, handle)
+    }
+    fn fill_buffer(&mut self, output: &mut [Stereo<f64>]) {
+        self.fill_buffer(output)
+    }
+
+}
+
 /// State needed for a playing note.
 struct NoteState {
     /// Handle that has been handed out to the host of the synthesizer when

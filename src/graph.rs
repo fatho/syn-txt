@@ -10,6 +10,8 @@ use snafu::Snafu;
 use crate::note::{Note, Velocity};
 use crate::wave::AudioBuffer;
 
+pub mod sox;
+
 /// Time measured in samples.
 pub type Sample = usize;
 
@@ -197,7 +199,7 @@ impl Graph {
         self.time += self.buffer_size;
     }
 
-    // TODO: allow getting a reference back to a node and downcast?
+    // REVIEW: allow getting a reference back to a node and downcast?
 
     // pub fn connect(&mut self, from: NodeId, to: NodeId, )
 }
@@ -207,7 +209,7 @@ struct NodeHolder {
     input_buffers: Vec<Rc<RefCell<AudioBuffer>>>,
     output_buffers: Vec<Rc<RefCell<AudioBuffer>>>,
 
-    // TODO: do we need those still? They are only used temporarily for topological sorting
+    // REVIEW: do we need those here? They are only used temporarily for topological sorting
     incoming: Vec<NodeId>,
     outgoing: Vec<NodeId>,
 }
@@ -229,7 +231,6 @@ impl NodeHolder {
             node,
             input_buffers,
             output_buffers,
-            // TODO: These are only used during topological sorting
             incoming: Vec::new(),
             outgoing: Vec::new(),
         }
@@ -254,8 +255,7 @@ pub struct RenderIo<'a> {
     length: Sample,
     events: &'a [Event],
     /// One buffer for each input of the node.
-    /// TODO: make non-connected buffers `None` instead of the empty buffer,
-    /// so that the nodes can detect that.
+    /// TODO: make non-connected buffers `None` instead of the empty buffer, so that the nodes can detect that.
     inputs: &'a [Rc<RefCell<AudioBuffer>>],
     outputs: &'a [Rc<RefCell<AudioBuffer>>],
 }

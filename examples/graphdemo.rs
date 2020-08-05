@@ -11,15 +11,20 @@ fn main() {
             frequency: 440.0,
         })
         .build();
+    // let sink = builder
+    //     .add_node(DebugSink)
+    //     .input_from(0, sine.output(0))
+    //     .build();
     let sink = builder
-        .add_node(DebugSink)
+        .add_node(sox::SoxSink::new(44100, sox::SoxTarget::Play).unwrap())
         .input_from(0, sine.output(0))
         .build();
+
     let sine2 = builder
         .add_node(Sine {
             samples_per_second: 44100,
             amplitude: 0.5,
-            frequency: 440.0 * 8.0,
+            frequency: 440.0 * 2.0,
         })
         .build();
     let _sum = builder
@@ -29,9 +34,10 @@ fn main() {
         .output_to(0, sink.input(0))
         .build();
 
-    let mut graph = builder.build(128).unwrap();
-    graph.step();
-    graph.step();
+    let mut graph = builder.build(1024).unwrap();
+    for _ in 0..40 {
+        graph.step();
+    }
 }
 
 /// Add audio streams together.

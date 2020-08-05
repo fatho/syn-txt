@@ -29,7 +29,7 @@ fn main() {
         .output_to(0, sink.input(0))
         .build();
 
-    let mut graph = builder.build(128);
+    let mut graph = builder.build(128).unwrap();
     graph.step();
     graph.step();
 }
@@ -81,7 +81,9 @@ impl Node for DebugSink {
 
         println!("[{}]", rio.start());
         println!("|{: ^41}|{: ^41}|", "left", "right");
-        println!("|-----------------------------------------|-----------------------------------------|");
+        println!(
+            "|-----------------------------------------|-----------------------------------------|"
+        );
         let half_width = 20;
         let width = half_width * 2;
         for s in input.samples() {

@@ -5,6 +5,8 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use snafu::Snafu;
+
 use crate::note::{Note, Velocity};
 use crate::wave::AudioBuffer;
 
@@ -59,7 +61,11 @@ impl GraphBuilder {
         }
     }
 
-    pub fn build(self, buffer_size: Sample) -> Graph {
+    /// Consume the GraphBuilder and turn it into a graph, provided that the graph structure has no cycles.
+    ///
+    /// NOTE: Currently, failure to build the graph means that all nodes are lost.
+    /// Do we need a way to recover those?
+    pub fn build(self, buffer_size: Sample) -> Result<Graph, GraphBuildError> {
         let mut nodes: Vec<NodeHolder> = self
             .nodes
             .into_iter()
@@ -68,8 +74,19 @@ impl GraphBuilder {
 
         // Connect the output buffers to the inputs and prepare topological sorting
         for (output, input) in self.edges {
-            nodes[input.node.0].input_buffers[input.index] =
-                Rc::clone(&nodes[output.node.0].output_buffers[output.index]);
+            let buffer = Rc::clone(
+                nodes
+                .get(output.node.0)
+                .ok_or(GraphBuildError::InvalidNode { node: output.node })?
+                .output_buffers
+                .get(output.index)
+                .ok_or(GraphBuildError::InvalidOutput { output })?
+            );
+            *(nodes.get_mut(input.node.0)
+                .ok_or(GraphBuildError::InvalidNode { node: input.node })?
+                .input_buffers
+                .get_mut(input.index)
+                .ok_or(GraphBuildError::InvalidInput { input })?) = buffer;
 
             if !nodes[input.node.0].incoming.contains(&output.node) {
                 nodes[input.node.0].incoming.push(output.node);
@@ -79,7 +96,7 @@ impl GraphBuilder {
             }
         }
 
-        // Topological sort Kahn's algorithm
+        // Topological sort using Kahn's algorithm
         let mut sorted_nodes = Vec::new();
         let mut nodes_without_incoming_edges: Vec<_> = nodes
             .iter()
@@ -99,16 +116,32 @@ impl GraphBuilder {
             }
         }
 
-        // TODO: validate that there are no circles, otherwise, we might get runtime panics
-        // (Can we actually have circles based on how things are built?)
-
-        Graph {
-            nodes,
-            evaluation_order: sorted_nodes,
-            time: 0,
-            buffer_size,
+        // Cycles are bad because then the order is undefined and makes a difference.
+        // Better solution: add explicit support for feedback loops to the graph builder if ever necessary.
+        if nodes.iter().find(|n| !n.incoming.is_empty()).is_some() {
+            Err(GraphBuildError::Cycle)
+        } else {
+            Ok(Graph {
+                nodes,
+                evaluation_order: sorted_nodes,
+                time: 0,
+                buffer_size,
+            })
         }
     }
+}
+
+/// Possible errors when building a graph.
+#[derive(Debug, PartialEq, Snafu)]
+pub enum GraphBuildError {
+    #[snafu(display("There is a cycle in the graph"))]
+    Cycle,
+    #[snafu(display("Referenced node {:?} does not exist", node))]
+    InvalidNode { node: NodeId },
+    #[snafu(display("Referenced input {:?} does not exist", input))]
+    InvalidInput { input: InputRef },
+    #[snafu(display("Referenced output {:?} does not exist", output))]
+    InvalidOutput { output: OutputRef },
 }
 
 /// Construct the connections between nodes.
@@ -251,6 +284,7 @@ impl<'a> RenderIo<'a> {
 
 /// An event can influence a note at a discrete time.
 /// TODO: Actually do something with events
+/// IDEA: Events are but an illusion. They can actually just be baked into their respective nodes without the graph knowing.
 pub struct Event {
     pub when: Sample,
     pub payload: EventPayload,
@@ -262,4 +296,102 @@ pub enum EventPayload {
         duration: Sample,
         velocity: Velocity,
     },
+}
+
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+
+    /// Check that the builder correctly errors out on a cycle.
+    #[test]
+    fn cycle_detection() {
+        let mut b = GraphBuilder::new();
+        let sink = b.add_node(Sink).build();
+        let x = b.add_node(FanOut)
+                .output_to(0, sink.input(0))
+                .build();
+        let y = b.add_node(FanIn)
+                .output_to(0, x.input(0))
+                .input_from(1, x.output(1))
+                .build();
+        let _source = b.add_node(Source)
+                .output_to(0, y.input(0))
+                .build();
+
+        match b.build(10) {
+            Ok(_) => panic!("Expected graph build to fail due to cycle"),
+            Err(err) => {
+                assert_eq!(err, GraphBuildError::Cycle)
+            }
+        }
+    }
+
+    /// Check that nodes are evaluated from source to sink,
+    /// even when they're added in a different order.
+    #[test]
+    fn correct_order() {
+        let mut b = GraphBuilder::new();
+        let sink = b.add_node(Sink).build();
+        let x = b.add_node(FanOut)
+                .build();
+        let y = b.add_node(FanIn)
+                .output_to(0, sink.input(0))
+                .input_from(0, x.output(1))
+                .input_from(1, x.output(0))
+                .build();
+        let source = b.add_node(Source)
+                .output_to(0, x.input(0))
+                .build();
+
+        let graph = b.build(10).unwrap();
+
+        assert_eq!(graph.evaluation_order, vec![source, x, y, sink]);
+    }
+
+
+    pub struct Source;
+    impl Node for Source {
+        fn num_inputs(&self) -> usize {
+            0
+        }
+        fn num_outputs(&self) -> usize {
+            1
+        }
+        fn render(&mut self, _rio: &RenderIo) {}
+    }
+
+    pub struct FanOut;
+    impl Node for FanOut {
+        fn num_inputs(&self) -> usize {
+            1
+        }
+        fn num_outputs(&self) -> usize {
+            2
+        }
+        fn render(&mut self, _rio: &RenderIo) {}
+    }
+
+    pub struct FanIn;
+    impl Node for FanIn {
+        fn num_inputs(&self) -> usize {
+            2
+        }
+        fn num_outputs(&self) -> usize {
+            1
+        }
+        fn render(&mut self, _rio: &RenderIo) {}
+    }
+
+    pub struct Sink;
+    impl Node for Sink {
+        fn num_inputs(&self) -> usize {
+            1
+        }
+        fn num_outputs(&self) -> usize {
+            0
+        }
+        fn render(&mut self, _rio: &RenderIo) {}
+    }
 }

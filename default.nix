@@ -42,7 +42,7 @@
 
     NIX_SOX_BIN = "${sox}/bin";
 
-    cargoSha256 = "0342vns1krnkkbgzzbsfqhixcfk0qgc79xsajb6g2cbrlhxa4bhz";
+    cargoSha256 = "1qic5ss437n5xi58z0f9afabdpj9d7lq3w6rvknbakgalrfwzsrv";
   };
 
   syn-txt-doc = nixpkgs.callPackage ./doc/default.nix {};

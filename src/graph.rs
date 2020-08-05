@@ -78,13 +78,14 @@ impl GraphBuilder {
         for (output, input) in self.edges {
             let buffer = Rc::clone(
                 nodes
-                .get(output.node.0)
-                .ok_or(GraphBuildError::InvalidNode { node: output.node })?
-                .output_buffers
-                .get(output.index)
-                .ok_or(GraphBuildError::InvalidOutput { output })?
+                    .get(output.node.0)
+                    .ok_or(GraphBuildError::InvalidNode { node: output.node })?
+                    .output_buffers
+                    .get(output.index)
+                    .ok_or(GraphBuildError::InvalidOutput { output })?,
             );
-            *(nodes.get_mut(input.node.0)
+            *(nodes
+                .get_mut(input.node.0)
                 .ok_or(GraphBuildError::InvalidNode { node: input.node })?
                 .input_buffers
                 .get_mut(input.index)
@@ -298,7 +299,6 @@ pub enum EventPayload {
     },
 }
 
-
 #[cfg(test)]
 mod tests {
 
@@ -309,22 +309,17 @@ mod tests {
     fn cycle_detection() {
         let mut b = GraphBuilder::new();
         let sink = b.add_node(Sink).build();
-        let x = b.add_node(FanOut)
-                .output_to(0, sink.input(0))
-                .build();
-        let y = b.add_node(FanIn)
-                .output_to(0, x.input(0))
-                .input_from(1, x.output(1))
-                .build();
-        let _source = b.add_node(Source)
-                .output_to(0, y.input(0))
-                .build();
+        let x = b.add_node(FanOut).output_to(0, sink.input(0)).build();
+        let y = b
+            .add_node(FanIn)
+            .output_to(0, x.input(0))
+            .input_from(1, x.output(1))
+            .build();
+        let _source = b.add_node(Source).output_to(0, y.input(0)).build();
 
         match b.build(10) {
             Ok(_) => panic!("Expected graph build to fail due to cycle"),
-            Err(err) => {
-                assert_eq!(err, GraphBuildError::Cycle)
-            }
+            Err(err) => assert_eq!(err, GraphBuildError::Cycle),
         }
     }
 
@@ -334,22 +329,19 @@ mod tests {
     fn correct_order() {
         let mut b = GraphBuilder::new();
         let sink = b.add_node(Sink).build();
-        let x = b.add_node(FanOut)
-                .build();
-        let y = b.add_node(FanIn)
-                .output_to(0, sink.input(0))
-                .input_from(0, x.output(1))
-                .input_from(1, x.output(0))
-                .build();
-        let source = b.add_node(Source)
-                .output_to(0, x.input(0))
-                .build();
+        let x = b.add_node(FanOut).build();
+        let y = b
+            .add_node(FanIn)
+            .output_to(0, sink.input(0))
+            .input_from(0, x.output(1))
+            .input_from(1, x.output(0))
+            .build();
+        let source = b.add_node(Source).output_to(0, x.input(0)).build();
 
         let graph = b.build(10).unwrap();
 
         assert_eq!(graph.evaluation_order, vec![source, x, y, sink]);
     }
-
 
     pub struct Source;
     impl Node for Source {

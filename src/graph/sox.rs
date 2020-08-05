@@ -19,7 +19,6 @@ use log::error;
 
 pub use crate::output::sox::SoxTarget;
 
-
 pub struct SoxSink {
     audio_stream: ChildStdin,
     buffer: Vec<u8>,
@@ -27,10 +26,7 @@ pub struct SoxSink {
 }
 
 impl SoxSink {
-    pub fn new(
-        sample_rate: i32,
-        target: SoxTarget,
-    ) -> io::Result<Self> {
+    pub fn new(sample_rate: i32, target: SoxTarget) -> io::Result<Self> {
         let sample_rate_str = format!("{}", sample_rate);
         let input_args = &[
             "-R", // make the output reproducible
@@ -98,7 +94,11 @@ impl super::Node for SoxSink {
         }
         inp.copy_bytes_to(&mut self.buffer);
 
-        if let Err(err) = self.audio_stream.write_all(&self.buffer) {
+        let status = self
+            .audio_stream
+            .write_all(&self.buffer)
+            .and_then(|_| self.audio_stream.flush());
+        if let Err(err) = status {
             error!("Failed to write audio to sox stream: {}", err);
             self.error = true;
         }

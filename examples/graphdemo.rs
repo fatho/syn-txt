@@ -11,13 +11,10 @@ fn main() {
             frequency: 440.0,
         })
         .build();
-    // let sink = builder
-    //     .add_node(DebugSink)
-    //     .input_from(0, sine.output(0))
-    //     .build();
+
+    let debug_sink = builder.add_node(DebugSink).build();
     let sink = builder
         .add_node(sox::SoxSink::new(44100, sox::SoxTarget::Play).unwrap())
-        .input_from(0, sine.output(0))
         .build();
 
     let sine2 = builder
@@ -32,6 +29,7 @@ fn main() {
         .input_from(0, sine.output(0))
         .input_from(1, sine2.output(0))
         .output_to(0, sink.input(0))
+        .output_to(0, debug_sink.input(0))
         .build();
 
     let mut graph = builder.build(1024).unwrap();

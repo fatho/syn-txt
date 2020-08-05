@@ -20,8 +20,8 @@ use snafu::Snafu;
 use crate::note::{Note, Velocity};
 use crate::wave::AudioBuffer;
 
-pub mod sox;
 pub mod instrument;
+pub mod sox;
 
 /// Time measured in samples.
 pub type Sample = usize;
@@ -57,6 +57,12 @@ pub struct GraphBuilder {
     edges: Vec<(OutputRef, InputRef)>,
 }
 
+impl Default for GraphBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl GraphBuilder {
     pub fn new() -> Self {
         Self {
@@ -65,7 +71,7 @@ impl GraphBuilder {
         }
     }
 
-    pub fn add_node<'a, N: Node + 'static>(&'a mut self, node: N) -> NodeBuilder<'a> {
+    pub fn add_node<N: Node + 'static>(&mut self, node: N) -> NodeBuilder<'_> {
         let id = NodeId(self.nodes.len());
         self.nodes.push(Box::new(node));
         NodeBuilder {
@@ -132,7 +138,7 @@ impl GraphBuilder {
 
         // Cycles are bad because then the order is undefined and makes a difference.
         // Better solution: add explicit support for feedback loops to the graph builder if ever necessary.
-        if nodes.iter().find(|n| !n.incoming.is_empty()).is_some() {
+        if nodes.iter().any(|n| !n.incoming.is_empty()) {
             Err(GraphBuildError::Cycle)
         } else {
             Ok(Graph {

@@ -59,16 +59,16 @@ impl Rational {
         }
     }
 
-    pub fn int(int: Int) -> Rational {
+    pub const fn int(int: Int) -> Rational {
         Rational { num: int, denom: 1 }
     }
 
-    pub fn zero() -> Rational {
-        Rational::new(0, 1)
+    pub const fn zero() -> Rational {
+        Rational::int(0)
     }
 
-    pub fn one() -> Rational {
-        Rational::new(1, 1)
+    pub const fn one() -> Rational {
+        Rational::int(1)
     }
 
     pub fn nth(n: Int) -> Self {
@@ -77,7 +77,7 @@ impl Rational {
 
     // ==================== Transformations ====================
 
-    pub fn recip(self) -> Rational {
+    pub const fn recip(self) -> Rational {
         Rational {
             num: self.denom,
             denom: self.num,
@@ -129,7 +129,7 @@ impl Rational {
     /// assert_eq!(Rational::new(-10, 6).truncate(), -1);
     /// assert_eq!(Rational::new(13, 7).truncate(), 1);
     /// ```
-    pub fn truncate(self) -> i64 {
+    pub const fn truncate(self) -> i64 {
         self.num / self.denom
     }
 
@@ -155,17 +155,17 @@ impl Rational {
 
     // ==================== Predicates ====================
 
-    pub fn is_zero(self) -> bool {
+    pub const fn is_zero(self) -> bool {
         self.num == 0
     }
 
     // ==================== Destructors ====================
 
-    pub fn numerator(self) -> Int {
+    pub const fn numerator(self) -> Int {
         self.num
     }
 
-    pub fn denominator(self) -> Int {
+    pub const fn denominator(self) -> Int {
         self.denom
     }
 }

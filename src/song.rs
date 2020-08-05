@@ -10,9 +10,9 @@
 
 //! High-level description of a song that can be turned into audio.
 
+use crate::instrument;
 use crate::note::{Note, Velocity};
 use crate::rational::Rational;
-use crate::synth;
 
 /// A description of a complete song.
 #[derive(Debug)]
@@ -27,7 +27,7 @@ pub struct Song {
 #[derive(Debug)]
 pub enum Instrument {
     /// The built-in test synthesizer.
-    TestSynth(synth::test::Params),
+    Wavinator(instrument::wavinator::Params),
 }
 
 /// A single track generating sound by playing notes on an instrument.
@@ -51,4 +51,27 @@ pub struct PlayedNote {
     pub start: Time,
     /// Time when the key was released
     pub duration: Time,
+}
+
+/// Time signature of the song, consisting of
+/// - the number of beats per minute,
+/// - the length of a single beat
+/// Note that this omits the number of beats per bar,
+/// which is not needed for computing time from beats.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub struct TimeSig {
+    /// How many beats per minute
+    pub beats_per_minute: i64,
+    /// The length of one beat is `1 / beat_unit`.
+    pub beat_unit: i64,
+}
+
+impl TimeSig {
+    pub fn seconds(&self, note_time: Rational) -> Rational {
+        note_time * self.beat_unit * 60 / self.beats_per_minute
+    }
+
+    pub fn samples(&self, note_time: Rational, samples_per_second: i64) -> i64 {
+        (self.seconds(note_time) * samples_per_second).round()
+    }
 }

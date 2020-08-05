@@ -10,30 +10,39 @@
 
 //! Evaluating how the graph interface could be used
 
-use syn_txt::{graph::*, wave::Stereo};
 use syn_txt::melody::parse_melody;
-use syn_txt::play;
-use syn_txt::{song::Time, synth};
+use syn_txt::song;
+use syn_txt::{graph::*, wave::Stereo};
+use syn_txt::{instrument::wavinator, song::Time};
 
 fn main() {
-    let instrument = synth::test::TestSynth::with_params(44100.0, synth::test::Params::default());
-    let notes = parse_melody(r"
+    let instrument = wavinator::Wavinator::with_params(44100.0, wavinator::Params::default());
+    let notes = parse_melody(
+        r"
             a3- c4- a3- d4- a3- e4- a3- d4-
             a3- c4- a3- d4- a3- e4- a3- d4-
             { { c4- d4- e4- d4- } a3+ } { { c4- d4- e4- d4- } a3+ }
             { a3 c4 } { a3 d4 } { a3 c4 } r
-        ").unwrap();
-    let last_note_end = notes.iter().map(|n| n.start + n.duration).max().unwrap_or(Time::int(0));
-    let sig = play::TimeSig {
+        ",
+    )
+    .unwrap();
+    let last_note_end = notes
+        .iter()
+        .map(|n| n.start + n.duration)
+        .max()
+        .unwrap_or(Time::int(0));
+    let sig = song::TimeSig {
         beats_per_minute: 128,
         beat_unit: 4,
     };
 
     let mut builder = GraphBuilder::new();
 
-    let source = builder.add_node(
-            instrument::InstrumentSource::new(44100, sig, instrument, notes)
-        ).build();
+    let source = builder
+        .add_node(instrument::InstrumentSource::new(
+            44100, sig, instrument, notes,
+        ))
+        .build();
 
     let _sink = builder
         .add_node(sox::SoxSink::new(44100, sox::SoxTarget::Play).unwrap())

@@ -11,9 +11,9 @@
 // modules for making sounds
 pub mod envelope;
 pub mod filter;
+pub mod instrument;
 pub mod note;
 pub mod oscillator;
-pub mod synth;
 pub mod tuning;
 pub mod util;
 pub mod wave;

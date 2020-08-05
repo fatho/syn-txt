@@ -18,7 +18,6 @@ use structopt::StructOpt;
 
 use crate::graph;
 use crate::instrument;
-use crate::output;
 use crate::song::{Instrument, Song, Time, TimeSig};
 use std::path::Path;
 
@@ -84,7 +83,7 @@ pub fn play(song: Song, outfile: Option<&Path>) -> io::Result<()> {
         .into_iter()
         .map(|track| match track.instrument {
             Instrument::Wavinator(ps) => graph_builder
-                .add_node(graph::instrument::InstrumentSource::new(
+                .add_node(graph::InstrumentSource::new(
                     sample_rate,
                     sig,
                     instrument::wavinator::Wavinator::with_params(sample_rate as f64, ps),
@@ -95,12 +94,12 @@ pub fn play(song: Song, outfile: Option<&Path>) -> io::Result<()> {
         .collect();
 
     let target = match outfile {
-        None => output::sox::SoxTarget::Play,
-        Some(path) => output::sox::SoxTarget::File(path),
+        None => graph::SoxTarget::Play,
+        Some(path) => graph::SoxTarget::File(path),
     };
 
     let _sink = graph_builder
-        .add_node(graph::sox::SoxSink::new(44100, target).unwrap())
+        .add_node(graph::SoxSink::new(44100, target).unwrap())
         .input_from(0, players[0].output(0)) // TODO: add mixer node and mix all players
         .build();
 

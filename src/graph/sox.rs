@@ -16,8 +16,10 @@ use std::path::Path;
 use std::process::{ChildStdin, Command, Stdio};
 
 use log::error;
-
-pub use crate::output::sox::SoxTarget;
+pub enum SoxTarget<'a> {
+    Play,
+    File(&'a Path),
+}
 
 pub struct SoxSink {
     audio_stream: ChildStdin,

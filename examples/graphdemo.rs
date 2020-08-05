@@ -24,7 +24,7 @@ fn main() {
 
     let debug_sink = builder.add_node(DebugSink).build();
     let sink = builder
-        .add_node(sox::SoxSink::new(44100, sox::SoxTarget::Play).unwrap())
+        .add_node(SoxSink::new(44100, SoxTarget::Play).unwrap())
         .build();
 
     let sine2 = builder

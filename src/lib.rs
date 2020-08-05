@@ -24,8 +24,5 @@ pub mod melody;
 pub mod play;
 pub mod song;
 
-// audio I/O
-pub mod output;
-
 // Utility modules
 pub mod rational;

@@ -39,13 +39,11 @@ fn main() {
     let mut builder = GraphBuilder::new();
 
     let source = builder
-        .add_node(instrument::InstrumentSource::new(
-            44100, sig, instrument, notes,
-        ))
+        .add_node(InstrumentSource::new(44100, sig, instrument, notes))
         .build();
 
     let _sink = builder
-        .add_node(sox::SoxSink::new(44100, sox::SoxTarget::Play).unwrap())
+        .add_node(SoxSink::new(44100, SoxTarget::Play).unwrap())
         .input_from(0, source.output(0))
         .build();
 

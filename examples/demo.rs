@@ -8,10 +8,10 @@
 // A copy of the license can be found in the LICENSE file in the root of
 // this repository.
 
+use syn_txt::instrument::wavinator;
 use syn_txt::melody::parse_melody;
 use syn_txt::play;
 use syn_txt::song::*;
-use syn_txt::synth;
 
 use std::io;
 
@@ -22,7 +22,7 @@ fn main() -> io::Result<()> {
             bpm: 128,
             tracks: vec![
                 Track {
-                    instrument: Instrument::TestSynth(synth::test::Params::default()),
+                    instrument: Instrument::Wavinator(wavinator::Params::default()),
                     notes: parse_melody(r"
                         a3- c4- a3- d4- a3- e4- a3- d4-
                         a3- c4- a3- d4- a3- e4- a3- d4-

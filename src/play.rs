@@ -13,16 +13,13 @@
 use std::io;
 use std::path::PathBuf;
 
-use log::{info, trace};
+use log::info;
 use structopt::StructOpt;
 
-use crate::note::{Note, Velocity};
-use crate::output;
-use crate::song::{Instrument, Song, Track};
-use crate::synth;
-use crate::{rational::Rational, wave};
-use std::{collections::BinaryHeap, path::Path};
-use wave::{AudioBuffer, Stereo};
+use crate::graph;
+use crate::instrument;
+use crate::song::{Instrument, Song, Time, TimeSig};
+use std::path::Path;
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "musicc", about = "Compiling code into music")]
@@ -71,14 +68,48 @@ pub fn play(song: Song, outfile: Option<&Path>) -> io::Result<()> {
         beat_unit: 4,
     };
 
-    let mut players: Vec<_> = song
+    let mut graph_builder = graph::GraphBuilder::new();
+
+    let last_note_end = song
+        .tracks
+        .iter()
+        .flat_map(|t| t.notes.iter())
+        .map(|n| n.start + n.duration)
+        .max()
+        .unwrap_or(Time::int(0));
+
+    let players: Vec<_> = song
         .tracks
         .into_iter()
-        .map(|track| TrackPlayer::new(sample_rate, sig, track))
+        .map(|track| match track.instrument {
+            Instrument::Wavinator(ps) => graph_builder
+                .add_node(graph::InstrumentSource::new(
+                    sample_rate,
+                    sig,
+                    instrument::wavinator::Wavinator::with_params(sample_rate as f64, ps),
+                    track.notes,
+                ))
+                .build(),
+        })
         .collect();
 
-    let max_samples =
-        players.iter().map(|p| p.samples_total()).max().unwrap_or(0) + 2 * sample_rate as usize;
+    let target = match outfile {
+        None => graph::SoxTarget::Play,
+        Some(path) => graph::SoxTarget::File(path),
+    };
+
+    let _sink = graph_builder
+        .add_node(graph::SoxSink::new(44100, target).unwrap())
+        .input_from(0, players[0].output(0)) // TODO: add mixer node and mix all players
+        .build();
+
+    // 10 ms buffer at 44100 Hz
+    let buffer_size = 441;
+    let max_samples = sig.samples(last_note_end + Time::int(2), sample_rate) + buffer_size - 1;
+
+    let mut graph = graph_builder
+        .build(buffer_size as usize)
+        .map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, e))?;
 
     info!("playing at {} bpm at {} Hz", song.bpm, sample_rate);
     info!(
@@ -87,201 +118,9 @@ pub fn play(song: Song, outfile: Option<&Path>) -> io::Result<()> {
         max_samples as f64 / sample_rate as f64
     );
 
-    // 10 ms buffer at 44100 Hz
-    let buffer_size = 441;
-
-    let target = match outfile {
-        None => output::sox::SoxTarget::Play,
-        Some(path) => output::sox::SoxTarget::File(path),
-    };
-    output::sox::with_sox(sample_rate as i32, target, |audio_stream| {
-        let mut audio_buffer = AudioBuffer::new(buffer_size);
-        let mut byte_buffer = vec![0u8; audio_buffer.byte_len()];
-
-        let mut samples_total = 0;
-        while samples_total < max_samples {
-            audio_buffer.fill_zero();
-            for player in players.iter_mut() {
-                player.fill_buffer(audio_buffer.samples_mut());
-            }
-
-            let n = audio_buffer.copy_bytes_to(&mut byte_buffer);
-            assert_eq!(n, audio_buffer.len());
-            audio_stream.write_all(&byte_buffer)?;
-            samples_total += audio_buffer.len();
-        }
-
-        Ok(())
-    })
-}
-
-/// Time signature of the song, consisting of
-/// - the number of beats per minute,
-/// - the length of a single beat
-/// Note that this omits the number of beats per bar,
-/// which is not needed for computing time from beats.
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub struct TimeSig {
-    /// How many beats per minute
-    pub beats_per_minute: i64,
-    /// The length of one beat is `1 / beat_unit`.
-    pub beat_unit: i64,
-}
-
-impl TimeSig {
-    pub fn seconds(&self, note_time: Rational) -> Rational {
-        note_time * self.beat_unit * 60 / self.beats_per_minute
+    for _ in 0..(max_samples / buffer_size) {
+        graph.step();
     }
 
-    pub fn samples(&self, note_time: Rational, samples_per_second: i64) -> i64 {
-        (self.seconds(note_time) * samples_per_second).round()
-    }
-}
-
-pub struct TrackPlayer {
-    /// The instrument on this track, there will be more choice eventually.
-    instrument: synth::test::TestSynth,
-    /// The notes that are played on this track
-    notes: Vec<QueuedPlay>,
-    /// The next note to be played
-    next_note: usize,
-    /// The currently active notes that are to be released in the future.
-    note_releases: BinaryHeap<QueuedRelease>,
-    /// How many samples were already played.
-    samples_processed: usize,
-    /// How long this track is in samples (measured until the end of the last note)
-    samples_total: usize,
-}
-
-impl TrackPlayer {
-    pub fn new(sample_rate: i64, time_sig: TimeSig, track: Track) -> Self {
-        let instrument = match track.instrument {
-            Instrument::TestSynth(params) => {
-                synth::test::TestSynth::with_params(sample_rate as f64, params)
-            }
-        };
-        let mut notes: Vec<_> = track
-            .notes
-            .into_iter()
-            .map(|note| QueuedPlay {
-                begin_sample: time_sig.samples(note.start, sample_rate) as usize,
-                end_sample: time_sig.samples(note.start + note.duration, sample_rate) as usize,
-                note: note.note,
-                velocity: note.velocity,
-            })
-            .collect();
-        // The notes must be sorted in the order they are played for `fill_buffer` to work correctly.
-        notes.sort_by_key(|n| n.begin_sample);
-
-        let samples_total = notes.iter().map(|p| p.end_sample).max().unwrap_or(0);
-
-        Self {
-            instrument,
-            notes,
-            next_note: 0,
-            note_releases: BinaryHeap::new(),
-            samples_processed: 0,
-            samples_total,
-        }
-    }
-
-    /// Sample where the last note is released.
-    /// The instrument might still generate sound after this point.
-    pub fn samples_total(&self) -> usize {
-        self.samples_total
-    }
-
-    pub fn fill_buffer(&mut self, buffer: &mut [Stereo<f64>]) {
-        // Compute start and end time of this buffer in samples
-        let buffer_start = self.samples_processed;
-        let buffer_end = self.samples_processed + buffer.len();
-
-        // process all notes that are due in the current window
-        while self.next_note < self.notes.len()
-            && self.notes[self.next_note].begin_sample < buffer_end
-        {
-            let note = &self.notes[self.next_note];
-            let handle = self.instrument.play_note(
-                note.begin_sample - buffer_start,
-                note.note,
-                note.velocity,
-            );
-            trace!(
-                "{:7}: play {:?} as {:?}",
-                note.begin_sample,
-                note.note,
-                handle
-            );
-            self.note_releases.push(QueuedRelease {
-                end_sample: note.end_sample,
-                note_handle: handle,
-            });
-            self.next_note += 1;
-        }
-        // process all note releases that are due in the current window
-        // NOTE: must be done after processing the notes to play in order
-        // to catch notes that last shorter than one buffer window.
-        while let Some(release) = self.note_releases.peek() {
-            if release.end_sample < buffer_end {
-                trace!(
-                    "{:7}: release {:?}",
-                    release.end_sample,
-                    release.note_handle
-                );
-                let release = self.note_releases.pop().unwrap();
-                self.instrument
-                    .release_note(release.end_sample - buffer_start, release.note_handle)
-            } else {
-                break;
-            }
-        }
-
-        self.samples_processed = buffer_end;
-        self.instrument.fill_buffer(buffer);
-    }
-}
-
-/// A note that is queued to be played in the future.
-pub struct QueuedPlay {
-    /// The sample number where the note starts playing.
-    begin_sample: usize,
-    /// The sample number where the note stops playing.
-    /// If the end sample lies before the begin sample, the note is note played.
-    end_sample: usize,
-    /// The note that is played.
-    note: Note,
-    /// How fast the note is played.
-    velocity: Velocity,
-}
-
-/// A note that is currently played and scheduled to be released in the future.
-pub struct QueuedRelease {
-    /// The number of the sample where the note stops playing.
-    end_sample: usize,
-    /// The handle to the note that is playing, needed for releasing the note.
-    note_handle: synth::test::PlayHandle,
-}
-
-/// Queued releases are compared by their scheduled time.
-impl PartialEq for QueuedRelease {
-    fn eq(&self, other: &Self) -> bool {
-        self.end_sample == other.end_sample
-    }
-}
-
-impl Eq for QueuedRelease {}
-
-impl PartialOrd for QueuedRelease {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-/// Queued releases are compared by their scheduled time,
-/// the higher the release time, the smaller the QueuedRelease (in order to use them in the standard binary heap).
-impl Ord for QueuedRelease {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        // the smallest release time is the largest queued release for the max heap
-        other.end_sample.cmp(&self.end_sample)
-    }
+    Ok(())
 }

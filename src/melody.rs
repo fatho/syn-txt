@@ -121,7 +121,7 @@ impl<'a> Parser<'a> {
                     notes.push(PlayedNote {
                         note: sym.note,
                         duration: sym.duration,
-                        start: start,
+                        start,
                         velocity: Velocity::from_f64(0.5),
                     });
                     time = time.max(start + sym.duration);

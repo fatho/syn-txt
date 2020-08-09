@@ -35,7 +35,7 @@ fn main() {
         })
         .build();
     let _sum = builder
-        .add_node(Sum { num_inputs: 2 })
+        .add_node(Sum::new(2))
         .input_from(0, sine.output(0))
         .input_from(1, sine2.output(0))
         .output_to(0, sink.input(0))
@@ -47,37 +47,6 @@ fn main() {
         graph.step();
     }
 }
-
-/// Add audio streams together.
-pub struct Sum {
-    num_inputs: usize,
-}
-
-impl Node for Sum {
-    fn num_inputs(&self) -> usize {
-        self.num_inputs
-    }
-
-    fn num_outputs(&self) -> usize {
-        1
-    }
-
-    fn render(&mut self, rio: &RenderIo) {
-        let mut out = rio.output(0);
-        out.fill_zero();
-        let outsamples = out.samples_mut();
-
-        for i in 0..self.num_inputs {
-            let in_ref = rio.input(i);
-            let in_samples = in_ref.samples();
-
-            for (i, o) in in_samples.iter().zip(outsamples.iter_mut()) {
-                *o += *i;
-            }
-        }
-    }
-}
-
 /// Render all the incoming audio data on the terminal.
 pub struct DebugSink;
 

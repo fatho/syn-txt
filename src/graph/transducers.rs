@@ -40,5 +40,40 @@ impl super::Node for Gain {
             *o = *i * self.gain;
         }
     }
+}
+
+/// A node with an arbitrary but static number of inputs.
+pub struct Sum {
+    /// How many inputs to sum.
+    count: usize,
+}
+
+impl Sum {
+    pub fn new(count: usize) -> Self {
+        Self { count }
+    }
+}
+
+impl super::Node for Sum {
+    fn num_inputs(&self) -> usize {
+        self.count
+    }
+    fn num_outputs(&self) -> usize {
+        1
+    }
+    fn render(&mut self, rio: &super::RenderIo) {
+        let mut out = rio.output(0);
+        out.fill_zero();
+        let outsamples = out.samples_mut();
+
+        for i in 0..self.count {
+            let in_ref = rio.input(i);
+            let in_samples = in_ref.samples();
+
+            for (i, o) in in_samples.iter().zip(outsamples.iter_mut()) {
+                *o += *i;
+            }
+        }
+    }
 
 }

@@ -102,10 +102,18 @@ pub fn play(song: Song, output_gain: f64, outfile: Option<&Path>) -> io::Result<
         Some(path) => graph::SoxTarget::File(path),
     };
 
-    // TODO: add mixer node and mix all players
+    let mixer= players
+        .iter()
+        .enumerate()
+        .fold(
+            graph_builder.add_node(graph::Sum::new(players.len())),
+            |accum, (index, item)| accum.input_from(index, item.output(0))
+        )
+        .build();
+
     let output_gain = graph_builder
         .add_node(graph::Gain::from_decibels(output_gain))
-        .input_from(0, players[0].output(0))
+        .input_from(0, mixer.output(0))
         .build();
 
     let _sink = graph_builder

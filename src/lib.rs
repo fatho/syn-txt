@@ -9,6 +9,7 @@
 // this repository.
 
 // modules for making sounds
+pub mod automation;
 pub mod envelope;
 pub mod filter;
 pub mod instrument;

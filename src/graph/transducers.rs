@@ -8,7 +8,6 @@
 // A copy of the license can be found in the LICENSE file in the root of
 // this repository.
 
-
 pub struct Gain {
     gain: f64,
 }
@@ -75,5 +74,4 @@ impl super::Node for Sum {
             }
         }
     }
-
 }

@@ -53,9 +53,10 @@ impl GraphBuilder {
             .map(|node| NodeHolder::new(node, buffer_size))
             .collect();
 
-
-        let mut incoming: Vec<Vec<NodeId>> = std::iter::repeat(Vec::new()).take(nodes.len()).collect();
-        let mut outgoing: Vec<Vec<NodeId>> = std::iter::repeat(Vec::new()).take(nodes.len()).collect();
+        let mut incoming: Vec<Vec<NodeId>> =
+            std::iter::repeat(Vec::new()).take(nodes.len()).collect();
+        let mut outgoing: Vec<Vec<NodeId>> =
+            std::iter::repeat(Vec::new()).take(nodes.len()).collect();
 
         // Connect the output buffers to the inputs and prepare topological sorting
         for (output, input) in self.edges {

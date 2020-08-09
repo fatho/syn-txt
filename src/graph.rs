@@ -22,9 +22,9 @@ mod instrument;
 mod sox;
 mod transducers;
 
+pub use builder::{GraphBuildError, GraphBuilder};
 pub use instrument::InstrumentSource;
 pub use sox::{SoxSink, SoxTarget};
-pub use builder::{GraphBuilder, GraphBuildError};
 pub use transducers::*;
 
 /// Time measured in samples.

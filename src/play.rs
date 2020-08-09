@@ -102,12 +102,12 @@ pub fn play(song: Song, output_gain: f64, outfile: Option<&Path>) -> io::Result<
         Some(path) => graph::SoxTarget::File(path),
     };
 
-    let mixer= players
+    let mixer = players
         .iter()
         .enumerate()
         .fold(
             graph_builder.add_node(graph::Sum::new(players.len())),
-            |accum, (index, item)| accum.input_from(index, item.output(0))
+            |accum, (index, item)| accum.input_from(index, item.output(0)),
         )
         .build();
 

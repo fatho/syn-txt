@@ -56,11 +56,11 @@ impl AudioBuffer {
         &mut self.samples
     }
 
-    pub fn iter(&self) -> impl Iterator<Item=&Stereo<f64>> {
+    pub fn iter(&self) -> impl Iterator<Item = &Stereo<f64>> {
         self.samples.iter()
     }
 
-    pub fn iter_mut(&mut self) -> impl Iterator<Item=&mut Stereo<f64>> {
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut Stereo<f64>> {
         self.samples.iter_mut()
     }
 

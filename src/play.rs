@@ -27,6 +27,10 @@ struct Opt {
     #[structopt(short = "v", long = "verbose", parse(from_occurrences))]
     verbose: usize,
 
+    /// Final gain applied to the output of the song.
+    #[structopt(short = "g", long = "gain", default_value = "1.0")]
+    gain: f64,
+
     /// Output file (any sox-supported format). Music is played directly if not given.
     #[structopt(short, long, parse(from_os_str))]
     output: Option<PathBuf>,
@@ -56,11 +60,11 @@ pub fn song_main<F: FnOnce() -> io::Result<crate::song::Song>>(compose: F) -> io
         let mut f = std::fs::File::create(dump_out_path)?;
         writeln!(f, "{:?}", song)?;
     }
-    play(song, opt.output.as_deref())
+    play(song, opt.gain, opt.output.as_deref())
 }
 
 /// Play a song on the default speakers.
-pub fn play(song: Song, outfile: Option<&Path>) -> io::Result<()> {
+pub fn play(song: Song, output_gain: f64, outfile: Option<&Path>) -> io::Result<()> {
     let sample_rate = 44100;
 
     let sig = TimeSig {
@@ -98,9 +102,15 @@ pub fn play(song: Song, outfile: Option<&Path>) -> io::Result<()> {
         Some(path) => graph::SoxTarget::File(path),
     };
 
+    // TODO: add mixer node and mix all players
+    let output_gain = graph_builder
+        .add_node(graph::Gain::from_decibels(output_gain))
+        .input_from(0, players[0].output(0))
+        .build();
+
     let _sink = graph_builder
         .add_node(graph::SoxSink::new(44100, target).unwrap())
-        .input_from(0, players[0].output(0)) // TODO: add mixer node and mix all players
+        .input_from(0, output_gain.output(0))
         .build();
 
     // 10 ms buffer at 44100 Hz

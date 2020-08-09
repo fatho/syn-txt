@@ -56,6 +56,14 @@ impl AudioBuffer {
         &mut self.samples
     }
 
+    pub fn iter(&self) -> impl Iterator<Item=&Stereo<f64>> {
+        self.samples.iter()
+    }
+
+    pub fn iter_mut(&mut self) -> impl Iterator<Item=&mut Stereo<f64>> {
+        self.samples.iter_mut()
+    }
+
     /// Copy the stereo `f64` samples to bytes, interleaving the left and right samples.
     ///
     /// Could probably be implemented with some sort of unsafe transmute,
@@ -178,6 +186,32 @@ impl<T: ops::Mul + Copy> ops::Mul<T> for Stereo<T> {
         }
     }
 }
+
+macro_rules! impl_left_Mul {
+    ($t:ty) => {
+        impl ops::Mul<Stereo<$t>> for $t {
+            type Output = Stereo<$t>;
+
+            fn mul(self, rhs: Stereo<$t>) -> Self::Output {
+                Stereo {
+                    left: self * rhs.left,
+                    right: self * rhs.right,
+                }
+            }
+        }
+    };
+}
+
+impl_left_Mul!(i64);
+impl_left_Mul!(i32);
+impl_left_Mul!(i16);
+impl_left_Mul!(i8);
+impl_left_Mul!(u64);
+impl_left_Mul!(u32);
+impl_left_Mul!(u16);
+impl_left_Mul!(u8);
+impl_left_Mul!(f32);
+impl_left_Mul!(f64);
 
 impl<T: ops::MulAssign + Copy> ops::MulAssign<T> for Stereo<T> {
     fn mul_assign(&mut self, rhs: T) {

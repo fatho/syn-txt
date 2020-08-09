@@ -17,13 +17,15 @@ use std::rc::Rc;
 
 use crate::wave::AudioBuffer;
 
+mod builder;
 mod instrument;
 mod sox;
-mod builder;
+mod transducers;
 
 pub use instrument::InstrumentSource;
 pub use sox::{SoxSink, SoxTarget};
 pub use builder::{GraphBuilder, GraphBuildError};
+pub use transducers::*;
 
 /// Time measured in samples.
 pub type Sample = usize;

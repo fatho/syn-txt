@@ -49,3 +49,16 @@ pub fn from_octaves(octaves: f64) -> f64 {
 pub fn from_semitones(semitones: f64) -> f64 {
     2.0f64.powf(semitones / 12.0)
 }
+
+/// Compute a factor measured in decibels.
+///
+/// # Example
+///
+/// ```
+/// # use syn_txt::util::*;
+///
+/// assert_eq!(from_semitones(3.0), from_octaves(3.0 / 12.0));
+/// ```
+pub fn from_decibels(decibels: f64) -> f64 {
+    10.0f64.powf(decibels / 10.0)
+}

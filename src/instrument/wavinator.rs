@@ -10,6 +10,7 @@
 
 //! Exemplary implementation of a synthesizer, wielding waves like a pro.
 
+use crate::automation::Expr;
 use crate::envelope::*;
 use crate::filter;
 use crate::note::*;
@@ -39,7 +40,7 @@ pub struct Wavinator {
 #[derive(Debug)]
 pub struct Params {
     /// Output gain of the synthesizer
-    pub gain: f64,
+    pub gain: Expr,
 
     /// Pan of the center unison voice
     pub pan: f64,
@@ -65,7 +66,7 @@ pub struct Params {
 impl Default for Params {
     fn default() -> Self {
         Self {
-            gain: 1.0,
+            gain: Expr::Const(1.0),
             pan: 0.0,
             unison: 3,
             unison_detune_cents: 3.0,
@@ -200,7 +201,7 @@ impl super::Instrument for Wavinator {
                 right: self.biquad.right.step(&filter_coefficients, wave.right),
             };
 
-            *out_sample += wave * self.parameters.gain;
+            *out_sample += wave * self.parameters.gain.eval(&[]).unwrap_or(0.0);
         }
     }
 }

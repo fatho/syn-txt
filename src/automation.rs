@@ -10,6 +10,7 @@ pub enum Expr {
     Const(f64),
     Var(Var),
     BinOp(BinOp, Box<Expr>, Box<Expr>),
+    UnOp(UnOp, Box<Expr>),
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -19,6 +20,13 @@ pub enum BinOp {
     Mul,
     Div,
     Rem,
+    Pow,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum UnOp {
+    Sin,
+    Cos,
 }
 
 #[derive(Debug, PartialEq, Eq, Snafu)]
@@ -47,6 +55,14 @@ impl Expr {
                     BinOp::Mul => x * y,
                     BinOp::Div => x / y,
                     BinOp::Rem => x % y,
+                    BinOp::Pow => x.powf(y),
+                })
+            }
+            Expr::UnOp(op, x) => {
+                let x = x.eval(env)?;
+                Ok(match op {
+                    UnOp::Sin => x.sin(),
+                    UnOp::Cos => x.cos(),
                 })
             }
         }
@@ -65,6 +81,9 @@ impl Expr {
             Some("*") => Self::parse_binop(BinOp::Mul, input),
             Some("/") => Self::parse_binop(BinOp::Div, input),
             Some("%") => Self::parse_binop(BinOp::Rem, input),
+            Some("^") => Self::parse_binop(BinOp::Pow, input),
+            Some("sin") => Self::parse_unop(UnOp::Sin, input),
+            Some("cos") => Self::parse_unop(UnOp::Cos, input),
             Some(other) => {
                 if other.starts_with('$') {
                     Some(Expr::Var(Var(other[1..].parse().ok()?)))
@@ -80,6 +99,11 @@ impl Expr {
         let l = Self::parse_any(input)?;
         let r = Self::parse_any(input)?;
         Some(Expr::BinOp(op, Box::new(l), Box::new(r)))
+    }
+
+    fn parse_unop(op: UnOp, input: &mut dyn Iterator<Item = &str>) -> Option<Expr> {
+        let l = Self::parse_any(input)?;
+        Some(Expr::UnOp(op, Box::new(l)))
     }
 }
 
@@ -99,6 +123,7 @@ mod test {
             Some(Ok(14.0 / 5.0))
         );
         assert_eq!(Expr::parse("% 9 4").map(|x| x.eval(&[])), Some(Ok(1.0)));
+        assert_eq!(Expr::parse("^ 3 2").map(|x| x.eval(&[])), Some(Ok(9.0)));
     }
 
     #[test]
@@ -117,5 +142,11 @@ mod test {
             Expr::parse("- $1 $0").map(|x| x.eval(env)),
             Some(Err(EvalError::UnknownVariable { var: Var(1) }))
         );
+    }
+
+    #[test]
+    fn trigonometry() {
+        assert_eq!(Expr::parse("sin 0").map(|x| x.eval(&[])), Some(Ok(0.0)));
+        assert_eq!(Expr::parse("cos 0").map(|x| x.eval(&[])), Some(Ok(1.0)));
     }
 }

@@ -13,6 +13,7 @@ use crate::{
     wave::Stereo,
 };
 
+pub mod polyphonic;
 pub mod wavinator;
 
 /// Interface of an interactive instrument.

@@ -8,7 +8,7 @@
 // A copy of the license can be found in the LICENSE file in the root of
 // this repository.
 
-use syn_txt::automation::Expr;
+use syn_txt::{automation::Expr, filter::BiquadType, oscillator::WaveShape};
 use syn_txt::instrument::wavinator;
 use syn_txt::melody::parse_melody;
 use syn_txt::play;
@@ -25,8 +25,12 @@ fn main() -> io::Result<()> {
                 Track {
                     instrument: Instrument::Wavinator(
                         wavinator::Params {
-                            // NOTE: $0 is global time
-                            gain: Expr::parse("/ $0 5").unwrap(),
+                            gain: Expr::Const(0.5),
+                            unison: 16,
+                            unison_detune_cents: 0.1,
+                            unison_spread: 1.0,
+                            filter: BiquadType::Lowpass { cutoff: 8000.0, q: 2.0f64.sqrt().recip() },
+                            wave_shape: WaveShape::Saw,
                             ..wavinator::Params::default()
                         }),
                     notes: parse_melody(r"
@@ -41,6 +45,9 @@ fn main() -> io::Result<()> {
                     instrument: Instrument::Wavinator(
                         wavinator::Params {
                             gain: Expr::Const(0.5),
+                            unison: 2,
+                            wave_shape: WaveShape::Rectangle,
+                            filter: BiquadType::Lowpass { cutoff: 1000.0, q: 2.0f64.sqrt().recip() },
                             ..wavinator::Params::default()
                         }),
                     notes: parse_melody(r"

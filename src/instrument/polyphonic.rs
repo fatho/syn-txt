@@ -37,7 +37,7 @@ pub trait NoteSampler {
     /// Generate the next sample for a note.
     /// Return `None` if the note has faded.
     /// Once `None` was returned, `sample` with never be called again.
-    fn sample(&mut self, sample_rate: f64, params: &Self::Params) -> Option<Stereo<f64>>;
+    fn sample(&mut self, global_sample_count: usize, sample_rate: f64, params: &Self::Params) -> Option<Stereo<f64>>;
 
     /// Called before the sample when the note is first released.
     fn release(&mut self);
@@ -109,7 +109,7 @@ impl<Sampler: NoteSampler> super::Instrument for Poly<Sampler> {
             let voice_count = self.active_notes.len();
             for voice_index in (0..voice_count).rev() {
                 if let Some(value) =
-                    self.active_notes[voice_index].sample(self.sample_rate, &self.parameters)
+                    self.active_notes[voice_index].sample(self.samples_processed, self.sample_rate, &self.parameters)
                 {
                     wave += value;
                 } else {
@@ -121,9 +121,9 @@ impl<Sampler: NoteSampler> super::Instrument for Poly<Sampler> {
                 }
             }
 
-            *out_sample += wave
+            *out_sample += wave;
+            self.samples_processed += 1;
         }
-        self.samples_processed += output.len();
     }
 }
 
@@ -143,7 +143,7 @@ struct NoteState<Sampler> {
 }
 
 impl<Sampler: NoteSampler> NoteState<Sampler> {
-    fn sample(&mut self, sample_rate: f64, params: &Sampler::Params) -> Option<Stereo<f64>> {
+    fn sample(&mut self, global_sample_count: usize, sample_rate: f64, params: &Sampler::Params) -> Option<Stereo<f64>> {
         if self.play_delay_samples > 0 {
             // the note has not started yet
             self.play_delay_samples -= 1;
@@ -158,7 +158,7 @@ impl<Sampler: NoteSampler> NoteState<Sampler> {
                 self.sampler.release();
             }
 
-            self.sampler.sample(sample_rate, params)
+            self.sampler.sample(global_sample_count, sample_rate, params)
         }
     }
 }

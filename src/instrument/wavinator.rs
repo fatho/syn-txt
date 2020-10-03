@@ -10,7 +10,7 @@
 
 //! Exemplary implementation of a synthesizer, wielding waves like a pro.
 
-use crate::automation::Expr;
+use crate::automation::{Expr, BuiltInValues};
 use crate::envelope::*;
 use crate::filter;
 use crate::note::*;
@@ -81,9 +81,14 @@ pub struct Sampler {
     envelope: EvalADSR,
     /// Filter for this note
     biquad: Stereo<filter::Biquad>,
+    /// Index of the center voice (which may be in between two voices)
     midpoint: f64,
+    /// Frequency of the center voice
     center_freq: f64,
+    /// The gain resulting from the initial note velocity
     velocity_gain: f64,
+    /// Duration of the current note in samples so far
+    playtime_samples: usize,
 }
 
 impl NoteSampler for Sampler {
@@ -104,13 +109,19 @@ impl NoteSampler for Sampler {
             center_freq: Tuning::default().frequency(note),
             // the velocity simply controls the volume of the note
             velocity_gain: velocity.as_f64(),
+            playtime_samples: 0,
         }
     }
 
-    fn sample(&mut self, sample_rate: f64, params: &Self::Params) -> Option<Stereo<f64>> {
+    fn sample(&mut self, global_sample_count: usize, sample_rate: f64, params: &Self::Params) -> Option<Stereo<f64>> {
         if self.envelope.faded() {
             return None;
         }
+        let builtins = BuiltInValues {
+            global_time_seconds: global_sample_count as f64 / sample_rate,
+            note_time_seconds: self.playtime_samples as f64 / sample_rate,
+        };
+
         let mut value = 0.0;
         let mut value_gain_sum = 0.0;
         let spread_squared = params.unison_spread.max(0.001).powi(2);
@@ -128,14 +139,14 @@ impl NoteSampler for Sampler {
         }
 
         let envelope_gain = self.envelope.step();
-        let instrument_gain = params.gain.eval(&[]).unwrap_or(0.0);
+        let instrument_gain = params.gain.eval(&builtins, &[]).unwrap_or(0.0);
         let correction_gain = value_gain_sum.recip();
 
         trace!("e = {}, i = {}, c = {}", envelope_gain, instrument_gain, correction_gain);
 
         let final_gain = instrument_gain * envelope_gain * self.velocity_gain * correction_gain;
 
-        let pan = params.pan.eval(&[]).unwrap_or(0.0);
+        let pan = params.pan.eval(&builtins, &[]).unwrap_or(0.0);
         let output = final_gain * Stereo::panned_mono(value, pan);
 
         // TODO: make filter automatable
@@ -144,6 +155,7 @@ impl NoteSampler for Sampler {
             left: self.biquad.left.step(&filter_coeffs, output.left),
             right: self.biquad.right.step(&filter_coeffs, output.right),
         };
+        self.playtime_samples += 1;
         Some(filtered_output)
     }
 

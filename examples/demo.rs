@@ -26,6 +26,7 @@ fn main() -> io::Result<()> {
                     instrument: Instrument::Wavinator(
                         wavinator::Params {
                             gain: Expr::Const(0.5),
+                            pan: Expr::parse("sin time").unwrap(),
                             unison: 16,
                             unison_detune_cents: 0.1,
                             unison_spread: 1.0,

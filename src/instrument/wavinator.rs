@@ -30,6 +30,9 @@ pub struct Wavinator {
 
     biquad: Stereo<filter::Biquad>,
 
+    /// Number of samples already processed
+    samples_processed: usize,
+
     /// Monotoneously increasing id used for identifying playing notes.
     next_play_handle: usize,
     active_notes: Vec<NoteState>,
@@ -102,6 +105,7 @@ impl Wavinator {
             // audio settings
             sample_rate,
             // internal state
+            samples_processed: 0,
             next_play_handle: 0,
             active_notes: vec![],
         }
@@ -180,6 +184,11 @@ impl super::Instrument for Wavinator {
 
     fn fill_buffer(&mut self, output: &mut [Stereo<f64>]) {
         for out_sample in output.iter_mut() {
+            // Environment for automation
+            let time_seconds = self.samples_processed as f64 / self.sample_rate;
+            self.samples_processed += 1;
+            let eval_env = &[time_seconds];
+
             let mut wave = Stereo::mono(0.0);
             let voice_count = self.active_notes.len();
             for voice_index in (0..voice_count).rev() {
@@ -201,7 +210,7 @@ impl super::Instrument for Wavinator {
                 right: self.biquad.right.step(&filter_coefficients, wave.right),
             };
 
-            *out_sample += wave * self.parameters.gain.eval(&[]).unwrap_or(0.0);
+            *out_sample += wave * self.parameters.gain.eval(eval_env).unwrap_or(0.0);
         }
     }
 }

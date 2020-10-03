@@ -85,6 +85,7 @@ impl Expr {
             Some("sin") => Self::parse_unop(UnOp::Sin, input),
             Some("cos") => Self::parse_unop(UnOp::Cos, input),
             Some(other) => {
+                // TODO: identify variables with names instead of numbers
                 if other.starts_with('$') {
                     Some(Expr::Var(Var(other[1..].parse().ok()?)))
                 } else {

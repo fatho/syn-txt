@@ -8,6 +8,7 @@
 // A copy of the license can be found in the LICENSE file in the root of
 // this repository.
 
+use syn_txt::automation::Expr;
 use syn_txt::instrument::wavinator;
 use syn_txt::melody::parse_melody;
 use syn_txt::play;
@@ -22,7 +23,12 @@ fn main() -> io::Result<()> {
             bpm: 128,
             tracks: vec![
                 Track {
-                    instrument: Instrument::Wavinator(wavinator::Params::default()),
+                    instrument: Instrument::Wavinator(
+                        wavinator::Params {
+                            // NOTE: $0 is global time
+                            gain: Expr::parse("/ $0 5").unwrap(),
+                            ..wavinator::Params::default()
+                        }),
                     notes: parse_melody(r"
                         r++
                         a3- c4- a3- d4- a3- e4- a3- d4-
@@ -32,7 +38,11 @@ fn main() -> io::Result<()> {
                     ").unwrap(),
                 },
                 Track {
-                    instrument: Instrument::Wavinator(wavinator::Params::default()),
+                    instrument: Instrument::Wavinator(
+                        wavinator::Params {
+                            gain: Expr::Const(0.5),
+                            ..wavinator::Params::default()
+                        }),
                     notes: parse_melody(r"
                         a1 a2 a1 a2
                         a1 a2 a1 a2

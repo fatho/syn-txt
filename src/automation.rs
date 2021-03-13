@@ -9,8 +9,15 @@ pub struct Var(usize);
 pub enum Expr {
     Const(f64),
     Var(Var),
+    BuiltInVar(BuiltInVar),
     BinOp(BinOp, Box<Expr>, Box<Expr>),
     UnOp(UnOp, Box<Expr>),
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum BuiltInVar {
+    GlobalTimeSeconds,
+    NoteTimeSeconds
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -35,8 +42,31 @@ pub enum EvalError {
     UnknownVariable { var: Var },
 }
 
+pub struct BuiltInValues {
+    pub global_time_seconds: f64,
+    pub note_time_seconds: f64,
+}
+
+impl Default for BuiltInValues {
+    fn default() -> Self {
+        Self {
+            global_time_seconds: 0.0,
+            note_time_seconds: 0.0,
+        }
+    }
+}
+
+impl BuiltInValues {
+    pub fn get(&self, var: BuiltInVar) -> f64 {
+        match var {
+            BuiltInVar::GlobalTimeSeconds => self.global_time_seconds,
+            BuiltInVar::NoteTimeSeconds => self.note_time_seconds,
+        }
+    }
+}
+
 impl Expr {
-    pub fn eval(&self, env: &[f64]) -> Result<f64, EvalError> {
+    pub fn eval(&self, builtins: &BuiltInValues, env: &[f64]) -> Result<f64, EvalError> {
         match self {
             Expr::Const(x) => Ok(*x),
             Expr::Var(v) => {
@@ -46,9 +76,10 @@ impl Expr {
                     Err(EvalError::UnknownVariable { var: *v })
                 }
             }
+            Expr::BuiltInVar(v) => Ok(builtins.get(*v)),
             Expr::BinOp(op, x, y) => {
-                let x = x.eval(env)?;
-                let y = y.eval(env)?;
+                let x = x.eval(builtins, env)?;
+                let y = y.eval(builtins, env)?;
                 Ok(match op {
                     BinOp::Add => x + y,
                     BinOp::Sub => x - y,
@@ -59,7 +90,7 @@ impl Expr {
                 })
             }
             Expr::UnOp(op, x) => {
-                let x = x.eval(env)?;
+                let x = x.eval(builtins, env)?;
                 Ok(match op {
                     UnOp::Sin => x.sin(),
                     UnOp::Cos => x.cos(),
@@ -84,10 +115,15 @@ impl Expr {
             Some("^") => Self::parse_binop(BinOp::Pow, input),
             Some("sin") => Self::parse_unop(UnOp::Sin, input),
             Some("cos") => Self::parse_unop(UnOp::Cos, input),
+            // Global constants
+            Some("time") => Some(Expr::BuiltInVar(BuiltInVar::GlobalTimeSeconds)),
+            Some("note_time") => Some(Expr::BuiltInVar(BuiltInVar::NoteTimeSeconds)),
             Some(other) => {
                 if other.starts_with('$') {
+                    // $-variables refer to node inputs (not yet implemented in the graph)
                     Some(Expr::Var(Var(other[1..].parse().ok()?)))
                 } else {
+                    // everything else must be a number
                     Some(Expr::Const(other.parse().ok()?))
                 }
             }
@@ -113,24 +149,24 @@ mod test {
 
     #[test]
     fn simple() {
-        assert_eq!(Expr::parse("+ 1 2").map(|x| x.eval(&[])), Some(Ok(3.0)));
+        assert_eq!(Expr::parse("+ 1 2").map(|x| x.eval(&BuiltInValues::default(), &[])), Some(Ok(3.0)));
         assert_eq!(
-            Expr::parse("+ 2 * 3 4").map(|x| x.eval(&[])),
+            Expr::parse("+ 2 * 3 4").map(|x| x.eval(&BuiltInValues::default(), &[])),
             Some(Ok(14.0))
         );
         assert_eq!(
-            Expr::parse("/ + 2 * 3 4 5").map(|x| x.eval(&[])),
+            Expr::parse("/ + 2 * 3 4 5").map(|x| x.eval(&BuiltInValues::default(), &[])),
             Some(Ok(14.0 / 5.0))
         );
-        assert_eq!(Expr::parse("% 9 4").map(|x| x.eval(&[])), Some(Ok(1.0)));
-        assert_eq!(Expr::parse("^ 3 2").map(|x| x.eval(&[])), Some(Ok(9.0)));
+        assert_eq!(Expr::parse("% 9 4").map(|x| x.eval(&BuiltInValues::default(), &[])), Some(Ok(1.0)));
+        assert_eq!(Expr::parse("^ 3 2").map(|x| x.eval(&BuiltInValues::default(), &[])), Some(Ok(9.0)));
     }
 
     #[test]
     fn variables() {
         let env = &[2.0, 5.0, 10.0];
         assert_eq!(
-            Expr::parse("/ - $1 $2 $0").map(|x| x.eval(env)),
+            Expr::parse("/ - $1 $2 $0").map(|x| x.eval(&BuiltInValues::default(), env)),
             Some(Ok(-2.5))
         );
     }
@@ -139,14 +175,14 @@ mod test {
     fn undefined_variables() {
         let env = &[2.0];
         assert_eq!(
-            Expr::parse("- $1 $0").map(|x| x.eval(env)),
+            Expr::parse("- $1 $0").map(|x| x.eval(&BuiltInValues::default(), env)),
             Some(Err(EvalError::UnknownVariable { var: Var(1) }))
         );
     }
 
     #[test]
     fn trigonometry() {
-        assert_eq!(Expr::parse("sin 0").map(|x| x.eval(&[])), Some(Ok(0.0)));
-        assert_eq!(Expr::parse("cos 0").map(|x| x.eval(&[])), Some(Ok(1.0)));
+        assert_eq!(Expr::parse("sin 0").map(|x| x.eval(&BuiltInValues::default(), &[])), Some(Ok(0.0)));
+        assert_eq!(Expr::parse("cos 0").map(|x| x.eval(&BuiltInValues::default(), &[])), Some(Ok(1.0)));
     }
 }

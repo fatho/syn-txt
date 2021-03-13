@@ -10,7 +10,7 @@
 
 //! Exemplary implementation of a synthesizer, wielding waves like a pro.
 
-use crate::automation::Expr;
+use crate::automation::{Expr, BuiltInValues};
 use crate::envelope::*;
 use crate::filter;
 use crate::note::*;
@@ -18,22 +18,11 @@ use crate::oscillator::*;
 use crate::tuning::*;
 use crate::wave::*;
 
-pub struct Wavinator {
-    /// Samples per second rate of the generated audio signal.
-    sample_rate: f64,
-    /// Reference note and frequency, determining the pitch of all other notes.
-    tuning: Tuning,
+use super::polyphonic::*;
 
-    /// The public parameters influencing the sound.
-    /// TODO: these are eventually automatable
-    parameters: Params,
+use log::trace;
 
-    biquad: Stereo<filter::Biquad>,
-
-    /// Monotoneously increasing id used for identifying playing notes.
-    next_play_handle: usize,
-    active_notes: Vec<NoteState>,
-}
+pub type Wavinator = Poly<Sampler>;
 
 /// Parameters of the synthesizer.
 /// TODO: Add filter settings
@@ -43,14 +32,15 @@ pub struct Params {
     pub gain: Expr,
 
     /// Pan of the center unison voice
-    pub pan: f64,
+    pub pan: Expr,
 
     /// Number of voices per note
     pub unison: usize,
     /// Maximum detune factor the outermost unison voices.
     pub unison_detune_cents: f64,
-    /// Gain falloff exponent for the more detuned noises.
-    pub unison_falloff: f64,
+    /// The larger the spread, the more evenly the unison voices contribute to the final sound,
+    /// the smaller the spread, the more the center frequency dominates.
+    pub unison_spread: f64,
 
     /// Oscillator shape
     pub wave_shape: WaveShape,
@@ -67,11 +57,11 @@ impl Default for Params {
     fn default() -> Self {
         Self {
             gain: Expr::Const(1.0),
-            pan: 0.0,
-            unison: 3,
+            pan: Expr::Const(0.0),
+            unison: 1,
             unison_detune_cents: 3.0,
-            unison_falloff: 0.0,
-            wave_shape: WaveShape::SuperSaw,
+            unison_spread: 1.0,
+            wave_shape: WaveShape::Sine,
             envelope: ADSR {
                 attack: 0.01,
                 decay: 0.0,
@@ -83,176 +73,93 @@ impl Default for Params {
     }
 }
 
-/// Opaque handle indicating a playing voice.
-#[derive(Debug, PartialEq, Eq)]
-pub struct PlayHandle(usize);
+/// State needed for a playing note.
+pub struct Sampler {
+    /// The voices producing the sound of the note
+    voices: Vec<Phase>,
+    /// The envelope defining the volume shape of the note
+    envelope: EvalADSR,
+    /// Filter for this note
+    biquad: Stereo<filter::Biquad>,
+    /// Index of the center voice (which may be in between two voices)
+    midpoint: f64,
+    /// Frequency of the center voice
+    center_freq: f64,
+    /// The gain resulting from the initial note velocity
+    velocity_gain: f64,
+    /// Duration of the current note in samples so far
+    playtime_samples: usize,
+}
 
-impl Wavinator {
-    pub fn new(sample_rate: f64) -> Self {
-        Self::with_params(sample_rate, Params::default())
-    }
-    pub fn with_params(sample_rate: f64, params: Params) -> Self {
-        Wavinator {
-            parameters: params,
-            tuning: Tuning::default(),
+impl NoteSampler for Sampler {
+    type Params = Params;
+
+    fn new(note: Note, velocity: Velocity, sample_rate: f64, params: &Self::Params) -> Self {
+        // NOTE: number of voices can only be determined at note creation at the moment
+        Self {
+            voices: std::iter::repeat(Phase::ZERO).take(params.unison.max(1)).collect(),
+            envelope: params.envelope.instantiate(sample_rate),
             biquad: Stereo {
                 left: filter::Biquad::new(),
                 right: filter::Biquad::new(),
             },
-            // audio settings
-            sample_rate,
-            // internal state
-            next_play_handle: 0,
-            active_notes: vec![],
-        }
-    }
-}
-
-impl Wavinator {
-    fn next_play_handle(&mut self) -> PlayHandle {
-        let h = PlayHandle(self.next_play_handle);
-        self.next_play_handle += 1;
-        h
-    }
-}
-
-impl super::Instrument for Wavinator {
-    type PlayHandle = PlayHandle;
-
-    fn play_note(
-        &mut self,
-        sample_delay: usize,
-        note: Note,
-        velocity: Velocity,
-    ) -> Self::PlayHandle {
-        let frequency = self.tuning.frequency(note);
-        let handle = self.next_play_handle();
-
-        let midpoint = (self.parameters.unison as f64 - 1.0) / 2.0;
-        let mut voices = (0..self.parameters.unison)
-            .map(|index| {
-                let offset = if self.parameters.unison > 1 {
-                    (index as f64 - midpoint) / midpoint
-                } else {
-                    0.0
-                };
-                let detune = crate::util::from_cents(offset * self.parameters.unison_detune_cents);
-                let pan = self.parameters.pan;
-                Voice {
-                    // normalized in the next step
-                    gain: (-self.parameters.unison_falloff * offset.powi(2)).exp(),
-                    pan,
-                    oscillator: Oscillator::new(
-                        self.parameters.wave_shape,
-                        self.sample_rate,
-                        frequency * detune,
-                    ),
-                }
-            })
-            .collect::<Vec<Voice>>();
-        let total_gain: Stereo<f64> = voices
-            .iter()
-            .map(|v| Stereo::panned_mono(v.gain, v.pan))
-            .sum();
-        let normalized_gain = 1.0 / total_gain.left.max(total_gain.right);
-        log::trace!("total unnormalized unison gain {:?}", total_gain);
-        for voice in voices.iter_mut() {
-            voice.gain *= velocity.as_f64() * normalized_gain;
-        }
-
-        self.active_notes.push(NoteState {
-            handle: PlayHandle(handle.0),
-            // state
-            play_delay_samples: sample_delay,
-            release_delay_samples: std::usize::MAX,
-            voices,
-            // volume
-            envelope: self.parameters.envelope.instantiate(self.sample_rate),
-        });
-        handle
-    }
-
-    fn release_note(&mut self, sample_delay: usize, handle: Self::PlayHandle) {
-        if let Some(voice) = self.active_notes.iter_mut().find(|v| v.handle == handle) {
-            voice.release_delay_samples = voice.release_delay_samples.min(sample_delay);
+            // Compute the index of the center voice (which may be in between two voices).
+            // The number of voices should be odd, so that one voice is playing the actual note frequency.
+            midpoint: (params.unison as f64 - 1.0) / 2.0,
+            center_freq: Tuning::default().frequency(note),
+            // the velocity simply controls the volume of the note
+            velocity_gain: velocity.as_f64(),
+            playtime_samples: 0,
         }
     }
 
-    fn fill_buffer(&mut self, output: &mut [Stereo<f64>]) {
-        for out_sample in output.iter_mut() {
-            let mut wave = Stereo::mono(0.0);
-            let voice_count = self.active_notes.len();
-            for voice_index in (0..voice_count).rev() {
-                wave += self.active_notes[voice_index].sample();
-                if self.active_notes[voice_index].envelope.faded() {
-                    log::trace!(
-                        "removing faded voice {:?}",
-                        self.active_notes[voice_index].handle
-                    );
-                    self.active_notes.swap_remove(voice_index);
-                }
-            }
-
-            // It's inefficient to compute these every sample, but once
-            // we get to automation, we'd have to do that anyway.
-            let filter_coefficients = self.parameters.filter.to_coefficients(self.sample_rate);
-            wave = Stereo {
-                left: self.biquad.left.step(&filter_coefficients, wave.left),
-                right: self.biquad.right.step(&filter_coefficients, wave.right),
-            };
-
-            *out_sample += wave * self.parameters.gain.eval(&[]).unwrap_or(0.0);
+    fn sample(&mut self, global_sample_count: usize, sample_rate: f64, params: &Self::Params) -> Option<Stereo<f64>> {
+        if self.envelope.faded() {
+            return None;
         }
-    }
-}
+        let builtins = BuiltInValues {
+            global_time_seconds: global_sample_count as f64 / sample_rate,
+            note_time_seconds: self.playtime_samples as f64 / sample_rate,
+        };
 
-/// State needed for a playing note.
-struct NoteState {
-    /// Handle that has been handed out to the host of the synthesizer when
-    /// this note was played, used for releasing it.
-    handle: PlayHandle,
-    /// Number of samples until the note starts
-    play_delay_samples: usize,
-    /// Number of samples until the note ends
-    release_delay_samples: usize,
-    /// The voices producing the sound of the note
-    voices: Vec<Voice>,
-    /// The envelope defining the volume shape of the note
-    envelope: EvalADSR,
-}
+        let mut value = 0.0;
+        let mut value_gain_sum = 0.0;
+        let spread_squared = params.unison_spread.max(0.001).powi(2);
+        for (index, voice) in self.voices.iter_mut().enumerate() {
+            let delta = index as f64 - self.midpoint;
 
-#[derive(Debug)]
-struct Voice {
-    pan: f64,
-    gain: f64,
-    oscillator: Oscillator,
-}
+            let gain = (- delta * delta / (2.0 * spread_squared)).exp();
 
-impl Voice {
-    fn sample(&mut self) -> Stereo<f64> {
-        let mono = self.oscillator.next_sample() * self.gain;
-        Stereo::panned_mono(mono, self.pan)
-    }
-}
+            value += params.wave_shape.eval(*voice) * gain;
+            value_gain_sum += gain;
 
-impl NoteState {
-    fn sample(&mut self) -> Stereo<f64> {
-        if self.play_delay_samples > 0 {
-            // the note has not started yet
-            self.play_delay_samples -= 1;
-            Stereo::mono(0.0)
-        } else {
-            if self.release_delay_samples > 0 {
-                self.release_delay_samples -= 1;
-            } else if !self.envelope.released() {
-                log::trace!("released {:?}", self.handle);
-                self.envelope.release();
-            }
-
-            let result: Stereo<f64> = self.voices.iter_mut().map(Voice::sample).sum();
-            let envelope = self.envelope.step();
-
-            result * envelope
+            let detune = crate::util::from_cents(params.unison_detune_cents * delta);
+            let frequency = detune * self.center_freq;
+            *voice = voice.step_frequency(frequency, sample_rate);
         }
+
+        let envelope_gain = self.envelope.step();
+        let instrument_gain = params.gain.eval(&builtins, &[]).unwrap_or(0.0);
+        let correction_gain = value_gain_sum.recip();
+
+        trace!("e = {}, i = {}, c = {}", envelope_gain, instrument_gain, correction_gain);
+
+        let final_gain = instrument_gain * envelope_gain * self.velocity_gain * correction_gain;
+
+        let pan = params.pan.eval(&builtins, &[]).unwrap_or(0.0);
+        let output = final_gain * Stereo::panned_mono(value, pan);
+
+        // TODO: make filter automatable
+        let filter_coeffs = params.filter.to_coefficients(sample_rate);
+        let filtered_output = Stereo {
+            left: self.biquad.left.step(&filter_coeffs, output.left),
+            right: self.biquad.right.step(&filter_coeffs, output.right),
+        };
+        self.playtime_samples += 1;
+        Some(filtered_output)
+    }
+
+    fn release(&mut self) {
+        self.envelope.release()
     }
 }

@@ -9,12 +9,99 @@
 // this repository.
 
 #[derive(Debug, Copy, Clone)]
+pub struct Phase(f64);
+
+impl Phase {
+    pub const ZERO: Phase = Phase(0.0);
+
+    pub fn new(mut offset: f64) -> Phase {
+        if offset >= 1.0 {
+            while offset >= 1.0 {
+                offset -= 1.0;
+            }
+        } else if offset < 0.0 {
+            while offset < 0.0 {
+                offset += 1.0;
+            }
+        }
+        Phase(offset)
+    }
+
+    pub fn offset(self) -> f64 {
+        self.0
+    }
+
+    pub fn step(self, amount: f64) -> Phase {
+        Phase::new(self.0 + amount)
+    }
+
+    pub fn step_frequency(self, frequency: f64, sample_rate: f64) -> Phase {
+        self.step(frequency / sample_rate)
+    }
+}
+
+#[derive(Debug, Copy, Clone)]
 pub enum WaveShape {
     Sine,
+    Rectangle,
+    Triangle,
     Saw,
     SuperSaw,
     TwoSidedSaw,
     AlternatingSaw,
+}
+
+impl WaveShape {
+    pub fn eval(self, phase: Phase) -> f64 {
+        let offset = phase.offset();
+        use std::f64::consts::PI;
+        match self {
+            WaveShape::Sine => (offset * 2.0 * PI).sin(),
+            WaveShape::Rectangle => {
+                if offset < 0.5 {
+                    1.0
+                } else {
+                    -1.0
+                }
+            },
+            WaveShape::Triangle => {
+                if offset < 0.25 {
+                    4.0 * offset
+                } else if offset < 0.75 {
+                    2.0 - 4.0 * offset
+                } else {
+                    4.0 * offset - 4.0
+                }
+            },
+            WaveShape::Saw => 2.0 * offset - 1.0,
+            WaveShape::SuperSaw => {
+                let slope = 3.0;
+                if offset < 0.5 {
+                    slope * offset - 1.0
+                } else {
+                    1.0 + slope * (offset - 1.0)
+                }
+            }
+            WaveShape::TwoSidedSaw => {
+                if offset < 0.5 {
+                    2.0 * offset
+                } else {
+                    -2.0 * (offset - 0.5)
+                }
+            }
+            WaveShape::AlternatingSaw => {
+                let upsaw = 2.0 * offset - 1.0;
+                let downsaw = -upsaw;
+                let breaks = 5;
+                let piece = (offset * (breaks + 1) as f64).trunc() as i32;
+                if piece % 2 == 0 {
+                    upsaw
+                } else {
+                    downsaw
+                }
+            }
+        }
+    }
 }
 
 /// An oscillator sampling a wave of some shape at a fixed sample rate.
@@ -23,7 +110,7 @@ pub struct Oscillator {
     shape: WaveShape,
     sample_rate: f64,
     frequency: f64,
-    phase_offset: f64,
+    phase: Phase,
 }
 
 impl Oscillator {
@@ -32,49 +119,13 @@ impl Oscillator {
             shape,
             sample_rate,
             frequency,
-            phase_offset: 0.0,
+            phase: Phase::ZERO,
         }
     }
 
     pub fn next_sample(&mut self) -> f64 {
-        let phase = self.phase_offset;
-        // Increment phase
-        let phase_increment = self.frequency / self.sample_rate;
-        self.phase_offset += phase_increment;
-        while self.phase_offset > 1.0 {
-            self.phase_offset -= 1.0;
-        }
-        // Compute wave
-        use std::f64::consts::PI;
-        match self.shape {
-            WaveShape::Sine => (phase * 2.0 * PI).sin(),
-            WaveShape::Saw => 2.0 * phase - 1.0,
-            WaveShape::SuperSaw => {
-                let slope = 3.0;
-                if phase < 0.5 {
-                    slope * phase - 1.0
-                } else {
-                    1.0 + slope * (phase - 1.0)
-                }
-            }
-            WaveShape::TwoSidedSaw => {
-                if phase < 0.5 {
-                    2.0 * phase
-                } else {
-                    -2.0 * (phase - 0.5)
-                }
-            }
-            WaveShape::AlternatingSaw => {
-                let upsaw = 2.0 * phase - 1.0;
-                let downsaw = -upsaw;
-                let breaks = 5;
-                let piece = (phase * (breaks + 1) as f64).trunc() as i32;
-                if piece % 2 == 0 {
-                    upsaw
-                } else {
-                    downsaw
-                }
-            }
-        }
+        let result = self.shape.eval(self.phase);
+        self.phase = self.phase.step_frequency(self.frequency, self.sample_rate);
+        result
     }
 }

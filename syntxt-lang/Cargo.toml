@@ -1,0 +1,13 @@
+[package]
+name = "syntxt-lang"
+version = "0.1.0"
+authors = ["Fabian Thorand <f.thorand@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+logos = "0.12.0"
+
+[dev-dependencies]
+expect-test = "1.1.0"

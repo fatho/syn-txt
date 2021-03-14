@@ -55,6 +55,7 @@ html_theme_options = {
     'logo': 'logo.png',
     'github_user': 'fatho',
     'github_repo': 'syn-txt',
+    'github_type': 'star',
     'show_powered_by': 'false',
 
     # Free fonts

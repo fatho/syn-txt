@@ -31,11 +31,17 @@ fn main() -> io::Result<()> {
                             unison_detune_cents: 0.1,
                             unison_spread: 1.0,
                             filter: BiquadType::Lowpass { cutoff: 8000.0, q: 2.0f64.sqrt().recip() },
-                            wave_shape: WaveShape::Saw,
+                            wave_shape: WaveShape::SuperSaw,
                             ..wavinator::Params::default()
                         }),
                     notes: parse_melody(r"
-                        r++
+                        r+++
+                        c3-- d3-- e3-- g3-- a3--
+                        d3-- e3-- g3-- a3-- c4--
+                        e3-- g3-- a3-- c4-- d4--
+                        g3-- a3-- c4-- d4-- e4--
+                        a3-- c4-- d4-- e4-- g4--
+                        c4-- d4-- e4-- g4-- a4--
                         a3- c4- a3- d4- a3- e4- a3- d4-
                         a3- c4- a3- d4- a3- e4- a3- d4-
                         { { c4- d4- e4- d4- } a3+ } { { c4- d4- e4- d4- } a3+ }
@@ -52,11 +58,12 @@ fn main() -> io::Result<()> {
                             ..wavinator::Params::default()
                         }),
                     notes: parse_melody(r"
-                        a1 a2 a1 a2
-                        a1 a2 a1 a2
-                        a1 a2 a1 a2
-                        a1 a2 a1 a2
-                        a1 a2 a1 a2
+                        a1 a2- a1- a1- a1- a2
+                        e1 e2- e1 e1- e2
+                        d1 d2- d1- d1- d1- d2
+                        a1 a2- a1 a1- a2
+                        a1 a2- a1- a1- a1- a2
+                        e1 e2- e1 e1- e2
                     ").unwrap(),
                 },
             ],

@@ -50,6 +50,6 @@ If everything worked, it should produce something similar to [this audio snippet
 
 ## License
 
-The project is free software licensed under the [GNU General Public License Version 3](/LICENSE).
+The project is free software licensed under the [GNU Affero General Public License Version 3](/LICENSE).
 
 [sox]: http://sox.sourceforge.net/

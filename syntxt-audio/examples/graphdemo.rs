@@ -1,90 +1,58 @@
 // syn.txt -- a text based synthesizer and audio workstation
-// Copyright (C) 2020  Fabian Thorand
-//
+// Copyright (C) 2021  Fabian Thorand
+// 
 // This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation.
-//
-// A copy of the license can be found in the LICENSE file in the root of
-// this repository.
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+// 
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+// 
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 //! Evaluating how the graph interface could be used
 
-use syn_txt::melody::parse_melody;
-use syn_txt::song;
 use syn_txt::{graph::*, wave::Stereo};
-use syn_txt::{instrument::wavinator, song::Time};
 
 fn main() {
-    let instrument = wavinator::Wavinator::with_params(44100.0, wavinator::Params::default());
-    let notes = parse_melody(
-        r"
-            a3- c4- a3- d4- a3- e4- a3- d4-
-            a3- c4- a3- d4- a3- e4- a3- d4-
-            { { c4- d4- e4- d4- } a3+ } { { c4- d4- e4- d4- } a3+ }
-            { a3 c4 } { a3 d4 } { a3 c4 } r
-        ",
-    )
-    .unwrap();
-    let last_note_end = notes
-        .iter()
-        .map(|n| n.start + n.duration)
-        .max()
-        .unwrap_or(Time::int(0));
-    let sig = song::TimeSig {
-        beats_per_minute: 128,
-        beat_unit: 4,
-    };
-
     let mut builder = GraphBuilder::new();
-
-    let source = builder
-        .add_node(InstrumentSource::new(44100, sig, instrument, notes))
+    let sine = builder
+        .add_node(Sine {
+            samples_per_second: 44100,
+            amplitude: 0.5,
+            frequency: 440.0,
+        })
         .build();
 
-    let _sink = builder
+    let debug_sink = builder.add_node(DebugSink).build();
+    let sink = builder
         .add_node(SoxSink::new(44100, SoxTarget::Play).unwrap())
-        .input_from(0, source.output(0))
         .build();
 
-    let buffer_size = 1024;
+    let sine2 = builder
+        .add_node(Sine {
+            samples_per_second: 44100,
+            amplitude: 0.5,
+            frequency: 440.0 * 2.0,
+        })
+        .build();
+    let _sum = builder
+        .add_node(Sum::new(2))
+        .input_from(0, sine.output(0))
+        .input_from(1, sine2.output(0))
+        .output_to(0, sink.input(0))
+        .output_to(0, debug_sink.input(0))
+        .build();
+
     let mut graph = builder.build(1024).unwrap();
-    let total_samples = sig.samples(last_note_end + Time::int(2), 44100) + buffer_size - 1;
-    for _ in 0..(total_samples / buffer_size) {
+    for _ in 0..40 {
         graph.step();
     }
 }
-
-/// Add audio streams together.
-pub struct Sum {
-    num_inputs: usize,
-}
-
-impl Node for Sum {
-    fn num_inputs(&self) -> usize {
-        self.num_inputs
-    }
-
-    fn num_outputs(&self) -> usize {
-        1
-    }
-
-    fn render(&mut self, rio: &RenderIo) {
-        let mut out = rio.output(0);
-        out.fill_zero();
-        let outsamples = out.samples_mut();
-
-        for i in 0..self.num_inputs {
-            let in_ref = rio.input(i);
-            let in_samples = in_ref.samples();
-
-            for (i, o) in in_samples.iter().zip(outsamples.iter_mut()) {
-                *o += *i;
-            }
-        }
-    }
-}
-
 /// Render all the incoming audio data on the terminal.
 pub struct DebugSink;
 

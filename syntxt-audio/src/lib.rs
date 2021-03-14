@@ -1,16 +1,3 @@
-#!/usr/bin/env bash
-
-# gnuify: easily prepend a GNU license header to each source file.
-
-gunify() {
-    filename=$1
-    if grep -q 'This program is free software' "$filename"; then
-        echo "skipping $filename"
-        return
-    fi
-    echo "gunifying $filename"
-    temp=$(mktemp)
-    cat > "$temp" <<EOF
 // syn.txt -- a text based synthesizer and audio workstation
 // Copyright (C) 2021  Fabian Thorand
 // 
@@ -27,12 +14,22 @@ gunify() {
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-EOF
-    cat "$filename" >> "$temp"
-    cp "$temp" "$filename"
-    rm "$temp"
-}
+// modules for making sounds
+pub mod automation;
+pub mod envelope;
+pub mod filter;
+pub mod instrument;
+pub mod note;
+pub mod oscillator;
+pub mod tuning;
+pub mod util;
+pub mod wave;
 
-for f in $(find . -name '*.rs'); do
-    gunify "$f"
-done
+// Building songs
+pub mod graph;
+pub mod melody;
+pub mod play;
+pub mod song;
+
+// Utility modules
+pub mod rational;

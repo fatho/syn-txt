@@ -895,3 +895,131 @@ fn parse_dot_exprs_invalid_parens() {
             )"#]],
     );
 }
+
+
+#[test]
+fn parse_call() {
+    check_expr("atan2(1, 2, ) + -foo.frob(42, sin(pi))",
+        expect![[r#"
+            Ok(
+                Node {
+                    span: 0..38,
+                    data: Binary {
+                        left: Node {
+                            span: 0..13,
+                            data: Call {
+                                callee: Node {
+                                    span: 0..5,
+                                    data: Var(
+                                        "atan2",
+                                    ),
+                                },
+                                lparen: Node {
+                                    span: 5..6,
+                                    data: (),
+                                },
+                                arguments: [
+                                    Node {
+                                        span: 6..7,
+                                        data: Int(
+                                            1,
+                                        ),
+                                    },
+                                    Node {
+                                        span: 9..10,
+                                        data: Int(
+                                            2,
+                                        ),
+                                    },
+                                ],
+                                rparen: Node {
+                                    span: 12..13,
+                                    data: (),
+                                },
+                            },
+                        },
+                        operator: Node {
+                            span: 14..15,
+                            data: Add,
+                        },
+                        right: Node {
+                            span: 16..38,
+                            data: Unary {
+                                operator: Node {
+                                    span: 16..17,
+                                    data: Minus,
+                                },
+                                operand: Node {
+                                    span: 17..38,
+                                    data: Call {
+                                        callee: Node {
+                                            span: 17..25,
+                                            data: Accessor {
+                                                expr: Node {
+                                                    span: 17..20,
+                                                    data: Var(
+                                                        "foo",
+                                                    ),
+                                                },
+                                                dot: Node {
+                                                    span: 20..21,
+                                                    data: (),
+                                                },
+                                                attribute: Node {
+                                                    span: 21..25,
+                                                    data: "frob",
+                                                },
+                                            },
+                                        },
+                                        lparen: Node {
+                                            span: 25..26,
+                                            data: (),
+                                        },
+                                        arguments: [
+                                            Node {
+                                                span: 26..28,
+                                                data: Int(
+                                                    42,
+                                                ),
+                                            },
+                                            Node {
+                                                span: 30..37,
+                                                data: Call {
+                                                    callee: Node {
+                                                        span: 30..33,
+                                                        data: Var(
+                                                            "sin",
+                                                        ),
+                                                    },
+                                                    lparen: Node {
+                                                        span: 33..34,
+                                                        data: (),
+                                                    },
+                                                    arguments: [
+                                                        Node {
+                                                            span: 34..36,
+                                                            data: Var(
+                                                                "pi",
+                                                            ),
+                                                        },
+                                                    ],
+                                                    rparen: Node {
+                                                        span: 36..37,
+                                                        data: (),
+                                                    },
+                                                },
+                                            },
+                                        ],
+                                        rparen: Node {
+                                            span: 37..38,
+                                            data: (),
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            )"#]],
+    );
+}

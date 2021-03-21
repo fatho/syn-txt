@@ -1,7 +1,7 @@
 use std::{fmt::Display, iter::Peekable, str::FromStr, sync::Arc};
 
 use ast::BinaryOp;
-use logos::{Logos, SpannedIter};
+use logos::Logos;
 
 use crate::lexer::{Span, Token};
 
@@ -60,9 +60,20 @@ pub mod ast {
             expr: NodePtr<Expr>,
             rparen: Node<()>,
         },
-        Object(Node<Object>),
+        Object(NodePtr<Object>),
         Var(String),
-        Accessor { expr: NodePtr<Expr>, dot: Node<()>, attribute: Node<String> }
+        Accessor {
+            expr: NodePtr<Expr>,
+            dot: Node<()>,
+            attribute: Node<String>,
+        },
+        Call {
+            callee: NodePtr<Expr>,
+            lparen: Node<()>,
+            // TODO: Also keep track of commas in argument list
+            arguments: Vec<Node<Expr>>,
+            rparen: Node<()>,
+        },
     }
 
     #[derive(Debug, Clone)]
@@ -343,15 +354,27 @@ impl<'a> Parser<'a> {
                     let dot = self.parse_expect_token(Token::Dot)?;
                     let attribute = self.parse_ident()?;
                     Node {
-                        span: left.span.start .. attribute.span.end,
+                        span: left.span.start..attribute.span.end,
                         data: ast::Expr::Accessor {
                             expr: Arc::new(left),
                             dot,
                             attribute,
-                        }
+                        },
                     }
                 }
-                // TODO: parse function calls here
+                Token::LParen if min_prec <= Prec::CALL => {
+                    let (lparen, arguments, rparen) =
+                        self.parse_expr_list(Token::LParen, Token::RParen)?;
+                    Node {
+                        span: left.span.start..rparen.span.end,
+                        data: ast::Expr::Call {
+                            callee: Arc::new(left),
+                            lparen,
+                            arguments,
+                            rparen,
+                        },
+                    }
+                }
                 // any unexpected token is not consumed, this is a problem for the caller
                 _ => break,
             }
@@ -382,7 +405,7 @@ impl<'a> Parser<'a> {
                     let object = self.parse_object_body(name)?;
                     Ok(Node {
                         span: object.span.clone(),
-                        data: ast::Expr::Object(object),
+                        data: ast::Expr::Object(Arc::new(object)),
                     })
                 } else {
                     Ok(Node {
@@ -442,6 +465,42 @@ impl<'a> Parser<'a> {
                 rparen,
             },
         })
+    }
+
+    fn parse_expr_list(
+        &mut self,
+        start: Token,
+        end: Token,
+    ) -> Result<(Node<()>, Vec<Node<ast::Expr>>, Node<()>), ParseError> {
+        let lparen = self.parse_expect_token(start)?;
+        let mut arguments = Vec::new();
+        while self.peek().0 != Some(end) {
+            arguments.push(self.parse_expr()?);
+
+            let (token, span) = self.peek();
+            match token {
+                Some(Token::Comma) => {
+                    self.parse_expect_token(Token::Comma)?;
+                }
+                Some(other) if other == end => break,
+                Some(got) => {
+                    return Err(ParseError::expected_but_got(
+                        span,
+                        &[Token::LParen, Token::Comma],
+                        got,
+                    ))
+                }
+                None => {
+                    return Err(ParseError::unexpected_eof(
+                        span,
+                        &[Token::LParen, Token::Comma],
+                    ))
+                }
+            }
+        }
+
+        let rparen = self.parse_expect_token(end)?;
+        Ok((lparen, arguments, rparen))
     }
 
     fn parse_native<T: FromStr>(&mut self, token: Token) -> Parse<T>

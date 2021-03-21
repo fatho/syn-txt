@@ -1,4 +1,4 @@
-use std::{fmt::Display, iter::Peekable, str::FromStr, sync::Arc};
+use std::{fmt::Display, iter::Peekable, num::ParseIntError, str::FromStr, sync::Arc};
 
 use ast::BinaryOp;
 use logos::Logos;
@@ -503,12 +503,18 @@ impl<'a> Parser<'a> {
         Ok((lparen, arguments, rparen))
     }
 
-    fn parse_native<T: FromStr>(&mut self, token: Token) -> Parse<T>
+    fn parse_native<T: FromStr>(&mut self, token: Token, ignore_underscores: bool) -> Parse<T>
     where
         T::Err: Display,
     {
         let node = self.parse_expect_token(token)?;
-        match self.source[node.span.clone()].parse::<T>() {
+        let input = &self.source[node.span.clone()];
+        let result = if ignore_underscores {
+            input.chars().filter(|ch| *ch != '_').collect::<String>().parse::<T>()
+        } else {
+            input.parse::<T>()
+        };
+        match result {
             Ok(int) => Ok(Node {
                 span: node.span,
                 data: int,
@@ -521,7 +527,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_int_expr(&mut self) -> Parse<ast::Expr> {
-        let int = self.parse_native(Token::LitInt)?;
+        let int = self.parse_native(Token::LitInt, true)?;
         Ok(Node {
             span: int.span,
             data: ast::Expr::Int(int.data),
@@ -529,7 +535,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_float_expr(&mut self) -> Parse<ast::Expr> {
-        let float = self.parse_native(Token::LitFloat)?;
+        let float = self.parse_native(Token::LitFloat, true)?;
         Ok(Node {
             span: float.span,
             data: ast::Expr::Float(float.data),
@@ -537,7 +543,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_bool_expr(&mut self) -> Parse<ast::Expr> {
-        let bool = self.parse_native(Token::LitBool)?;
+        let bool = self.parse_native(Token::LitBool, false)?;
         Ok(Node {
             span: bool.span,
             data: ast::Expr::Bool(bool.data),

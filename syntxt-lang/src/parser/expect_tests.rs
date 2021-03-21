@@ -531,6 +531,22 @@ fn parse_expr_int_lit() {
 }
 
 #[test]
+fn parse_expr_int_lit_underscores() {
+    check_expr(
+        "1_337",
+        expect![[r#"
+            Ok(
+                Node {
+                    span: 0..5,
+                    data: Int(
+                        1337,
+                    ),
+                },
+            )"#]],
+    );
+}
+
+#[test]
 fn parse_expr_unary_parens() {
     check_expr(
         "-(-(1337))",

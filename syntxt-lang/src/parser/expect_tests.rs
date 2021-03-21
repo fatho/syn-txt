@@ -785,3 +785,113 @@ fn parse_expr_bool() {
             )"#]],
     );
 }
+
+
+#[test]
+fn parse_dot_exprs() {
+    check_expr("foo.bar.baz",
+        expect![[r#"
+            Ok(
+                Node {
+                    span: 0..11,
+                    data: Accessor {
+                        expr: Node {
+                            span: 0..7,
+                            data: Accessor {
+                                expr: Node {
+                                    span: 0..3,
+                                    data: Var(
+                                        "foo",
+                                    ),
+                                },
+                                dot: Node {
+                                    span: 3..4,
+                                    data: (),
+                                },
+                                attribute: Node {
+                                    span: 4..7,
+                                    data: "bar",
+                                },
+                            },
+                        },
+                        dot: Node {
+                            span: 7..8,
+                            data: (),
+                        },
+                        attribute: Node {
+                            span: 8..11,
+                            data: "baz",
+                        },
+                    },
+                },
+            )"#]],
+    );
+}
+
+
+#[test]
+fn parse_dot_exprs_parens() {
+    check_expr("(foo.bar).baz",
+        expect![[r#"
+            Ok(
+                Node {
+                    span: 0..13,
+                    data: Accessor {
+                        expr: Node {
+                            span: 0..9,
+                            data: Paren {
+                                lparen: Node {
+                                    span: 0..1,
+                                    data: (),
+                                },
+                                expr: Node {
+                                    span: 1..8,
+                                    data: Accessor {
+                                        expr: Node {
+                                            span: 1..4,
+                                            data: Var(
+                                                "foo",
+                                            ),
+                                        },
+                                        dot: Node {
+                                            span: 4..5,
+                                            data: (),
+                                        },
+                                        attribute: Node {
+                                            span: 5..8,
+                                            data: "bar",
+                                        },
+                                    },
+                                },
+                                rparen: Node {
+                                    span: 8..9,
+                                    data: (),
+                                },
+                            },
+                        },
+                        dot: Node {
+                            span: 9..10,
+                            data: (),
+                        },
+                        attribute: Node {
+                            span: 10..13,
+                            data: "baz",
+                        },
+                    },
+                },
+            )"#]],
+    );
+}
+
+#[test]
+fn parse_dot_exprs_invalid_parens() {
+    check_expr("foo.(bar.baz)",
+        expect![[r#"
+            Err(
+                ParseError {
+                    span: 4..5,
+                    message: "Expected one of [Ident], but got LParen",
+                },
+            )"#]],
+    );
+}

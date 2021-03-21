@@ -1,7 +1,7 @@
 use std::{fmt::Display, iter::Peekable, str::FromStr, sync::Arc};
 
 use ast::BinaryOp;
-use logos::Logos;
+use logos::{Logos, SpannedIter};
 
 use crate::lexer::{Span, Token};
 
@@ -62,6 +62,7 @@ pub mod ast {
         },
         Object(Node<Object>),
         Var(String),
+        Accessor { expr: NodePtr<Expr>, dot: Node<()>, attribute: Node<String> }
     }
 
     #[derive(Debug, Clone)]
@@ -127,7 +128,9 @@ impl Prec {
     const ADDITIVE: Prec = Prec(3);
     const MULTIPLICATIVE: Prec = Prec(4);
     const UNARY: Prec = Prec(5);
-    const HIGHEST: Prec = Prec(6);
+    const CALL: Prec = Prec(6);
+    const DOT: Prec = Prec(7);
+    const HIGHEST: Prec = Prec(8);
 
     pub fn succ(self) -> Prec {
         // this would be a parser bug:
@@ -285,8 +288,8 @@ impl<'a> Parser<'a> {
                 (Some(token), span) => (token, span),
             };
 
-            // Supported infix/postfix operators
             left = match token {
+                // Infix operations
                 Token::Or if min_prec <= Prec::DISJUNCTIVE => self.parse_binary_operand(
                     left,
                     Node {
@@ -335,6 +338,19 @@ impl<'a> Parser<'a> {
                     },
                     Prec::MULTIPLICATIVE.succ(),
                 )?,
+                // Postfix operations
+                Token::Dot if min_prec <= Prec::DOT => {
+                    let dot = self.parse_expect_token(Token::Dot)?;
+                    let attribute = self.parse_ident()?;
+                    Node {
+                        span: left.span.start .. attribute.span.end,
+                        data: ast::Expr::Accessor {
+                            expr: Arc::new(left),
+                            dot,
+                            attribute,
+                        }
+                    }
+                }
                 // TODO: parse function calls here
                 // any unexpected token is not consumed, this is a problem for the caller
                 _ => break,

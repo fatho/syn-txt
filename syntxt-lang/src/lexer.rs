@@ -32,6 +32,8 @@ pub enum Token {
     Semi,
     #[token(",")]
     Comma,
+    #[token(".")]
+    Dot,
 
     // Grouping
     #[token("{")]

@@ -1,9 +1,12 @@
-use std::{fmt::format, iter::Peekable, ops::Deref, sync::Arc, thread::spawn};
+use std::{iter::Peekable, sync::Arc};
 
 use ast::BinaryOp;
-use logos::{internal::CallbackResult, Logos, SpannedIter};
+use logos::Logos;
 
 use crate::lexer::{Span, Token};
+
+#[cfg(test)]
+mod expect_tests;
 
 #[derive(Debug, Clone)]
 pub struct Node<T> {
@@ -24,13 +27,17 @@ pub mod ast {
     #[derive(Debug, Clone)]
     pub struct Object {
         pub name: Node<String>,
+        pub lbrace: Node<()>,
         pub attrs: Vec<Node<Attribute>>,
         pub children: Vec<Node<Object>>,
+        pub rbrace: Node<()>,
     }
 
     #[derive(Debug, Clone)]
     pub struct Attribute {
         pub name: Node<String>,
+        pub colon: Node<()>,
+        pub value: Node<Expr>,
     }
 
     #[derive(Debug, Clone)]
@@ -201,7 +208,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_object_body(&mut self, name: Node<String>) -> Parse<ast::Object> {
-        self.parse_expect_token(Token::LBrace)?;
+        let lbrace = self.parse_expect_token(Token::LBrace)?;
 
         let mut attrs = Vec::new();
         let mut children = Vec::new();
@@ -214,9 +221,14 @@ impl<'a> Parser<'a> {
                     let (token, span) = self.peek();
                     match token {
                         Some(Token::Colon) => {
-                            // attribute
-                            // TODO: parse value
-                            todo!("attribute")
+                            let colon = self.parse_expect_token(Token::Colon)?;
+                            let value = self.parse_expr()?;
+                            attrs.push(Node {
+                                span: inner_name.span.start..value.span.end,
+                                data: ast::Attribute {
+                                    name: inner_name, colon, value
+                                }
+                            })
                         }
                         Some(Token::LBrace) => {
                             let child_object = self.parse_object_body(inner_name)?;
@@ -239,8 +251,10 @@ impl<'a> Parser<'a> {
             span: name.span.start..rbrace.span.end,
             data: ast::Object {
                 name,
+                lbrace,
                 attrs,
                 children,
+                rbrace,
             },
         })
     }
@@ -378,312 +392,5 @@ impl<'a> Parser<'a> {
             span: int.span,
             data: ast::Expr::Int(int.data),
         })
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use super::{ast, Node, Parser};
-    use expect_test::{expect, Expect};
-
-    fn check(input: &str, output: Expect) {
-        let mut parser = Parser::new(input);
-        let result = parser.parse_root();
-        let debug = format!("{:#?}", result);
-        output.assert_eq(&debug);
-    }
-
-    fn check_expr(input: &str, output: Expect) {
-        let mut parser = Parser::new(input);
-        let result = parser.parse_expr();
-        let debug = format!("{:#?}", result);
-        output.assert_eq(&debug);
-    }
-
-    #[test]
-    fn parse_empty() {
-        check(
-            "",
-            expect![[r#"
-                Err(
-                    ParseError {
-                        span: 0..0,
-                        message: "Expected one of [Ident], but reached end of file",
-                    },
-                )"#]],
-        );
-    }
-
-    #[test]
-    fn parse_empty_object() {
-        check(
-            r"Song {
-            // super awesome song, eventually
-        }",
-            expect![[r#"
-                Ok(
-                    Node {
-                        span: 0..62,
-                        data: Root {
-                            object: Node {
-                                span: 0..62,
-                                data: Object {
-                                    name: Node {
-                                        span: 0..4,
-                                        data: "Song",
-                                    },
-                                    attrs: [],
-                                    children: [],
-                                },
-                            },
-                        },
-                    },
-                )"#]],
-        );
-    }
-
-    #[test]
-    fn parse_nested_objects() {
-        check(
-            r"Song {
-            // super awesome song with several tracks
-            Track {
-
-            }
-            Track {
-
-            }
-        }",
-            expect![[r#"
-                Ok(
-                    Node {
-                        span: 0..140,
-                        data: Root {
-                            object: Node {
-                                span: 0..140,
-                                data: Object {
-                                    name: Node {
-                                        span: 0..4,
-                                        data: "Song",
-                                    },
-                                    attrs: [],
-                                    children: [
-                                        Node {
-                                            span: 73..95,
-                                            data: Object {
-                                                name: Node {
-                                                    span: 73..78,
-                                                    data: "Track",
-                                                },
-                                                attrs: [],
-                                                children: [],
-                                            },
-                                        },
-                                        Node {
-                                            span: 108..130,
-                                            data: Object {
-                                                name: Node {
-                                                    span: 108..113,
-                                                    data: "Track",
-                                                },
-                                                attrs: [],
-                                                children: [],
-                                            },
-                                        },
-                                    ],
-                                },
-                            },
-                        },
-                    },
-                )"#]],
-        );
-    }
-
-    #[test]
-    fn parse_expr_int_lit() {
-        check_expr(
-            "-+1337",
-            expect![[r#"
-                Ok(
-                    Node {
-                        span: 0..6,
-                        data: Unary {
-                            operator: Node {
-                                span: 0..1,
-                                data: Minus,
-                            },
-                            operand: Node {
-                                span: 1..6,
-                                data: Int(
-                                    1337,
-                                ),
-                            },
-                        },
-                    },
-                )"#]],
-        );
-    }
-
-    #[test]
-    fn parse_expr_unary_parens() {
-        check_expr(
-            "-(-(1337))",
-            expect![[r#"
-                Ok(
-                    Node {
-                        span: 0..10,
-                        data: Unary {
-                            operator: Node {
-                                span: 0..1,
-                                data: Minus,
-                            },
-                            operand: Node {
-                                span: 1..10,
-                                data: Paren {
-                                    lparen: Node {
-                                        span: 1..2,
-                                        data: (),
-                                    },
-                                    expr: Node {
-                                        span: 2..9,
-                                        data: Unary {
-                                            operator: Node {
-                                                span: 2..3,
-                                                data: Minus,
-                                            },
-                                            operand: Node {
-                                                span: 3..9,
-                                                data: Paren {
-                                                    lparen: Node {
-                                                        span: 3..4,
-                                                        data: (),
-                                                    },
-                                                    expr: Node {
-                                                        span: 4..8,
-                                                        data: Int(
-                                                            1337,
-                                                        ),
-                                                    },
-                                                    rparen: Node {
-                                                        span: 8..9,
-                                                        data: (),
-                                                    },
-                                                },
-                                            },
-                                        },
-                                    },
-                                    rparen: Node {
-                                        span: 9..10,
-                                        data: (),
-                                    },
-                                },
-                            },
-                        },
-                    },
-                )"#]],
-        );
-    }
-
-    #[test]
-    fn parse_expr_int_lit_too_big() {
-        check_expr(
-            "2305972057823905702935709237509237509237509237509237059273057",
-            expect![[r#"
-                Err(
-                    ParseError {
-                        span: 0..61,
-                        message: "number too large to fit in target type",
-                    },
-                )"#]],
-        );
-    }
-
-    #[test]
-    fn parse_expr_infix() {
-        check_expr(
-            "2 * 4 + 17 * (1 + 1)",
-            expect![[r#"
-                Ok(
-                    Node {
-                        span: 0..20,
-                        data: Binary {
-                            left: Node {
-                                span: 0..5,
-                                data: Binary {
-                                    left: Node {
-                                        span: 0..1,
-                                        data: Int(
-                                            2,
-                                        ),
-                                    },
-                                    operator: Node {
-                                        span: 2..3,
-                                        data: Mult,
-                                    },
-                                    right: Node {
-                                        span: 4..5,
-                                        data: Int(
-                                            4,
-                                        ),
-                                    },
-                                },
-                            },
-                            operator: Node {
-                                span: 6..7,
-                                data: Add,
-                            },
-                            right: Node {
-                                span: 8..20,
-                                data: Binary {
-                                    left: Node {
-                                        span: 8..10,
-                                        data: Int(
-                                            17,
-                                        ),
-                                    },
-                                    operator: Node {
-                                        span: 11..12,
-                                        data: Mult,
-                                    },
-                                    right: Node {
-                                        span: 13..20,
-                                        data: Paren {
-                                            lparen: Node {
-                                                span: 13..14,
-                                                data: (),
-                                            },
-                                            expr: Node {
-                                                span: 14..19,
-                                                data: Binary {
-                                                    left: Node {
-                                                        span: 14..15,
-                                                        data: Int(
-                                                            1,
-                                                        ),
-                                                    },
-                                                    operator: Node {
-                                                        span: 16..17,
-                                                        data: Add,
-                                                    },
-                                                    right: Node {
-                                                        span: 18..19,
-                                                        data: Int(
-                                                            1,
-                                                        ),
-                                                    },
-                                                },
-                                            },
-                                            rparen: Node {
-                                                span: 19..20,
-                                                data: (),
-                                            },
-                                        },
-                                    },
-                                },
-                            },
-                        },
-                    },
-                )"#]],
-        );
     }
 }

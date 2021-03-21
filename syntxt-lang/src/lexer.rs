@@ -18,6 +18,12 @@ pub enum Token {
     Slash,
     #[token("%")]
     Percent,
+    #[token("not")]
+    Not,
+    #[token("and")]
+    And,
+    #[token("or")]
+    Or,
 
     // Punctuation
     #[token(":")]
@@ -56,6 +62,9 @@ pub enum Token {
     LitFloat,
     #[regex(r"[+-]?(?&decimal)/(?&decimal)")]
     LitRatio,
+    #[token("true")]
+    #[token("false")]
+    LitBool,
 
     #[error]
     #[regex(r"[ \t\n\f]+", logos::skip)]
@@ -157,5 +166,11 @@ mod tests {
         check("13/3_7", expect![[r#"[(LitRatio, 0..6)]"#]]);
         check("-1/337", expect![[r#"[(LitRatio, 0..6)]"#]]);
         check("+0/1337", expect![[r#"[(LitRatio, 0..7)]"#]]);
+    }
+
+    #[test]
+    fn bools() {
+        check("true", expect![[r#"[(LitBool, 0..4)]"#]]);
+        check("false", expect![[r#"[(LitBool, 0..5)]"#]]);
     }
 }

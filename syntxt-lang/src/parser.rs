@@ -1,4 +1,4 @@
-use std::{iter::Peekable, sync::Arc};
+use std::{fmt::Display, iter::Peekable, str::FromStr, sync::Arc};
 
 use ast::BinaryOp;
 use logos::Logos;
@@ -45,6 +45,7 @@ pub mod ast {
         String(String),
         Int(i64),
         Float(f64),
+        Bool(bool),
         Unary {
             operator: Node<UnaryOp>,
             operand: NodePtr<Expr>,
@@ -59,12 +60,15 @@ pub mod ast {
             expr: NodePtr<Expr>,
             rparen: Node<()>,
         },
+        Object(Node<Object>),
+        Var(String),
     }
 
     #[derive(Debug, Clone)]
     pub enum UnaryOp {
         Plus,
         Minus,
+        Not,
     }
 
     #[derive(Debug, Clone)]
@@ -73,6 +77,8 @@ pub mod ast {
         Sub,
         Mult,
         Div,
+        And,
+        Or,
     }
 }
 
@@ -116,10 +122,12 @@ pub struct Prec(u16);
 
 impl Prec {
     const LOWEST: Prec = Prec(0);
-    const ADDITIVE: Prec = Prec(1);
-    const MULTIPLICATIVE: Prec = Prec(2);
-    const UNARY: Prec = Prec(3);
-    const HIGHEST: Prec = Prec(4);
+    const DISJUNCTIVE: Prec = Prec(1);
+    const CONJUNCTIVE: Prec = Prec(2);
+    const ADDITIVE: Prec = Prec(3);
+    const MULTIPLICATIVE: Prec = Prec(4);
+    const UNARY: Prec = Prec(5);
+    const HIGHEST: Prec = Prec(6);
 
     pub fn succ(self) -> Prec {
         // this would be a parser bug:
@@ -180,14 +188,6 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_any_token(&mut self) -> Parse<()> {
-        if let Some((token, span)) = self.consume() {
-            return Ok(Node { span, data: () });
-        } else {
-            return Err(ParseError::unexpected_str_eof(self.eof(), "any token"));
-        }
-    }
-
     fn eof(&self) -> Span {
         self.source.len()..self.source.len()
     }
@@ -226,8 +226,10 @@ impl<'a> Parser<'a> {
                             attrs.push(Node {
                                 span: inner_name.span.start..value.span.end,
                                 data: ast::Attribute {
-                                    name: inner_name, colon, value
-                                }
+                                    name: inner_name,
+                                    colon,
+                                    value,
+                                },
                             })
                         }
                         Some(Token::LBrace) => {
@@ -285,18 +287,54 @@ impl<'a> Parser<'a> {
 
             // Supported infix/postfix operators
             left = match token {
-                Token::Plus if min_prec <= Prec::ADDITIVE => {
-                    self.parse_binary_operand(left, Node { span, data: BinaryOp::Add }, Prec::ADDITIVE.succ())?
-                }
-                Token::Minus if min_prec <= Prec::ADDITIVE => {
-                    self.parse_binary_operand(left, Node { span, data: BinaryOp::Sub }, Prec::ADDITIVE.succ())?
-                },
-                Token::Star if min_prec <= Prec::MULTIPLICATIVE =>  {
-                    self.parse_binary_operand(left, Node { span, data: BinaryOp::Mult }, Prec::MULTIPLICATIVE.succ())?
-                },
-                Token::Slash if min_prec <= Prec::MULTIPLICATIVE =>  {
-                    self.parse_binary_operand(left, Node { span, data: BinaryOp::Div }, Prec::MULTIPLICATIVE.succ())?
-                },
+                Token::Or if min_prec <= Prec::DISJUNCTIVE => self.parse_binary_operand(
+                    left,
+                    Node {
+                        span,
+                        data: BinaryOp::Or,
+                    },
+                    Prec::DISJUNCTIVE.succ(),
+                )?,
+                Token::And if min_prec <= Prec::CONJUNCTIVE => self.parse_binary_operand(
+                    left,
+                    Node {
+                        span,
+                        data: BinaryOp::And,
+                    },
+                    Prec::CONJUNCTIVE.succ(),
+                )?,
+                Token::Plus if min_prec <= Prec::ADDITIVE => self.parse_binary_operand(
+                    left,
+                    Node {
+                        span,
+                        data: BinaryOp::Add,
+                    },
+                    Prec::ADDITIVE.succ(),
+                )?,
+                Token::Minus if min_prec <= Prec::ADDITIVE => self.parse_binary_operand(
+                    left,
+                    Node {
+                        span,
+                        data: BinaryOp::Sub,
+                    },
+                    Prec::ADDITIVE.succ(),
+                )?,
+                Token::Star if min_prec <= Prec::MULTIPLICATIVE => self.parse_binary_operand(
+                    left,
+                    Node {
+                        span,
+                        data: BinaryOp::Mult,
+                    },
+                    Prec::MULTIPLICATIVE.succ(),
+                )?,
+                Token::Slash if min_prec <= Prec::MULTIPLICATIVE => self.parse_binary_operand(
+                    left,
+                    Node {
+                        span,
+                        data: BinaryOp::Div,
+                    },
+                    Prec::MULTIPLICATIVE.succ(),
+                )?,
                 // TODO: parse function calls here
                 // any unexpected token is not consumed, this is a problem for the caller
                 _ => break,
@@ -316,9 +354,27 @@ impl<'a> Parser<'a> {
             Token::Minus => self.parse_unary_operand(ast::UnaryOp::Minus, span),
             Token::LParen => self.parse_paren_expr(),
             Token::LitInt => self.parse_int_expr(),
-            Token::LitFloat => todo!("float literal"),
+            Token::LitFloat => self.parse_float_expr(),
             Token::LitRatio => todo!("ratio literal"),
-            Token::LitString => todo!("string literal"),
+            Token::LitString => self.parse_string_expr(),
+            Token::LitBool => self.parse_bool_expr(),
+            Token::Ident => {
+                let name = self.parse_ident()?;
+
+                // Can either be an object or a normal identifier, depending on what follows
+                if let Some(Token::LBrace) = self.peek().0 {
+                    let object = self.parse_object_body(name)?;
+                    Ok(Node {
+                        span: object.span.clone(),
+                        data: ast::Expr::Object(object),
+                    })
+                } else {
+                    Ok(Node {
+                        span: name.span,
+                        data: ast::Expr::Var(name.data),
+                    })
+                }
+            }
             _ => Err(ParseError::expected_str_but_got(span, "expression", token)),
         }
     }
@@ -372,9 +428,12 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn parse_int(&mut self) -> Parse<i64> {
-        let node = self.parse_expect_token(Token::LitInt)?;
-        match self.source[node.span.clone()].parse::<i64>() {
+    fn parse_native<T: FromStr>(&mut self, token: Token) -> Parse<T>
+    where
+        T::Err: Display,
+    {
+        let node = self.parse_expect_token(token)?;
+        match self.source[node.span.clone()].parse::<T>() {
             Ok(int) => Ok(Node {
                 span: node.span,
                 data: int,
@@ -387,10 +446,84 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_int_expr(&mut self) -> Parse<ast::Expr> {
-        let int = self.parse_int()?;
+        let int = self.parse_native(Token::LitInt)?;
         Ok(Node {
             span: int.span,
             data: ast::Expr::Int(int.data),
+        })
+    }
+
+    fn parse_float_expr(&mut self) -> Parse<ast::Expr> {
+        let float = self.parse_native(Token::LitFloat)?;
+        Ok(Node {
+            span: float.span,
+            data: ast::Expr::Float(float.data),
+        })
+    }
+
+    fn parse_bool_expr(&mut self) -> Parse<ast::Expr> {
+        let bool = self.parse_native(Token::LitBool)?;
+        Ok(Node {
+            span: bool.span,
+            data: ast::Expr::Bool(bool.data),
+        })
+    }
+
+    fn parse_string(&mut self) -> Parse<String> {
+        // get literal text
+        let node = self.parse_expect_token(Token::LitString)?;
+        let lit_full = &self.source[node.span.clone()];
+
+        // skip quotation marks
+        assert!(
+            lit_full.len() >= 2,
+            "lexer bug: string literals must be at least two bytes"
+        );
+        let mut lit_remaining = lit_full[1..lit_full.len() - 1].char_indices();
+
+        // parse string data
+        let mut data = String::new();
+        while let Some((index, ch)) = lit_remaining.next() {
+            let start_index = node.span.start + 1 + index;
+            if ch == '\\' {
+                match lit_remaining.next() {
+                    None => {
+                        return Err(ParseError {
+                            span: start_index..start_index + 1,
+                            message: "unterminated escape sequence".into(),
+                        })
+                    }
+                    Some((index, ch)) => {
+                        let end_index = node.span.start + 1 + index + ch.len_utf8();
+                        match ch {
+                            'n' => data.push('\n'),
+                            't' => data.push('\t'),
+                            'r' => data.push('\r'),
+                            '\\' => data.push('\\'),
+                            _ => {
+                                return Err(ParseError {
+                                    span: start_index..end_index,
+                                    message: "unknown escape sequence".into(),
+                                })
+                            }
+                        }
+                    }
+                }
+            } else {
+                data.push(ch);
+            }
+        }
+        Ok(Node {
+            span: node.span,
+            data,
+        })
+    }
+
+    fn parse_string_expr(&mut self) -> Parse<ast::Expr> {
+        let string = self.parse_string()?;
+        Ok(Node {
+            span: string.span,
+            data: ast::Expr::String(string.data),
         })
     }
 }

@@ -14,8 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! Implementations of various digital filters.
-
-pub mod biquad;
-
-pub use biquad::*;
+// modules for making sounds
+pub mod note;
+pub mod rational;
+pub mod util;

@@ -1,20 +1,20 @@
 // syn.txt -- a text based synthesizer and audio workstation
 // Copyright (C) 2021  Fabian Thorand
-// 
+//
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
-// 
+//
 // This program is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU Affero General Public License for more details.
-// 
+//
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::note::*;
+use syntxt_core::note::*;
 
 /// Defines the tuning of an instrument by assinging a frequency to a certain note.
 /// This defines the frequencies of all other notes at a standard tuning of 12 half-tones per octave.
@@ -22,8 +22,8 @@ use crate::note::*;
 /// # Examples
 ///
 /// ```
-/// use syn_txt::note::*;
-/// use syn_txt::tuning::*;
+/// use syntxt_core::note::*;
+/// use syntxt_audio::tuning::*;
 /// assert_eq!(Tuning::default().frequency(Note::from_midi(57)), 220.0);
 /// assert_eq!(Tuning::default().frequency(Note::from_midi(81)), 880.0);
 /// ```

@@ -2,4 +2,5 @@
 
 members = [
     "syntxt-audio",
+    "syntxt-lang",
 ]

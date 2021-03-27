@@ -1,23 +1,23 @@
 // syn.txt -- a text based synthesizer and audio workstation
 // Copyright (C) 2021  Fabian Thorand
-// 
+//
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
-// 
+//
 // This program is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU Affero General Public License for more details.
-// 
+//
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 //! Prototype for a polyphonic instrument where each note can be played individually.
 
-use crate::note::*;
 use crate::wave::*;
+use syntxt_core::note::*;
 
 pub struct Poly<Sampler: NoteSampler> {
     /// Samples per second rate of the generated audio signal.
@@ -43,7 +43,12 @@ pub trait NoteSampler {
     /// Generate the next sample for a note.
     /// Return `None` if the note has faded.
     /// Once `None` was returned, `sample` with never be called again.
-    fn sample(&mut self, global_sample_count: usize, sample_rate: f64, params: &Self::Params) -> Option<Stereo<f64>>;
+    fn sample(
+        &mut self,
+        global_sample_count: usize,
+        sample_rate: f64,
+        params: &Self::Params,
+    ) -> Option<Stereo<f64>>;
 
     /// Called before the sample when the note is first released.
     fn release(&mut self);
@@ -114,9 +119,11 @@ impl<Sampler: NoteSampler> super::Instrument for Poly<Sampler> {
             let mut wave = Stereo::mono(0.0);
             let voice_count = self.active_notes.len();
             for voice_index in (0..voice_count).rev() {
-                if let Some(value) =
-                    self.active_notes[voice_index].sample(self.samples_processed, self.sample_rate, &self.parameters)
-                {
+                if let Some(value) = self.active_notes[voice_index].sample(
+                    self.samples_processed,
+                    self.sample_rate,
+                    &self.parameters,
+                ) {
                     wave += value;
                 } else {
                     log::trace!(
@@ -149,7 +156,12 @@ struct NoteState<Sampler> {
 }
 
 impl<Sampler: NoteSampler> NoteState<Sampler> {
-    fn sample(&mut self, global_sample_count: usize, sample_rate: f64, params: &Sampler::Params) -> Option<Stereo<f64>> {
+    fn sample(
+        &mut self,
+        global_sample_count: usize,
+        sample_rate: f64,
+        params: &Sampler::Params,
+    ) -> Option<Stereo<f64>> {
         if self.play_delay_samples > 0 {
             // the note has not started yet
             self.play_delay_samples -= 1;
@@ -164,7 +176,8 @@ impl<Sampler: NoteSampler> NoteState<Sampler> {
                 self.sampler.release();
             }
 
-            self.sampler.sample(global_sample_count, sample_rate, params)
+            self.sampler
+                .sample(global_sample_count, sample_rate, params)
         }
     }
 }

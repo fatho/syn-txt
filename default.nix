@@ -17,6 +17,7 @@
                 ${builtins.readFile ./.gitignore}
                 *
                 !syntxt-audio/
+                !syntxt-core/
                 !syntxt-lang/
                 !Cargo.toml
                 !Cargo.lock
@@ -42,7 +43,7 @@
 
     NIX_SOX_BIN = "${sox}/bin";
 
-    cargoSha256 = "05n6rhjc54w716xp0v1rp41xxfqbvhimhc3rgz6wa87dalcfb0m8";
+    cargoSha256 = "1cdb0drg76kj7glmar3ap88gykg3mdxyk04qqky8clh0ynx2cfnb";
   };
 
   syn-txt-doc = nixpkgs.callPackage ./doc/default.nix {};

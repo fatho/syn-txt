@@ -51,11 +51,14 @@ pub fn song_main<F: FnOnce() -> io::Result<crate::song::Song>>(compose: F) -> io
     let opt: Opt = Opt::from_args();
 
     let level = match opt.verbose {
-        0 => log::Level::Info,
-        1 => log::Level::Debug,
-        _ => log::Level::Trace,
+        0 => log::LevelFilter::Info,
+        1 => log::LevelFilter::Debug,
+        _ => log::LevelFilter::Trace,
     };
-    simple_logger::init_with_level(level).unwrap();
+    simple_logger::SimpleLogger::new()
+        .with_level(level)
+        .init()
+        .unwrap();
 
     let dump_out = opt
         .dump_description

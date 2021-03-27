@@ -28,9 +28,17 @@ pub fn greet() {
 }
 
 #[wasm_bindgen]
-pub fn parse(code: &str) -> String {
+pub fn parse(code: &str) -> Box<[JsValue]> {
     match syntxt_lang::parser::Parser::parse(code) {
-        Err(err) => format!("Failed: {}", err.message),
-        Ok(_) => format!("OK"),
+        Err(err) => {
+            Box::new([
+                JsValue::from_f64(err.pos.start.line as f64),
+                JsValue::from_f64(err.pos.start.column as f64),
+                JsValue::from_f64(err.pos.end.line as f64),
+                JsValue::from_f64(err.pos.end.column as f64),
+                JsValue::from_str(&err.message),
+            ])
+        },
+        Ok(_) => Box::new([]),
     }
 }

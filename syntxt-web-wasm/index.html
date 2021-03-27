@@ -124,6 +124,7 @@
                     '}',
                 ].join('\n'),
                 language: 'syntxt',
+	            glyphMargin: true,
             });
 
             // Resize the editor when element size changes
@@ -132,15 +133,37 @@
             });
             resizeObserver.observe(containerElem);
 
-            // editor.onDidChangeContent((event) => {
-            //     console.log(editor.value)
-            // });
-
             window.editor = editor;
+            window.decorations = [];
 
             editor.getModel().onDidChangeContent((event) => {
                 if(window.syntxt) {
                     let result = window.syntxt.parse(editor.getModel().getValue());
+                    if(result .length > 0) {
+                        monaco.editor.setModelMarkers(editor.getModel(), "syntxt", [
+                            {
+                                startLineNumber: result[0],
+                                startColumn: result[1],
+                                endLineNumber: result[2],
+                                endColumn: result[3],
+                                message: result[4],
+                                severity: monaco.MarkerSeverity.Error,
+                            },
+                        ]);
+                        window.decorations = editor.deltaDecorations(window.decorations, [
+                            {
+                                range: new monaco.Range(result[0],result[1],result[0], result[1]),
+                                options: {
+                                    isWholeLine: true,
+                                    glyphMarginClassName: 'errorGlyphMargin',
+                                    glyphMarginHoverMessage: result[4],
+                                }
+                            }
+                        ]);
+                    } else {
+                        monaco.editor.setModelMarkers(editor.getModel(), "syntxt", [])
+                        window.decorations = editor.deltaDecorations(window.decorations, []);
+                    }
                     document.getElementById("compileStatus").innerText = result;
                 }
             });
@@ -191,6 +214,11 @@
 
         .fill {
             height: calc(100vh - 24px - 48px);
+        }
+
+        .errorGlyphMargin {
+            background-image: url('assets/error.png');
+            background-size: contain;
         }
     </style>
 </head>

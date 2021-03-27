@@ -1,4 +1,4 @@
-{ nixpkgs ? import (import ./nix/sources.nix).nixpkgs {}
+{ nixpkgs ? import ./nix/nixpkgs.nix {}
 }:
 {
   syn-txt = with nixpkgs; rustPlatform.buildRustPackage rec {

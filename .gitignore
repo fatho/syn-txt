@@ -1,6 +1,9 @@
 # Rust
 /target
 
+# WASM
+/*/pkg
+
 # IDE
 /.vscode
 

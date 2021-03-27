@@ -11,4 +11,15 @@ self: super: {
       cp -r $src $out
     '';
   };
+
+  rustChannel = self.rustChannelOf { channel = "1.51.0"; };
+  rustToolchain = self.rustChannel.rust.override {
+    targets = [
+      (self.rust.toRustTarget self.stdenv.hostPlatform)
+      "wasm32-unknown-unknown"
+    ];
+    extensions = [
+      "rust-src"
+    ];
+  };
 }

@@ -114,8 +114,8 @@ pub mod ast {
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct ParseError {
-    span: Span,
-    message: String,
+    pub span: Span,
+    pub message: String,
 }
 
 impl ParseError {
@@ -409,6 +409,7 @@ impl<'a> Parser<'a> {
         match token {
             Token::Plus => self.parse_unary_operand(ast::UnaryOp::Plus, span),
             Token::Minus => self.parse_unary_operand(ast::UnaryOp::Minus, span),
+            Token::Not => self.parse_unary_operand(ast::UnaryOp::Not, span),
             Token::LParen => self.parse_paren_expr(),
             Token::LitInt => self.parse_int_expr(),
             Token::LitFloat => self.parse_float_expr(),

@@ -13,6 +13,15 @@
             var containerElem = document.getElementById('container');
 
             monaco.languages.register({ id: 'syntxt' });
+            monaco.languages.setLanguageConfiguration("syntxt", {
+                brackets: [
+                    ['{', '}'],
+                    ['(', ')'],
+                ],
+                comments: {
+                    lineComment: '//'
+                },
+            });
             monaco.languages.setMonarchTokensProvider('syntxt', {
                 // Set defaultToken to invalid to see what you do not tokenize yet
                 defaultToken: 'invalid',
@@ -103,11 +112,6 @@
                     '    }',
                     '    Track {',
                     '      name: "Lead"',
-                    '      filtes: [',
-                    '        LowPass {',
-                    '          cutoff: time * 100.1',
-                    '        }',
-                    '      ]',
                     '',
                     '      Sequence {',
                     '        start: 8/4',
@@ -127,8 +131,29 @@
                 editor.layout();
             });
             resizeObserver.observe(containerElem);
+
+            // editor.onDidChangeContent((event) => {
+            //     console.log(editor.value)
+            // });
+
+            window.editor = editor;
+
+            editor.getModel().onDidChangeContent((event) => {
+                if(window.syntxt) {
+                    let result = window.syntxt.parse(editor.getModel().getValue());
+                    document.getElementById("compileStatus").innerText = result;
+                }
+            });
+
         });
     </script>
+    <script type="module">
+        import wasm, * as syntxt from "./pkg/syntxt_web_wasm.js";
+
+        wasm().then((module) => {
+            window.syntxt = syntxt;
+        });
+      </script>
 
     <style type="text/css">
         * {
@@ -178,7 +203,7 @@
         </div>
         <div class="fill" id="container"></div>
         <div class="footer">
-            TODO: some useful information in the footer
+            <span id="compileStatus"></span>
         </div>
     </div>
 </body>

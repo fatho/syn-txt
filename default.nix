@@ -19,6 +19,7 @@
                 !syntxt-audio/
                 !syntxt-core/
                 !syntxt-lang/
+                !syntxt-web-wasm/
                 !Cargo.toml
                 !Cargo.lock
                 !LICENSE
@@ -43,7 +44,7 @@
 
     NIX_SOX_BIN = "${sox}/bin";
 
-    cargoSha256 = "1cdb0drg76kj7glmar3ap88gykg3mdxyk04qqky8clh0ynx2cfnb";
+    cargoSha256 = "0dy1n438c0mksljdmks9l5lzq6ra9cbrxig7khnmnirb6k225zn5";
   };
 
   syn-txt-doc = nixpkgs.callPackage ./doc/default.nix {};

@@ -546,6 +546,58 @@ fn parse_expr_int_lit_underscores() {
 }
 
 #[test]
+fn parse_expr_ratio_lit() {
+    check_expr(
+        "-1337/42",
+        expect![[r#"
+            Ok(
+                Node {
+                    span: 0..8,
+                    data: Ratio(
+                        Rational {
+                            num: -191,
+                            denom: 6,
+                        },
+                    ),
+                },
+            )"#]],
+    );
+}
+
+#[test]
+fn parse_expr_ratio_lit_underscores() {
+    check_expr(
+        "+1_337/42",
+        expect![[r#"
+            Ok(
+                Node {
+                    span: 0..9,
+                    data: Ratio(
+                        Rational {
+                            num: 191,
+                            denom: 6,
+                        },
+                    ),
+                },
+            )"#]],
+    );
+}
+
+#[test]
+fn parse_expr_invalid_ratio() {
+    check_expr(
+        "+1_337/0",
+        expect![[r#"
+            Err(
+                ParseError {
+                    span: 0..8,
+                    message: "denominator is zero",
+                },
+            )"#]],
+    );
+}
+
+#[test]
 fn parse_expr_unary_parens() {
     check_expr(
         "-(-(1337))",

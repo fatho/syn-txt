@@ -9,6 +9,7 @@ license = "AGPL-3.0-only"
 
 [dependencies]
 logos = "0.12.0"
+syntxt-core = { path = "../syntxt-core" }
 
 [dev-dependencies]
 expect-test = "1.1.0"

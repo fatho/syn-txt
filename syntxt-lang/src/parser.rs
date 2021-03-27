@@ -1,4 +1,4 @@
-use std::{fmt::Display, iter::Peekable, num::ParseIntError, str::FromStr, sync::Arc};
+use std::{fmt::Display, iter::Peekable, str::FromStr, sync::Arc};
 
 use ast::BinaryOp;
 use logos::Logos;
@@ -18,6 +18,7 @@ pub type NodePtr<T> = Arc<Node<T>>;
 
 pub mod ast {
     use super::{Node, NodePtr};
+    use syntxt_core::rational::Rational;
 
     #[derive(Debug, Clone)]
     pub struct Root {
@@ -44,6 +45,7 @@ pub mod ast {
     pub enum Expr {
         String(String),
         Int(i64),
+        Ratio(Rational),
         Float(f64),
         Bool(bool),
         Unary {
@@ -394,7 +396,7 @@ impl<'a> Parser<'a> {
             Token::LParen => self.parse_paren_expr(),
             Token::LitInt => self.parse_int_expr(),
             Token::LitFloat => self.parse_float_expr(),
-            Token::LitRatio => todo!("ratio literal"),
+            Token::LitRatio => self.parse_ratio_expr(),
             Token::LitString => self.parse_string_expr(),
             Token::LitBool => self.parse_bool_expr(),
             Token::Ident => {
@@ -535,6 +537,14 @@ impl<'a> Parser<'a> {
         Ok(Node {
             span: int.span,
             data: ast::Expr::Int(int.data),
+        })
+    }
+
+    fn parse_ratio_expr(&mut self) -> Parse<ast::Expr> {
+        let ratio = self.parse_native(Token::LitRatio, true)?;
+        Ok(Node {
+            span: ratio.span,
+            data: ast::Expr::Ratio(ratio.data),
         })
     }
 

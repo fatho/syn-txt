@@ -1,16 +1,16 @@
 // syn.txt -- a text based synthesizer and audio workstation
 // Copyright (C) 2021  Fabian Thorand
-// 
+//
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
-// 
+//
 // This program is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU Affero General Public License for more details.
-// 
+//
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
@@ -33,7 +33,7 @@ pub enum Expr {
 #[derive(Debug, Clone, Copy)]
 pub enum BuiltInVar {
     GlobalTimeSeconds,
-    NoteTimeSeconds
+    NoteTimeSeconds,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -165,7 +165,10 @@ mod test {
 
     #[test]
     fn simple() {
-        assert_eq!(Expr::parse("+ 1 2").map(|x| x.eval(&BuiltInValues::default(), &[])), Some(Ok(3.0)));
+        assert_eq!(
+            Expr::parse("+ 1 2").map(|x| x.eval(&BuiltInValues::default(), &[])),
+            Some(Ok(3.0))
+        );
         assert_eq!(
             Expr::parse("+ 2 * 3 4").map(|x| x.eval(&BuiltInValues::default(), &[])),
             Some(Ok(14.0))
@@ -174,8 +177,14 @@ mod test {
             Expr::parse("/ + 2 * 3 4 5").map(|x| x.eval(&BuiltInValues::default(), &[])),
             Some(Ok(14.0 / 5.0))
         );
-        assert_eq!(Expr::parse("% 9 4").map(|x| x.eval(&BuiltInValues::default(), &[])), Some(Ok(1.0)));
-        assert_eq!(Expr::parse("^ 3 2").map(|x| x.eval(&BuiltInValues::default(), &[])), Some(Ok(9.0)));
+        assert_eq!(
+            Expr::parse("% 9 4").map(|x| x.eval(&BuiltInValues::default(), &[])),
+            Some(Ok(1.0))
+        );
+        assert_eq!(
+            Expr::parse("^ 3 2").map(|x| x.eval(&BuiltInValues::default(), &[])),
+            Some(Ok(9.0))
+        );
     }
 
     #[test]
@@ -198,7 +207,13 @@ mod test {
 
     #[test]
     fn trigonometry() {
-        assert_eq!(Expr::parse("sin 0").map(|x| x.eval(&BuiltInValues::default(), &[])), Some(Ok(0.0)));
-        assert_eq!(Expr::parse("cos 0").map(|x| x.eval(&BuiltInValues::default(), &[])), Some(Ok(1.0)));
+        assert_eq!(
+            Expr::parse("sin 0").map(|x| x.eval(&BuiltInValues::default(), &[])),
+            Some(Ok(0.0))
+        );
+        assert_eq!(
+            Expr::parse("cos 0").map(|x| x.eval(&BuiltInValues::default(), &[])),
+            Some(Ok(1.0))
+        );
     }
 }

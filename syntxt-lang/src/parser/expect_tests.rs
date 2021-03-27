@@ -328,7 +328,6 @@ fn parse_nested_objects_with_attrs() {
     );
 }
 
-
 #[test]
 fn parse_attr_objects() {
     check(
@@ -709,7 +708,6 @@ fn parse_expr_infix() {
     );
 }
 
-
 #[test]
 fn parse_expr_string() {
     check_expr(
@@ -726,7 +724,6 @@ fn parse_expr_string() {
     );
 }
 
-
 #[test]
 fn parse_invalid_escape() {
     check_expr(
@@ -741,10 +738,10 @@ fn parse_invalid_escape() {
     );
 }
 
-
 #[test]
 fn parse_expr_bool() {
-    check_expr("true and false or false and true",
+    check_expr(
+        "true and false or false and true",
         expect![[r#"
             Ok(
                 Node {
@@ -802,10 +799,10 @@ fn parse_expr_bool() {
     );
 }
 
-
 #[test]
 fn parse_dot_exprs() {
-    check_expr("foo.bar.baz",
+    check_expr(
+        "foo.bar.baz",
         expect![[r#"
             Ok(
                 Node {
@@ -844,10 +841,10 @@ fn parse_dot_exprs() {
     );
 }
 
-
 #[test]
 fn parse_dot_exprs_parens() {
-    check_expr("(foo.bar).baz",
+    check_expr(
+        "(foo.bar).baz",
         expect![[r#"
             Ok(
                 Node {
@@ -901,7 +898,8 @@ fn parse_dot_exprs_parens() {
 
 #[test]
 fn parse_dot_exprs_invalid_parens() {
-    check_expr("foo.(bar.baz)",
+    check_expr(
+        "foo.(bar.baz)",
         expect![[r#"
             Err(
                 ParseError {
@@ -912,10 +910,10 @@ fn parse_dot_exprs_invalid_parens() {
     );
 }
 
-
 #[test]
 fn parse_call() {
-    check_expr("atan2(1, 2, ) + -foo.frob(42, sin(pi))",
+    check_expr(
+        "atan2(1, 2, ) + -foo.frob(42, sin(pi))",
         expect![[r#"
             Ok(
                 Node {

@@ -1,5 +1,5 @@
 [package]
-name = "syntxt-audio"
+name = "syntxt-core"
 version = "0.1.0"
 authors = ["Fabian Thorand <f.thorand@gmail.com>"]
 edition = "2018"
@@ -7,8 +7,3 @@ license = "AGPL-3.0-only"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [dependencies]
-log = "0.4.11"
-structopt = "0.3.16"
-simple_logger = "1.6.0"
-snafu = "0.6.8"
-syntxt-core = { path = "../syntxt-core" }

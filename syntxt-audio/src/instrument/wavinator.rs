@@ -1,28 +1,28 @@
 // syn.txt -- a text based synthesizer and audio workstation
 // Copyright (C) 2021  Fabian Thorand
-// 
+//
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
-// 
+//
 // This program is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU Affero General Public License for more details.
-// 
+//
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 //! Exemplary implementation of a synthesizer, wielding waves like a pro.
 
-use crate::automation::{Expr, BuiltInValues};
+use crate::automation::{BuiltInValues, Expr};
 use crate::envelope::*;
 use crate::filter;
-use crate::note::*;
 use crate::oscillator::*;
 use crate::tuning::*;
 use crate::wave::*;
+use syntxt_core::note::*;
 
 use super::polyphonic::*;
 
@@ -103,7 +103,9 @@ impl NoteSampler for Sampler {
     fn new(note: Note, velocity: Velocity, sample_rate: f64, params: &Self::Params) -> Self {
         // NOTE: number of voices can only be determined at note creation at the moment
         Self {
-            voices: std::iter::repeat(Phase::ZERO).take(params.unison.max(1)).collect(),
+            voices: std::iter::repeat(Phase::ZERO)
+                .take(params.unison.max(1))
+                .collect(),
             envelope: params.envelope.instantiate(sample_rate),
             biquad: Stereo {
                 left: filter::Biquad::new(),
@@ -119,7 +121,12 @@ impl NoteSampler for Sampler {
         }
     }
 
-    fn sample(&mut self, global_sample_count: usize, sample_rate: f64, params: &Self::Params) -> Option<Stereo<f64>> {
+    fn sample(
+        &mut self,
+        global_sample_count: usize,
+        sample_rate: f64,
+        params: &Self::Params,
+    ) -> Option<Stereo<f64>> {
         if self.envelope.faded() {
             return None;
         }
@@ -134,12 +141,12 @@ impl NoteSampler for Sampler {
         for (index, voice) in self.voices.iter_mut().enumerate() {
             let delta = index as f64 - self.midpoint;
 
-            let gain = (- delta * delta / (2.0 * spread_squared)).exp();
+            let gain = (-delta * delta / (2.0 * spread_squared)).exp();
 
             value += params.wave_shape.eval(*voice) * gain;
             value_gain_sum += gain;
 
-            let detune = crate::util::from_cents(params.unison_detune_cents * delta);
+            let detune = syntxt_core::util::from_cents(params.unison_detune_cents * delta);
             let frequency = detune * self.center_freq;
             *voice = voice.step_frequency(frequency, sample_rate);
         }
@@ -148,7 +155,12 @@ impl NoteSampler for Sampler {
         let instrument_gain = params.gain.eval(&builtins, &[]).unwrap_or(0.0);
         let correction_gain = value_gain_sum.recip();
 
-        trace!("e = {}, i = {}, c = {}", envelope_gain, instrument_gain, correction_gain);
+        trace!(
+            "e = {}, i = {}, c = {}",
+            envelope_gain,
+            instrument_gain,
+            correction_gain
+        );
 
         let final_gain = instrument_gain * envelope_gain * self.velocity_gain * correction_gain;
 

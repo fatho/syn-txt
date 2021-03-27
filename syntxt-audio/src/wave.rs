@@ -1,16 +1,16 @@
 // syn.txt -- a text based synthesizer and audio workstation
 // Copyright (C) 2021  Fabian Thorand
-// 
+//
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
-// 
+//
 // This program is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU Affero General Public License for more details.
-// 
+//
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
@@ -91,7 +91,7 @@ impl AudioBuffer {
 /// Convenience type for making things stereo, e.g. individual samples or whole buffers.
 ///
 /// ```
-/// use syn_txt::wave::*;
+/// use syntxt_audio::wave::*;
 ///
 /// let stereo = Stereo::new(0.25, 0.5);
 /// let stereo2 = stereo + Stereo::new(0.5, -0.25);
@@ -123,7 +123,7 @@ impl Stereo<f64> {
     /// # Examples
     ///
     /// ```
-    /// # use syn_txt::wave::*;
+    /// # use syntxt_audio::wave::*;
     ///
     /// assert_eq!(Stereo::panned_mono(1.0, 0.0), Stereo::new(1.0, 1.0));
     /// assert_eq!(Stereo::panned_mono(1.0, -1.0), Stereo::new(1.0, 0.0));

@@ -1,4 +1,3 @@
-
 use logos::Logos;
 
 // Re-exports
@@ -76,9 +75,9 @@ pub enum Token {
 
 #[cfg(test)]
 mod tests {
+    use super::Token;
     use expect_test::{expect, Expect};
     use logos::Logos;
-    use super::Token;
 
     fn check(input: &str, output: Expect) {
         let lexer = Token::lexer(input);
@@ -98,7 +97,8 @@ mod tests {
 
     #[test]
     fn it_works() {
-        assert_lexable(r#"
+        assert_lexable(
+            r#"
             Song {
                 sampleRate: 44_100;
                 meta: Meta {
@@ -117,7 +117,8 @@ mod tests {
                     }
                 ];
             }
-        "#)
+        "#,
+        )
     }
 
     #[test]
@@ -132,18 +133,29 @@ mod tests {
 
     #[test]
     fn escaped_string() {
-        check(r#""hello, so called \"world\"""#, expect![[r#"[(LitString, 0..28)]"#]]);
+        check(
+            r#""hello, so called \"world\"""#,
+            expect![[r#"[(LitString, 0..28)]"#]],
+        );
     }
 
     #[test]
     fn super_escaped_string() {
-        check(r#""hello, so called \\\"world\\\" \w\p\:\t\n""#, expect![[r#"[(LitString, 0..43)]"#]]);
+        check(
+            r#""hello, so called \\\"world\\\" \w\p\:\t\n""#,
+            expect![[r#"[(LitString, 0..43)]"#]],
+        );
     }
 
     #[test]
     fn errorneous_multi_line_string() {
-        check(r#""hello, so called\
-\\\"world\\\"""#, expect![[r#"[(Error, 0..17), (Error, 17..18), (Error, 19..20), (Error, 20..21), (Error, 21..22), (LitString, 22..33)]"#]]);
+        check(
+            r#""hello, so called\
+\\\"world\\\"""#,
+            expect![[
+                r#"[(Error, 0..17), (Error, 17..18), (Error, 19..20), (Error, 20..21), (Error, 21..22), (LitString, 22..33)]"#
+            ]],
+        );
     }
 
     #[test]

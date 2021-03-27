@@ -510,7 +510,11 @@ impl<'a> Parser<'a> {
         let node = self.parse_expect_token(token)?;
         let input = &self.source[node.span.clone()];
         let result = if ignore_underscores {
-            input.chars().filter(|ch| *ch != '_').collect::<String>().parse::<T>()
+            input
+                .chars()
+                .filter(|ch| *ch != '_')
+                .collect::<String>()
+                .parse::<T>()
         } else {
             input.parse::<T>()
         };

@@ -1,23 +1,23 @@
 // syn.txt -- a text based synthesizer and audio workstation
 // Copyright (C) 2021  Fabian Thorand
-// 
+//
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
-// 
+//
 // This program is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU Affero General Public License for more details.
-// 
+//
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 //! A simple textual format for writing melodies while testing things.
 
-use crate::note::{Accidental, Note, NoteName, Velocity};
 use crate::song::{PlayedNote, Time};
+use syntxt_core::note::{Accidental, Note, NoteName, Velocity};
 
 /// Parse a melody described in a textual format.
 pub fn parse_melody(input: &str) -> Result<Vec<PlayedNote>, ParseError> {

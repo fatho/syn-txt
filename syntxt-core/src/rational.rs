@@ -1,16 +1,16 @@
 // syn.txt -- a text based synthesizer and audio workstation
 // Copyright (C) 2021  Fabian Thorand
-// 
+//
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
-// 
+//
 // This program is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU Affero General Public License for more details.
-// 
+//
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
@@ -48,7 +48,7 @@ impl Rational {
     /// # Examples
     ///
     /// ```
-    /// # use syn_txt::rational::*;
+    /// # use syntxt_core::rational::*;
     ///
     /// assert_eq!(Rational::new(10, 5), Rational::new(2, 1));
     /// assert_eq!(Rational::new(-10, -5), Rational::new(6, 3));
@@ -93,7 +93,7 @@ impl Rational {
     /// Compute an integer power of the rational.
     ///
     /// ```
-    /// # use syn_txt::rational::*;
+    /// # use syntxt_core::rational::*;
     /// assert_eq!(Rational::int(2).powi(0), Rational::int(1));
     /// assert_eq!(Rational::int(2).powi(1), Rational::int(2));
     /// assert_eq!(Rational::int(2).powi(2), Rational::int(4));
@@ -129,7 +129,7 @@ impl Rational {
     /// Round towards zero.
     ///
     /// ```
-    /// # use syn_txt::rational::*;
+    /// # use syntxt_core::rational::*;
     ///
     /// assert_eq!(Rational::new(10, 5).truncate(), 2);
     /// assert_eq!(Rational::new(-10, 6).truncate(), -1);
@@ -142,7 +142,7 @@ impl Rational {
     /// Round to closed integer, half up.
     ///
     /// ```
-    /// # use syn_txt::rational::*;
+    /// # use syntxt_core::rational::*;
     ///
     /// assert_eq!(Rational::new(10, 5).round(), 2);
     /// assert_eq!(Rational::new(-10, 5).round(), -2);
@@ -179,7 +179,7 @@ impl Rational {
 /// # Examples
 ///
 /// ```
-/// use syn_txt::rational::*;
+/// use syntxt_core::rational::*;
 ///
 /// assert_eq!(Rational::new(1, 2) + Rational::new(3, 4), Rational::new(5, 4));
 /// assert_eq!(Rational::new(3, 4) + Rational::new(3, 4), Rational::new(3, 2));
@@ -225,7 +225,7 @@ impl ops::Div for Rational {
 /// # Examples
 ///
 /// ```
-/// # use syn_txt::rational::*;
+/// # use syntxt_core::rational::*;
 ///
 /// assert_eq!(Rational::new(5, 1) % Rational::new(3, 1), Rational::new(2, 1));
 /// assert_eq!(Rational::new(-5, 1) % Rational::new(3, 1), Rational::new(-2, 1));
@@ -261,7 +261,7 @@ impl ops::Mul<Rational> for Int {
 }
 
 /// ```
-/// # use syn_txt::rational::*;
+/// # use syntxt_core::rational::*;
 /// assert_eq!(Rational::new(1, 4) / 2, Rational::new(1, 8));
 /// assert_eq!(Rational::new(9, 13) / 3, Rational::new(3, 13));
 /// ```
@@ -316,7 +316,7 @@ impl PartialOrd for Rational {
 }
 
 /// ```
-/// use syn_txt::rational::*;
+/// use syntxt_core::rational::*;
 ///
 /// assert!(Rational::new(3,4) < Rational::new(3,2));
 /// ```
@@ -407,7 +407,7 @@ impl std::str::FromStr for Rational {
 /// # Example
 ///
 /// ```
-/// use syn_txt::rational::*;
+/// use syntxt_core::rational::*;
 ///
 /// assert_eq!(gcd(20, 15), 5);
 /// assert_eq!(gcd(20, 19), 1);

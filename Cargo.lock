@@ -323,14 +323,19 @@ dependencies = [
 ]
 
 [[package]]
-name = "syn-txt"
+name = "syntxt-audio"
 version = "0.1.0"
 dependencies = [
  "log",
  "simple_logger",
  "snafu",
  "structopt",
+ "syntxt-core",
 ]
+
+[[package]]
+name = "syntxt-core"
+version = "0.1.0"
 
 [[package]]
 name = "syntxt-lang"
@@ -338,6 +343,7 @@ version = "0.1.0"
 dependencies = [
  "expect-test",
  "logos",
+ "syntxt-core",
 ]
 
 [[package]]

@@ -216,7 +216,7 @@ impl<'a> Parser<'a> {
     pub fn expected_str_but_got(&self, span: Span, expected: &str, got: Token) -> ParseError {
         self.make_error(
             span,
-            format!("Expected one of {}, but got {:?}", expected, got),
+            format!("Expected {}, but got {:?}", expected, got),
         )
     }
 
@@ -238,6 +238,11 @@ impl<'a> Parser<'a> {
 
     fn parse_root(&mut self) -> Parse<ast::Root> {
         let object = self.parse_object()?;
+        // Must be all there is
+        if let Some((token, span)) = self.consume() {
+            return Err(self.expected_str_but_got(span, "eof", token))
+        }
+
         Ok(Node {
             span: object.span.clone(),
             data: ast::Root { object },

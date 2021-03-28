@@ -161,6 +161,10 @@
                             newCallback(state.editor.getModel().getValue());
                         });
                     }
+                },
+                jumpTo: function(state, line, column) {
+                    state.editor.setPosition({column: column, lineNumber: line});
+                    state.editor.focus();
                 }
             };
 

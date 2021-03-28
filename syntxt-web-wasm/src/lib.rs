@@ -5,8 +5,12 @@ use yew::prelude::*;
 pub mod components;
 pub mod console;
 
-use components::{editor::Editor, list::ListItem};
 use components::list::List;
+use components::{
+    editor::{self, Editor},
+    list::ListItem,
+    WeakComponentLink,
+};
 
 #[wasm_bindgen(start)]
 pub fn run() {
@@ -31,7 +35,7 @@ pub fn parse(code: &str) -> Box<[JsValue]> {
 
 struct AppModel {
     link: ComponentLink<Self>,
-    editor_ref: NodeRef,
+    editor: WeakComponentLink<Editor>,
     showing_issues: bool,
     issues: Vec<Issue>,
 }
@@ -48,7 +52,7 @@ impl Component for AppModel {
     fn create(_: Self::Properties, link: ComponentLink<Self>) -> Self {
         Self {
             link,
-            editor_ref: NodeRef::default(),
+            editor: WeakComponentLink::default(),
             showing_issues: true,
             issues: Vec::new(),
         }
@@ -60,12 +64,10 @@ impl Component for AppModel {
                 self.issues.clear();
                 match syntxt_lang::parser::Parser::parse(&code) {
                     Ok(_) => {}
-                    Err(err) => {
-                        self.issues.push(Issue {
-                            message: err.message,
-                            location: err.pos.start,
-                        })
-                    }
+                    Err(err) => self.issues.push(Issue {
+                        message: err.message,
+                        location: err.pos.start,
+                    }),
                 }
                 true
             }
@@ -79,7 +81,10 @@ impl Component for AppModel {
             }
             Msg::GoToIssue(index) => {
                 if let Some(issue) = self.issues.get(index) {
-                    console_log!("Going to {:?}, talk to {:?}", issue.location, self.editor_ref);
+                    self.editor.send_message(editor::Msg::GoTo {
+                        line: issue.location.line as u32,
+                        column: issue.location.column as u32,
+                    });
                 }
                 false
             }
@@ -103,7 +108,7 @@ impl Component for AppModel {
                 </header>
                 <div style="flex: 1 1 0px; min-height: 0; min-width: 0;">
                     <Editor
-                        ref=self.editor_ref.clone()
+                        weak_link=&self.editor
                         on_content_changed=self.link.callback(|code| Msg::SourceCodeChanged(code))
                         />
                 </div>

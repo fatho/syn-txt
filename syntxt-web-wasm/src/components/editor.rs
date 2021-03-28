@@ -1,11 +1,14 @@
 use wasm_bindgen::prelude::*;
-use yew::{prelude::*, web_sys::HtmlElement};
 use yew::Properties;
+use yew::{prelude::*, web_sys::HtmlElement};
 
+use super::WeakComponentLink;
 
 pub struct Editor {
     #[allow(unused)]
     link: ComponentLink<Self>,
+    weak_link: WeakComponentLink<Editor>,
+
     container_ref: NodeRef,
     on_content_changed: Callback<String>,
     editor: Option<JsValue>,
@@ -16,10 +19,11 @@ pub struct Editor {
 pub struct Props {
     #[prop_or_default]
     pub on_content_changed: Callback<String>,
+    pub weak_link: WeakComponentLink<Editor>,
 }
 
 pub enum Msg {
-    Test
+    GoTo { line: u32, column: u32 },
 }
 
 impl Component for Editor {
@@ -27,9 +31,11 @@ impl Component for Editor {
     type Properties = Props;
 
     fn create(props: Self::Properties, link: ComponentLink<Self>) -> Self {
+        props.weak_link.attach(link.clone());
         let on_content_changed = props.on_content_changed.clone();
         Self {
             link,
+            weak_link: props.weak_link,
             container_ref: NodeRef::default(),
             on_content_changed: props.on_content_changed,
             editor: None,
@@ -39,7 +45,14 @@ impl Component for Editor {
         }
     }
 
-    fn update(&mut self, _msg: Self::Message) -> ShouldRender {
+    fn update(&mut self, msg: Self::Message) -> ShouldRender {
+        match msg {
+            Msg::GoTo { line, column } => {
+                if let Some(editor) = self.editor.clone() {
+                    jumpTo(editor, line, column);
+                }
+            }
+        }
         false
     }
 
@@ -82,6 +95,7 @@ impl Component for Editor {
     }
 
     fn destroy(&mut self) {
+        self.weak_link.detach();
         if let Some(editor) = self.editor.take() {
             destroyEditor(editor);
         }
@@ -101,4 +115,7 @@ extern "C" {
 
     #[wasm_bindgen(js_namespace = syntxt_helpers, js_name = destroyEditor)]
     fn destroyEditor(editor: JsValue);
+
+    #[wasm_bindgen(js_namespace = syntxt_helpers, js_name = jumpTo)]
+    fn jumpTo(editor: JsValue, line: u32, column: u32);
 }

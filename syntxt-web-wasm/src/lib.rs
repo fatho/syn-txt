@@ -5,7 +5,8 @@ use yew::prelude::*;
 pub mod components;
 pub mod console;
 
-use components::editor::Editor;
+use components::{editor::Editor, list::ListItem};
+use components::list::List;
 
 #[wasm_bindgen(start)]
 pub fn run() {
@@ -30,6 +31,7 @@ pub fn parse(code: &str) -> Box<[JsValue]> {
 
 struct AppModel {
     link: ComponentLink<Self>,
+    editor_ref: NodeRef,
     showing_issues: bool,
     issues: Vec<Issue>,
 }
@@ -37,6 +39,7 @@ struct AppModel {
 enum Msg {
     SourceCodeChanged(String),
     ShowIssues(bool),
+    GoToIssue(usize),
 }
 
 impl Component for AppModel {
@@ -45,6 +48,7 @@ impl Component for AppModel {
     fn create(_: Self::Properties, link: ComponentLink<Self>) -> Self {
         Self {
             link,
+            editor_ref: NodeRef::default(),
             showing_issues: true,
             issues: Vec::new(),
         }
@@ -73,6 +77,12 @@ impl Component for AppModel {
                     false
                 }
             }
+            Msg::GoToIssue(index) => {
+                if let Some(issue) = self.issues.get(index) {
+                    console_log!("Going to {:?}, talk to {:?}", issue.location, self.editor_ref);
+                }
+                false
+            }
         }
     }
 
@@ -92,26 +102,18 @@ impl Component for AppModel {
                 <header style="flex: 0 0 0px; background-color: black">
                 </header>
                 <div style="flex: 1 1 0px; min-height: 0; min-width: 0;">
-                    <Editor on_content_changed=self.link.callback(|code| Msg::SourceCodeChanged(code))/>
+                    <Editor
+                        ref=self.editor_ref.clone()
+                        on_content_changed=self.link.callback(|code| Msg::SourceCodeChanged(code))
+                        />
                 </div>
                 <div class=classes!("tab", issue_tab_class) style="flex: 0 0 20%; min-height: 0; overflow: auto">
-                    <div class=classes!("list-flat") style="overflow-x: hidden; overflow-y: auto">
-                    {
-                        if self.issues.is_empty() {
-                            html! {
-                                <div class=classes!("list-item-flat") disabled=true>
-                                    <span style="color:red; font-weight: bold; visibility: hidden; margin-right: 5px">{"ⓧ"}</span>
-                                    <span>{"No issues detected"}</span>
-                                </div>
-                            }
-                        } else {
-                            self.issues.iter()
-                                .enumerate()
-                                .map(|(index, issue)| render_issue(index, issue))
-                                .collect::<Html>()
-                        }
-                    }
-                    </div>
+                    // TODO: make this more efficient by not cloning the issues
+                    <List<Issue>
+                        items=self.issues.clone()
+                        empty_text="No issues detected"
+                        onclick=self.link.callback(|index| Msg::GoToIssue(index))
+                        />
                 </div>
                 <footer class=classes!("footer") style="flex: 0 0 24px;">
                     <button
@@ -125,17 +127,20 @@ impl Component for AppModel {
     }
 }
 
+#[derive(PartialEq, Clone, Debug)]
 struct Issue {
     message: String,
     location: Pos,
 }
 
-fn render_issue(index: usize, issue: &Issue) -> Html {
-    html! {
-        <div class=classes!("list-item-flat") tabindex={index}>
-            <span style="color:red; font-weight: bold; margin-right: 5px">{"ⓧ"}</span>
-            <span>{&issue.message}</span>
-            <span style="color:gray; margin-left: 5px">{issue.location.line}{":"}{issue.location.column}</span>
-        </div>
+impl ListItem for Issue {
+    fn view(&self) -> Html {
+        html! {
+            <>
+                <span style="color:red; font-weight: bold; margin-right: 5px">{"ⓧ"}</span>
+                <span>{&self.message}</span>
+                <span style="color:gray; margin-left: 5px">{self.location.line}{":"}{self.location.column}</span>
+            </>
+        }
     }
 }

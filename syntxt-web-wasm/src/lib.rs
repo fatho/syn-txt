@@ -1,5 +1,3 @@
-mod utils;
-
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
@@ -19,7 +17,8 @@ macro_rules! console_log {
 
 #[wasm_bindgen(start)]
 pub fn run() {
-    utils::set_panic_hook();
+    console_error_panic_hook::set_once();
+    console_log!("syntxt initialized");
 }
 
 #[wasm_bindgen]

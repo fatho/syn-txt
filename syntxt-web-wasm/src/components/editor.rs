@@ -1,8 +1,11 @@
 use wasm_bindgen::prelude::*;
 use yew::Properties;
 use yew::{prelude::*, web_sys::HtmlElement};
+use serde_repr::*;
+use serde::{Serialize, Deserialize};
 
 use super::WeakComponentLink;
+
 
 pub struct Editor {
     #[allow(unused)]
@@ -13,13 +16,36 @@ pub struct Editor {
     on_content_changed: Callback<String>,
     editor: Option<JsValue>,
     change_handler: Closure<dyn Fn(String)>,
+    markers: Vec<ModelMarker>,
 }
 
 #[derive(Clone, PartialEq, Properties)]
 pub struct Props {
     #[prop_or_default]
     pub on_content_changed: Callback<String>,
+    #[prop_or_default]
+    pub markers: Vec<ModelMarker>,
     pub weak_link: WeakComponentLink<Editor>,
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct ModelMarker {
+    pub start_line_number: u32,
+    pub start_column: u32,
+    pub end_line_number: u32,
+    pub end_column: u32,
+    pub message: String,
+    pub severity: MarkerSeverity,
+}
+
+#[derive(Serialize_repr, Deserialize_repr, Clone, PartialEq, Debug, Copy)]
+#[repr(u32)]
+pub enum MarkerSeverity {
+    Error = 8,
+    Hint = 1,
+    Info = 2,
+    Warning = 4,
 }
 
 pub enum Msg {
@@ -42,6 +68,7 @@ impl Component for Editor {
             change_handler: Closure::wrap(Box::new(move |value| {
                 on_content_changed.emit(value);
             })),
+            markers: props.markers,
         }
     }
 
@@ -71,6 +98,13 @@ impl Component for Editor {
             }
 
             self.change_handler = new_change_handler;
+        }
+        if self.markers != props.markers {
+            self.markers = props.markers;
+            if let Some(editor) = self.editor.clone() {
+                let marker_value = JsValue::from_serde(&self.markers).unwrap();
+                setModelMarkers(&editor, &marker_value);
+            }
         }
         false
     }
@@ -118,4 +152,7 @@ extern "C" {
 
     #[wasm_bindgen(js_namespace = syntxt_helpers, js_name = jumpTo)]
     fn jumpTo(editor: JsValue, line: u32, column: u32);
+
+    #[wasm_bindgen(js_namespace = syntxt_helpers, js_name = setModelMarkers)]
+    fn setModelMarkers(editor: &JsValue, markers: &JsValue);
 }

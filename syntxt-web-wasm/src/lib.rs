@@ -5,7 +5,7 @@ use yew::prelude::*;
 pub mod components;
 pub mod console;
 
-use components::list::List;
+use components::{editor::{MarkerSeverity, ModelMarker}, list::List};
 use components::{
     editor::{self, Editor},
     list::ListItem,
@@ -16,7 +16,6 @@ use components::{
 pub fn run() {
     console_error_panic_hook::set_once();
     App::<AppModel>::new().mount_to_body();
-    console_log!("syntxt initialized");
 }
 
 #[wasm_bindgen]
@@ -66,7 +65,8 @@ impl Component for AppModel {
                     Ok(_) => {}
                     Err(err) => self.issues.push(Issue {
                         message: err.message,
-                        location: err.pos.start,
+                        start: err.pos.start,
+                        end: err.pos.end,
                     }),
                 }
                 true
@@ -82,8 +82,8 @@ impl Component for AppModel {
             Msg::GoToIssue(index) => {
                 if let Some(issue) = self.issues.get(index) {
                     self.editor.send_message(editor::Msg::GoTo {
-                        line: issue.location.line as u32,
-                        column: issue.location.column as u32,
+                        line: issue.start.line as u32,
+                        column: issue.start.column as u32,
                     });
                 }
                 false
@@ -109,11 +109,20 @@ impl Component for AppModel {
                 <div style="flex: 1 1 0px; min-height: 0; min-width: 0;">
                     <Editor
                         weak_link=&self.editor
+                        markers=self.issues.iter().map(|issue| {
+                            ModelMarker {
+                                start_line_number: issue.start.line as u32,
+                                start_column: issue.start.column as u32,
+                                end_line_number: issue.end.line as u32,
+                                end_column: issue.end.column as u32,
+                                message: issue.message.clone(),
+                                severity: MarkerSeverity::Error,
+                            }
+                        }).collect::<Vec<_>>()
                         on_content_changed=self.link.callback(|code| Msg::SourceCodeChanged(code))
                         />
                 </div>
                 <div class=classes!("tab", issue_tab_class) style="flex: 0 0 20%; min-height: 0; overflow: auto">
-                    // TODO: make this more efficient by not cloning the issues
                     <List<Issue>
                         items=self.issues.clone()
                         empty_text="No issues detected"
@@ -135,7 +144,8 @@ impl Component for AppModel {
 #[derive(PartialEq, Clone, Debug)]
 struct Issue {
     message: String,
-    location: Pos,
+    start: Pos,
+    end: Pos,
 }
 
 impl ListItem for Issue {
@@ -144,7 +154,7 @@ impl ListItem for Issue {
             <>
                 <span style="color:red; font-weight: bold; margin-right: 5px">{"ⓧ"}</span>
                 <span>{&self.message}</span>
-                <span style="color:gray; margin-left: 5px">{self.location.line}{":"}{self.location.column}</span>
+                <span style="color:gray; margin-left: 5px">{self.start.line}{":"}{self.start.column}</span>
             </>
         }
     }

@@ -165,6 +165,9 @@
                 jumpTo: function(state, line, column) {
                     state.editor.setPosition({column: column, lineNumber: line});
                     state.editor.focus();
+                },
+                setModelMarkers: function(state, markers) {
+                    monaco.editor.setModelMarkers(state.editor.getModel(), "owner", markers);
                 }
             };
 

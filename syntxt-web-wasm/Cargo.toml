@@ -12,6 +12,7 @@ crate-type = ["cdylib", "rlib"]
 # yew master fixes a few issues with rust-analyzer
 yew = { git = "https://github.com/yewstack/yew" }
 serde = "1.0.125"
+serde_repr = "0.1.6"
 wasm-bindgen = { version = "0.2", features = ["serde-serialize"] }
 console_error_panic_hook = "0.1.1"
 

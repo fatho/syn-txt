@@ -1,0 +1,16 @@
+html, body {
+    margin: 0;
+    height: 100vh;
+    overflow: hidden;
+    background-color: white;
+    font-family: 'Roboto', sans-serif;
+}
+
+
+.popup {
+    position: absolute;
+    left: calc(100% / 3);
+    top: calc(100% / 3);
+    width: calc(100% / 3);
+    height: calc(100% / 3);
+}

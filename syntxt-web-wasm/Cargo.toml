@@ -9,7 +9,9 @@ license = "AGPL-3.0-only"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-wasm-bindgen = "0.2"
+yew = "0.17.4"
+serde = "1.0.125"
+wasm-bindgen = { version = "0.2", features = ["serde-serialize"] }
 console_error_panic_hook = "0.1.1"
 
 syntxt-lang = { path = "../syntxt-lang" }

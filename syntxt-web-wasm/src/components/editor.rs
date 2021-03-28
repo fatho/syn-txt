@@ -59,7 +59,6 @@ impl Component for Editor {
 
             self.change_handler = new_change_handler;
         }
-        // TODO: update callback
         false
     }
 

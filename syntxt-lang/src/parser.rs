@@ -14,12 +14,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::{fmt::Display, iter::Peekable, str::FromStr, sync::Arc};
+use std::{fmt::Display, iter::Peekable, ops::Range, str::FromStr, sync::Arc};
 
 use ast::BinaryOp;
 use logos::Logos;
 
-use crate::lexer::{Span, Token};
+use crate::{lexer::{Span, Token}, line_map::{LineMap, Pos}};
 
 #[cfg(test)]
 mod expect_tests;
@@ -114,37 +114,9 @@ pub mod ast {
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct ParseError {
-    span: Span,
-    message: String,
-}
-
-impl ParseError {
-    pub fn expected_but_got(span: Span, expected: &[Token], got: Token) -> ParseError {
-        ParseError {
-            span,
-            message: format!("Expected one of {:?}, but got {:?}", expected, got),
-        }
-    }
-    pub fn expected_str_but_got(span: Span, expected: &str, got: Token) -> ParseError {
-        ParseError {
-            span,
-            message: format!("Expected one of {}, but got {:?}", expected, got),
-        }
-    }
-
-    pub fn unexpected_eof(span: Span, expected: &[Token]) -> ParseError {
-        ParseError {
-            span,
-            message: format!("Expected one of {:?}, but reached end of file", expected),
-        }
-    }
-
-    pub fn unexpected_str_eof(span: Span, expected: &str) -> ParseError {
-        ParseError {
-            span,
-            message: format!("Expected one of {}, but reached end of file", expected),
-        }
-    }
+    pub span: Span,
+    pub pos: Range<Pos>,
+    pub message: String,
 }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
@@ -174,6 +146,7 @@ pub struct Parser<'a> {
     source: &'a str,
     stream: Peekable<logos::SpannedIter<'a, Token>>,
     consumed: usize,
+    line_map: LineMap<'a>,
 }
 
 impl<'a> Parser<'a> {
@@ -189,6 +162,7 @@ impl<'a> Parser<'a> {
             source,
             stream: Token::lexer(source).spanned().peekable(),
             consumed: 0,
+            line_map: LineMap::new(source),
         }
     }
 
@@ -213,10 +187,10 @@ impl<'a> Parser<'a> {
             if token == expected {
                 return Ok(Node { span, data: () });
             } else {
-                return Err(ParseError::expected_but_got(span, &[expected], token));
+                return Err(self.expected_but_got(span, &[expected], token));
             }
         } else {
-            return Err(ParseError::unexpected_eof(self.eof(), &[expected]));
+            return Err(self.unexpected_eof(self.eof(), &[expected]));
         }
     }
 
@@ -224,10 +198,51 @@ impl<'a> Parser<'a> {
         self.source.len()..self.source.len()
     }
 
+    fn make_error(&self, span: Span, message: String) -> ParseError {
+        ParseError {
+            pos: self.line_map.offset_to_pos(span.start)..self.line_map.offset_to_pos(span.end),
+            message,
+            span,
+        }
+    }
+
+    pub fn expected_but_got(&self, span: Span, expected: &[Token], got: Token) -> ParseError {
+        self.make_error(
+            span,
+            format!("Expected one of {:?}, but got {:?}", expected, got),
+        )
+    }
+
+    pub fn expected_str_but_got(&self, span: Span, expected: &str, got: Token) -> ParseError {
+        self.make_error(
+            span,
+            format!("Expected {}, but got {:?}", expected, got),
+        )
+    }
+
+    pub fn unexpected_eof(&self, span: Span, expected: &[Token]) -> ParseError {
+        self.make_error(
+            span,
+            format!("Expected one of {:?}, but reached end of file", expected),
+        )
+    }
+
+    pub fn unexpected_str_eof(&self, span: Span, expected: &str) -> ParseError {
+        self.make_error(
+            span,
+            format!("Expected one of {}, but reached end of file", expected),
+        )
+    }
+
     // Parse rules
 
     fn parse_root(&mut self) -> Parse<ast::Root> {
         let object = self.parse_object()?;
+        // Must be all there is
+        if let Some((token, span)) = self.consume() {
+            return Err(self.expected_str_but_got(span, "eof", token))
+        }
+
         Ok(Node {
             span: object.span.clone(),
             data: ast::Root { object },
@@ -269,10 +284,10 @@ impl<'a> Parser<'a> {
                             children.push(child_object);
                         }
                         Some(other) => {
-                            return Err(ParseError::expected_but_got(span, EXPECTATION, other))
+                            return Err(self.expected_but_got(span, EXPECTATION, other))
                         }
                         None => {
-                            return Err(ParseError::unexpected_eof(span, EXPECTATION));
+                            return Err(self.unexpected_eof(span, EXPECTATION));
                         }
                     }
                 }
@@ -403,12 +418,13 @@ impl<'a> Parser<'a> {
 
     fn parse_prefix_expr(&mut self) -> Parse<ast::Expr> {
         let (token, span) = match self.peek() {
-            (None, span) => return Err(ParseError::unexpected_str_eof(span, "expression")),
+            (None, span) => return Err(self.unexpected_str_eof(span, "expression")),
             (Some(token), span) => (token, span),
         };
         match token {
             Token::Plus => self.parse_unary_operand(ast::UnaryOp::Plus, span),
             Token::Minus => self.parse_unary_operand(ast::UnaryOp::Minus, span),
+            Token::Not => self.parse_unary_operand(ast::UnaryOp::Not, span),
             Token::LParen => self.parse_paren_expr(),
             Token::LitInt => self.parse_int_expr(),
             Token::LitFloat => self.parse_float_expr(),
@@ -432,7 +448,7 @@ impl<'a> Parser<'a> {
                     })
                 }
             }
-            _ => Err(ParseError::expected_str_but_got(span, "expression", token)),
+            _ => Err(self.expected_str_but_got(span, "expression", token)),
         }
     }
 
@@ -502,14 +518,14 @@ impl<'a> Parser<'a> {
                 }
                 Some(other) if other == end => break,
                 Some(got) => {
-                    return Err(ParseError::expected_but_got(
+                    return Err(self.expected_but_got(
                         span,
                         &[Token::LParen, Token::Comma],
                         got,
                     ))
                 }
                 None => {
-                    return Err(ParseError::unexpected_eof(
+                    return Err(self.unexpected_eof(
                         span,
                         &[Token::LParen, Token::Comma],
                     ))
@@ -541,10 +557,10 @@ impl<'a> Parser<'a> {
                 span: node.span,
                 data: int,
             }),
-            Err(err) => Err(ParseError {
-                span: node.span,
-                message: format!("{}", err),
-            }),
+            Err(err) => Err(self.make_error(
+                node.span,
+                format!("{}", err),
+            )),
         }
     }
 
@@ -599,10 +615,10 @@ impl<'a> Parser<'a> {
             if ch == '\\' {
                 match lit_remaining.next() {
                     None => {
-                        return Err(ParseError {
-                            span: start_index..start_index + 1,
-                            message: "unterminated escape sequence".into(),
-                        })
+                        return Err(self.make_error(
+                            start_index..start_index + 1,
+                            "unterminated escape sequence".into()
+                        ))
                     }
                     Some((index, ch)) => {
                         let end_index = node.span.start + 1 + index + ch.len_utf8();
@@ -612,10 +628,10 @@ impl<'a> Parser<'a> {
                             'r' => data.push('\r'),
                             '\\' => data.push('\\'),
                             _ => {
-                                return Err(ParseError {
-                                    span: start_index..end_index,
-                                    message: "unknown escape sequence".into(),
-                                })
+                                return Err(self.make_error(
+                                    start_index..end_index,
+                                    "unknown escape sequence".into(),
+                                ))
                             }
                         }
                     }

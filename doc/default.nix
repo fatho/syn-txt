@@ -17,6 +17,7 @@ stdenv.mkDerivation {
         ./source/conf.py
         ./source/index.rst
 
+        ./favicon.ico
         ./logo.png
         ./Makefile
       ];
@@ -38,6 +39,7 @@ stdenv.mkDerivation {
 
       # Put the logo where sphinx can find it
       mv ./logo.png ./source/_static
+      mv ./favicon.ico ./source
 
       # We need to override this date variable to get a 2020 copyright statement,
       # instead of a 1970 one.

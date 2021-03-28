@@ -39,6 +39,13 @@ fn parse_empty() {
             Err(
                 ParseError {
                     span: 0..0,
+                    pos: Pos {
+                        line: 1,
+                        column: 1,
+                    }..Pos {
+                        line: 1,
+                        column: 1,
+                    },
                     message: "Expected one of [Ident], but reached end of file",
                 },
             )"#]],
@@ -607,6 +614,13 @@ fn parse_expr_invalid_ratio() {
             Err(
                 ParseError {
                     span: 0..8,
+                    pos: Pos {
+                        line: 1,
+                        column: 1,
+                    }..Pos {
+                        line: 1,
+                        column: 9,
+                    },
                     message: "denominator is zero",
                 },
             )"#]],
@@ -681,6 +695,13 @@ fn parse_expr_int_lit_too_big() {
             Err(
                 ParseError {
                     span: 0..61,
+                    pos: Pos {
+                        line: 1,
+                        column: 1,
+                    }..Pos {
+                        line: 1,
+                        column: 62,
+                    },
                     message: "number too large to fit in target type",
                 },
             )"#]],
@@ -800,6 +821,13 @@ fn parse_invalid_escape() {
             Err(
                 ParseError {
                     span: 8..10,
+                    pos: Pos {
+                        line: 1,
+                        column: 9,
+                    }..Pos {
+                        line: 1,
+                        column: 11,
+                    },
                     message: "unknown escape sequence",
                 },
             )"#]],
@@ -972,6 +1000,13 @@ fn parse_dot_exprs_invalid_parens() {
             Err(
                 ParseError {
                     span: 4..5,
+                    pos: Pos {
+                        line: 1,
+                        column: 5,
+                    }..Pos {
+                        line: 1,
+                        column: 6,
+                    },
                     message: "Expected one of [Ident], but got LParen",
                 },
             )"#]],

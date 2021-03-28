@@ -1,4 +1,11 @@
 {
+    "monaco-editor": {
+        "sha256": "1yvr7n1m1xjr95q3kqi6md283sbx0k3ggxrvs0v0y0jsvnyb58bh",
+        "type": "tarball",
+        "url": "https://registry.npmjs.org/monaco-editor/-/monaco-editor-0.23.0.tgz",
+        "url_template": "https://registry.npmjs.org/monaco-editor/-/monaco-editor-<version>.tgz",
+        "version": "0.23.0"
+    },
     "nixpkgs": {
         "branch": "nixpkgs-unstable",
         "description": "Nix Packages collection.",
@@ -9,6 +16,18 @@
         "sha256": "0fy7z7yxk5n7yslsvx5cyc6h21qwi4bhxf3awhirniszlbvaazy2",
         "type": "tarball",
         "url": "https://github.com/NixOS/nixpkgs/archive/c0e881852006b132236cbf0301bd1939bb50867e.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
+    },
+    "nixpkgs-mozilla": {
+        "branch": "master",
+        "description": "mozilla related nixpkgs (extends nixos/nixpkgs repo)",
+        "homepage": "",
+        "owner": "mozilla",
+        "repo": "nixpkgs-mozilla",
+        "rev": "8c007b60731c07dd7a052cce508de3bb1ae849b4",
+        "sha256": "1zybp62zz0h077zm2zmqs2wcg3whg6jqaah9hcl1gv4x8af4zhs6",
+        "type": "tarball",
+        "url": "https://github.com/mozilla/nixpkgs-mozilla/archive/8c007b60731c07dd7a052cce508de3bb1ae849b4.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     }
 }

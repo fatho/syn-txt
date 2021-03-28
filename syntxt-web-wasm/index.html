@@ -134,7 +134,6 @@
             resizeObserver.observe(containerElem);
 
             window.editor = editor;
-            window.decorations = [];
 
             editor.getModel().onDidChangeContent((event) => {
                 if(window.syntxt) {
@@ -150,23 +149,14 @@
                                 severity: monaco.MarkerSeverity.Error,
                             },
                         ]);
-                        window.decorations = editor.deltaDecorations(window.decorations, [
-                            {
-                                range: new monaco.Range(result[0],result[1],result[0], result[1]),
-                                options: {
-                                    isWholeLine: true,
-                                    glyphMarginClassName: 'errorGlyphMargin',
-                                    glyphMarginHoverMessage: result[4],
-                                }
-                            }
-                        ]);
                     } else {
                         monaco.editor.setModelMarkers(editor.getModel(), "syntxt", [])
-                        window.decorations = editor.deltaDecorations(window.decorations, []);
                     }
                     document.getElementById("compileStatus").innerText = result;
                 }
             });
+
+            editor.focus();
 
         });
     </script>
@@ -214,11 +204,6 @@
 
         .fill {
             height: calc(100vh - 24px - 48px);
-        }
-
-        .errorGlyphMargin {
-            background-image: url('assets/error.png');
-            background-size: contain;
         }
     </style>
 </head>

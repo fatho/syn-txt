@@ -1,12 +1,10 @@
-use syntxt_lang::parser::NodePtr;
 use wasm_bindgen::prelude::*;
 use yew::{prelude::*, web_sys::HtmlElement};
 use yew::Properties;
-use serde::{Serialize,Deserialize};
 
-use crate::console_log;
 
 pub struct Editor {
+    #[allow(unused)]
     link: ComponentLink<Self>,
     container_ref: NodeRef,
     on_content_changed: Callback<String>,
@@ -66,11 +64,10 @@ impl Component for Editor {
     }
 
     fn view(&self) -> Html {
-        //let callback = self.link.callback(|_| Msg::Test);
         html! {
             <div
                 ref=self.container_ref.clone()
-                style="height: 100%"
+                style="height: 100%; width: 100%;"
                 >
             </div>
         }

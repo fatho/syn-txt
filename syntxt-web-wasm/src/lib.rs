@@ -31,7 +31,6 @@ pub fn parse(code: &str) -> Box<[JsValue]> {
 
 struct AppModel {
     link: ComponentLink<Self>,
-    value: i64,
 }
 
 enum Msg {
@@ -44,7 +43,6 @@ impl Component for AppModel {
     fn create(_: Self::Properties, link: ComponentLink<Self>) -> Self {
         Self {
             link,
-            value: 0,
         }
     }
 
@@ -66,7 +64,15 @@ impl Component for AppModel {
 
     fn view(&self) -> Html {
         html! {
-            <Editor on_content_changed=self.link.callback(|code| Msg::SourceCodeChanged(code))/>
+            <section style="height: 100vh; display: flex; flex-direction: column">
+                <header style="flex: 0 0 48px; background-color: black">
+                </header>
+                <div style="flex: 1 1 0px; min-height: 0; min-width: 0;">
+                    <Editor on_content_changed=self.link.callback(|code| Msg::SourceCodeChanged(code))/>
+                </div>
+                <footer style="flex: 0 0 48px; background-color: black">
+                </footer>
+            </section>
         }
     }
 }

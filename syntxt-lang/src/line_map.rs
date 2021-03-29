@@ -30,6 +30,15 @@ pub struct Pos {
     pub column: usize,
 }
 
+impl Pos {
+    pub fn origin() -> Self {
+        Self {
+            line: 0,
+            column: 0,
+        }
+    }
+}
+
 impl fmt::Display for Pos {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}:{}", self.line, self.column)

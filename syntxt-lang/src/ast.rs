@@ -14,14 +14,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::{ops::Deref, sync::Arc};
+use std::{ops::{Deref, Range}, sync::Arc};
 
-use crate::lexer::Span;
+use crate::{lexer::Span, line_map::Pos};
 use syntxt_core::{nonnan::F64N, rational::Rational};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Node<T> {
     pub span: Span,
+    pub pos: Range<Pos>,
     pub data: T,
 }
 

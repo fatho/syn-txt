@@ -68,6 +68,7 @@ impl Component for AppModel {
             showing_issues: true,
             ast: ast::Node {
                 span: 0..0,
+                pos: Pos::origin()..Pos::origin(),
                 data: ast::Root { objects: vec![] },
             },
             issues: Vec::new(),
@@ -113,10 +114,7 @@ impl Component for AppModel {
                 false
             }
             Msg::JumpToEditor { line, column } => {
-                self.editor.send_message(editor::Msg::GoTo {
-                    line,
-                    column,
-                });
+                self.editor.send_message(editor::Msg::GoTo { line, column });
                 false
             }
         }
@@ -222,28 +220,38 @@ impl AstTreeVisitor {
         self.stack.push(self.children.len());
     }
 
-    fn finish<S: AsRef<str>>(&mut self, label: S) {
+    fn finish<S: AsRef<str>>(&mut self, label: S, pos: Pos) {
         let scope_start = self.stack.pop().unwrap();
-        let node = html! {
-            <TreeNode
-                label=label.as_ref()
-                onaction=self.link.callback(|()| Msg::JumpToEditor { line: 1, column: 1})
-                >
-                { self.children.drain(scope_start..).collect::<Html>() }
-            </TreeNode>
+        let onaction = self.link.callback(move |()| Msg::JumpToEditor {
+            line: pos.line as u32,
+            column: pos.column as u32,
+        });
+        let node = if scope_start < self.children.len() {
+            html! {
+                <TreeNode
+                    label=label.as_ref()
+                    onaction=onaction
+                    >
+                    { self.children.drain(scope_start..).collect::<Html>() }
+                </TreeNode>
+            }
+        } else {
+            html! {
+                <TreeNode label=label.as_ref() onaction=onaction />
+            }
         };
         self.children.push(node);
     }
 
-    fn leaf<S: AsRef<str>>(&mut self, label: S) {
-        self.children
-            .push(html! { <TreeNode label=label.as_ref() /> });
+    fn leaf<S: AsRef<str>, T>(&mut self, label: S, node: &ast::Node<T>) {
+        self.begin();
+        self.finish(label, node.pos.start)
     }
 
     fn nested<S: AsRef<str>, T: Walk>(&mut self, label: S, node: &ast::Node<T>) {
         self.begin();
         node.walk(self);
-        self.finish(label);
+        self.finish(label, node.pos.start);
     }
 }
 
@@ -263,12 +271,12 @@ impl ast::Visitor for AstTreeVisitor {
     fn expression(&mut self, node: &ast::Node<ast::Expr>) {
         match &node.data {
             // leaf nodes
-            ast::Expr::String(x) => self.leaf(format!("{:?}", x)),
-            ast::Expr::Int(x) => self.leaf(format!("{}", x)),
-            ast::Expr::Ratio(x) => self.leaf(format!("{}", x)),
-            ast::Expr::Float(x) => self.leaf(format!("{}", x)),
-            ast::Expr::Bool(x) => self.leaf(format!("{:?}", x)),
-            ast::Expr::Var(x) => self.leaf(format!("{}", x)),
+            ast::Expr::String(x) => self.leaf(format!("{:?}", x), node),
+            ast::Expr::Int(x) => self.leaf(format!("{}", x), node),
+            ast::Expr::Ratio(x) => self.leaf(format!("{}", x), node),
+            ast::Expr::Float(x) => self.leaf(format!("{}", x), node),
+            ast::Expr::Bool(x) => self.leaf(format!("{:?}", x), node),
+            ast::Expr::Var(x) => self.leaf(format!("{}", x), node),
             // nested expressions
             ast::Expr::Unary { operator, .. } => self.nested(format!("{:?}", operator.data), node),
             ast::Expr::Binary { operator, .. } => self.nested(format!("{:?}", operator.data), node),

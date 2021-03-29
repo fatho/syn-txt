@@ -529,6 +529,12 @@ impl<'a> Parser<'a> {
                     let _ = self.consume();
                     self.errors.push(self.expected_but_got(span, &[end, Token::Comma], got));
                     self.skip_until_next_line_or_token(false, &[end, Token::Comma]);
+                    // The previous recovery doesn't consume the sync token, but if it is
+                    // a comma, we actually need to consume it here so that the next loop
+                    // iteration can resume parsing the argument expression.
+                    if self.peek().0 == Some(Token::Comma) {
+                        let _ = self.consume();
+                    }
                 }
                 None => {
                     self.errors.push(self.unexpected_eof(&[end, Token::Comma]));

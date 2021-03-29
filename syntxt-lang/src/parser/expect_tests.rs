@@ -1625,17 +1625,6 @@ fn parse_recover_from_errors() {
                             message: "Expected one of [RParen, Comma], but got LitString",
                         },
                         ParseError {
-                            span: 295..296,
-                            pos: Pos {
-                                line: 16,
-                                column: 30,
-                            }..Pos {
-                                line: 16,
-                                column: 31,
-                            },
-                            message: "Expected expression, but got Comma",
-                        },
-                        ParseError {
                             span: 305..310,
                             pos: Pos {
                                 line: 16,

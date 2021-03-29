@@ -62,12 +62,19 @@ pub struct Parser<'a> {
     stream: Peekable<logos::SpannedIter<'a, Token>>,
     consumed: usize,
     line_map: LineMap<'a>,
+    errors: Vec<ParseError>,
 }
 
 impl<'a> Parser<'a> {
     // Public interface
-    pub fn parse(source: &'a str) -> Parse<ast::Root> {
-        Parser::new(source).parse_root()
+    pub fn parse(source: &'a str) -> Result<Node<ast::Root>, (Node<ast::Root>, Vec<ParseError>)> {
+        let mut parser = Parser::new(source);
+        let root = parser.parse_root();
+        if parser.errors.is_empty() {
+            Ok(root)
+        } else {
+            Err((root, parser.errors))
+        }
     }
 
     // Private helpers
@@ -78,6 +85,7 @@ impl<'a> Parser<'a> {
             stream: Token::lexer(source).spanned().peekable(),
             consumed: 0,
             line_map: LineMap::new(source),
+            errors: Vec::new(),
         }
     }
 
@@ -105,7 +113,7 @@ impl<'a> Parser<'a> {
                 return Err(self.expected_but_got(span, &[expected], token));
             }
         } else {
-            return Err(self.unexpected_eof(self.eof(), &[expected]));
+            return Err(self.unexpected_eof(&[expected]));
         }
     }
 
@@ -132,9 +140,9 @@ impl<'a> Parser<'a> {
         self.make_error(span, format!("Expected {}, but got {:?}", expected, got))
     }
 
-    pub fn unexpected_eof(&self, span: Span, expected: &[Token]) -> ParseError {
+    pub fn unexpected_eof(&self, expected: &[Token]) -> ParseError {
         self.make_error(
-            span,
+            self.eof(),
             format!("Expected one of {:?}, but reached end of file", expected),
         )
     }
@@ -146,23 +154,88 @@ impl<'a> Parser<'a> {
         )
     }
 
+    /// Recover from a parsing error by skipping ahead to the next line.
+    fn recover_next_line<T>(&mut self, result: Parse<T>) -> Option<Node<T>> {
+        self.recover_skip(result, true, &[])
+    }
+
+    /// Recover from a parse error by substituting a token
+    fn recover_replace<T>(&mut self, result: Parse<T>, replacement: T) -> Node<T> {
+        match result {
+            Ok(node) => node,
+            Err(error) => {
+                let span = error.span.clone();
+                self.errors.push(error);
+                Node {
+                    span,
+                    data: replacement,
+                }
+            }
+        }
+    }
+
+    /// Recover from a parse error by skipping until one of the given sync tokens or until
+    /// the next line, if `sync_next_line` is set.
+    fn recover_skip<T>(
+        &mut self,
+        result: Parse<T>,
+        sync_next_line: bool,
+        sync_tokens: &[Token],
+    ) -> Option<Node<T>> {
+        match result {
+            Ok(node) => Some(node),
+            Err(error) => {
+                self.errors.push(error);
+                self.skip_until_next_line_or_token(sync_next_line, sync_tokens);
+                None
+            }
+        }
+    }
+
+    /// Eat tokens until we reach the next line. The parser itself isn't whitespace sensitive
+    /// under normal conditions, but when recovering from an error, whitespace can be a good
+    /// heuristic.
+    fn skip_until_next_line(&mut self) {
+        self.skip_until_next_line_or_token(true, &[])
+    }
+
+    /// Eat tokens until we reach the next line or one of the specified synchronisation tokens. The
+    /// parser itself isn't whitespace sensitive under normal conditions, but when recovering from
+    /// an error, whitespace can be a good heuristic.
+    fn skip_until_next_line_or_token(&mut self, sync_line: bool, sync_tokens: &[Token]) {
+        let start_line = self.line_map.offset_to_pos(self.consumed).line;
+        while let (Some(token), span) = self.peek() {
+            let current_line = self.line_map.offset_to_pos(span.start).line;
+            if (sync_line && (current_line > start_line)) || sync_tokens.contains(&token) {
+                break;
+            } else {
+                let _ = self.consume();
+            }
+        }
+    }
+
     // Parse rules
 
-    fn parse_root(&mut self) -> Parse<ast::Root> {
-        let object = self.parse_object()?;
-        // Must be all there is
-        if let Some((token, span)) = self.consume() {
-            return Err(self.expected_str_but_got(span, "eof", token));
+    fn parse_root(&mut self) -> Node<ast::Root> {
+        let mut objects = Vec::new();
+
+        while self.peek().0.is_some() {
+            let object_parse = self.parse_object();
+            if let Some(object) = self.recover_next_line(object_parse) {
+                objects.push(object)
+            }
         }
 
-        Ok(Node {
-            span: object.span.clone(),
-            data: ast::Root { object },
-        })
+        Node {
+            span: objects.first().map_or(0, |obj| obj.span.start)
+                ..objects.last().map_or(self.consumed, |obj| obj.span.end),
+            data: ast::Root { objects },
+        }
     }
 
     fn parse_object(&mut self) -> Parse<ast::Object> {
-        let name = self.parse_ident()?;
+        let name_parse = self.parse_ident();
+        let name = self.recover_replace(name_parse, "<<unknown>>".into());
         self.parse_object_body(name)
     }
 
@@ -181,27 +254,49 @@ impl<'a> Parser<'a> {
                     match token {
                         Some(Token::Colon) => {
                             let colon = self.parse_expect_token(Token::Colon)?;
-                            let value = self.parse_expr()?;
-                            attrs.push(Node {
-                                span: inner_name.span.start..value.span.end,
-                                data: ast::Attribute {
-                                    name: inner_name,
-                                    colon,
-                                    value,
-                                },
-                            })
+
+                            let value_parse = self.parse_expr();
+                            if let Some(value) = self.recover_next_line(value_parse) {
+                                attrs.push(Node {
+                                    span: inner_name.span.start..value.span.end,
+                                    data: ast::Attribute {
+                                        name: inner_name,
+                                        colon,
+                                        value,
+                                    },
+                                })
+                            }
                         }
                         Some(Token::LBrace) => {
                             let child_object = self.parse_object_body(inner_name)?;
                             children.push(child_object);
                         }
-                        Some(other) => return Err(self.expected_but_got(span, EXPECTATION, other)),
+                        Some(other) => {
+                            self.errors
+                                .push(self.expected_but_got(span, EXPECTATION, other));
+                            self.skip_until_next_line();
+                        }
                         None => {
-                            return Err(self.unexpected_eof(span, EXPECTATION));
+                            self.errors.push(self.unexpected_eof(EXPECTATION));
+                            break;
                         }
                     }
                 }
-                _ => break,
+                Some(Token::RBrace) => break,
+                Some(other) => {
+                    let (_, span) = self.consume().unwrap();
+                    self.errors.push(self.expected_but_got(
+                        span,
+                        &[Token::Ident, Token::RBrace],
+                        other,
+                    ));
+                    self.skip_until_next_line();
+                }
+                None => {
+                    self.errors
+                        .push(self.unexpected_eof(&[Token::Ident, Token::RBrace]));
+                    break;
+                }
             }
         }
 
@@ -419,7 +514,10 @@ impl<'a> Parser<'a> {
         let lparen = self.parse_expect_token(start)?;
         let mut arguments = Vec::new();
         while self.peek().0 != Some(end) {
-            arguments.push(self.parse_expr()?);
+            let expr_parse = self.parse_expr();
+            if let Some(expr) = self.recover_skip(expr_parse, false, &[end, Token::Comma]) {
+                arguments.push(expr);
+            }
 
             let (token, span) = self.peek();
             match token {
@@ -428,13 +526,19 @@ impl<'a> Parser<'a> {
                 }
                 Some(other) if other == end => break,
                 Some(got) => {
-                    return Err(self.expected_but_got(span, &[Token::LParen, Token::Comma], got))
+                    let _ = self.consume();
+                    self.errors.push(self.expected_but_got(span, &[end, Token::Comma], got));
+                    self.skip_until_next_line_or_token(false, &[end, Token::Comma]);
                 }
-                None => return Err(self.unexpected_eof(span, &[Token::LParen, Token::Comma])),
+                None => {
+                    self.errors.push(self.unexpected_eof(&[end, Token::Comma]));
+                    break;
+                },
             }
         }
 
-        let rparen = self.parse_expect_token(end)?;
+        let rparen_parse = self.parse_expect_token(end);
+        let rparen = self.recover_replace(rparen_parse, ());
         Ok((lparen, arguments, rparen))
     }
 

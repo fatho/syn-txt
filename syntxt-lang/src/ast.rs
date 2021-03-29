@@ -29,7 +29,7 @@ pub type NodePtr<T> = Arc<Node<T>>;
 
 #[derive(Debug, Clone)]
 pub struct Root {
-    pub object: Node<Object>,
+    pub objects: Vec<Node<Object>>,
 }
 
 #[derive(Debug, Clone)]

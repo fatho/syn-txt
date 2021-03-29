@@ -18,8 +18,7 @@ use super::Parser;
 use expect_test::{expect, Expect};
 
 fn check(input: &str, output: Expect) {
-    let mut parser = Parser::new(input);
-    let result = parser.parse_root();
+    let result = Parser::parse(input);
     let debug = format!("{:#?}", result);
     output.assert_eq(&debug);
 }
@@ -36,17 +35,12 @@ fn parse_empty() {
     check(
         "",
         expect![[r#"
-            Err(
-                ParseError {
+            Ok(
+                Node {
                     span: 0..0,
-                    pos: Pos {
-                        line: 1,
-                        column: 1,
-                    }..Pos {
-                        line: 1,
-                        column: 1,
+                    data: Root {
+                        objects: [],
                     },
-                    message: "Expected one of [Ident], but reached end of file",
                 },
             )"#]],
     );
@@ -63,25 +57,27 @@ fn parse_empty_object() {
                 Node {
                     span: 0..46,
                     data: Root {
-                        object: Node {
-                            span: 0..46,
-                            data: Object {
-                                name: Node {
-                                    span: 0..4,
-                                    data: "Song",
-                                },
-                                lbrace: Node {
-                                    span: 5..6,
-                                    data: (),
-                                },
-                                attrs: [],
-                                children: [],
-                                rbrace: Node {
-                                    span: 45..46,
-                                    data: (),
+                        objects: [
+                            Node {
+                                span: 0..46,
+                                data: Object {
+                                    name: Node {
+                                        span: 0..4,
+                                        data: "Song",
+                                    },
+                                    lbrace: Node {
+                                        span: 5..6,
+                                        data: (),
+                                    },
+                                    attrs: [],
+                                    children: [],
+                                    rbrace: Node {
+                                        span: 45..46,
+                                        data: (),
+                                    },
                                 },
                             },
-                        },
+                        ],
                     },
                 },
             )"#]],
@@ -105,64 +101,66 @@ fn parse_nested_objects() {
                 Node {
                     span: 0..92,
                     data: Root {
-                        object: Node {
-                            span: 0..92,
-                            data: Object {
-                                name: Node {
-                                    span: 0..4,
-                                    data: "Song",
-                                },
-                                lbrace: Node {
-                                    span: 5..6,
-                                    data: (),
-                                },
-                                attrs: [],
-                                children: [
-                                    Node {
-                                        span: 57..71,
-                                        data: Object {
-                                            name: Node {
-                                                span: 57..62,
-                                                data: "Track",
-                                            },
-                                            lbrace: Node {
-                                                span: 63..64,
-                                                data: (),
-                                            },
-                                            attrs: [],
-                                            children: [],
-                                            rbrace: Node {
-                                                span: 70..71,
-                                                data: (),
+                        objects: [
+                            Node {
+                                span: 0..92,
+                                data: Object {
+                                    name: Node {
+                                        span: 0..4,
+                                        data: "Song",
+                                    },
+                                    lbrace: Node {
+                                        span: 5..6,
+                                        data: (),
+                                    },
+                                    attrs: [],
+                                    children: [
+                                        Node {
+                                            span: 57..71,
+                                            data: Object {
+                                                name: Node {
+                                                    span: 57..62,
+                                                    data: "Track",
+                                                },
+                                                lbrace: Node {
+                                                    span: 63..64,
+                                                    data: (),
+                                                },
+                                                attrs: [],
+                                                children: [],
+                                                rbrace: Node {
+                                                    span: 70..71,
+                                                    data: (),
+                                                },
                                             },
                                         },
-                                    },
-                                    Node {
-                                        span: 76..90,
-                                        data: Object {
-                                            name: Node {
-                                                span: 76..81,
-                                                data: "Track",
-                                            },
-                                            lbrace: Node {
-                                                span: 82..83,
-                                                data: (),
-                                            },
-                                            attrs: [],
-                                            children: [],
-                                            rbrace: Node {
-                                                span: 89..90,
-                                                data: (),
+                                        Node {
+                                            span: 76..90,
+                                            data: Object {
+                                                name: Node {
+                                                    span: 76..81,
+                                                    data: "Track",
+                                                },
+                                                lbrace: Node {
+                                                    span: 82..83,
+                                                    data: (),
+                                                },
+                                                attrs: [],
+                                                children: [],
+                                                rbrace: Node {
+                                                    span: 89..90,
+                                                    data: (),
+                                                },
                                             },
                                         },
+                                    ],
+                                    rbrace: Node {
+                                        span: 91..92,
+                                        data: (),
                                     },
-                                ],
-                                rbrace: Node {
-                                    span: 91..92,
-                                    data: (),
                                 },
                             },
-                        },
+                        ],
                     },
                 },
             )"#]],
@@ -189,162 +187,164 @@ fn parse_nested_objects_with_attrs() {
                 Node {
                     span: 0..174,
                     data: Root {
-                        object: Node {
-                            span: 0..174,
-                            data: Object {
-                                name: Node {
-                                    span: 0..4,
-                                    data: "Song",
-                                },
-                                lbrace: Node {
-                                    span: 5..6,
-                                    data: (),
-                                },
-                                attrs: [
-                                    Node {
-                                        span: 11..19,
-                                        data: Attribute {
-                                            name: Node {
-                                                span: 11..14,
-                                                data: "bpm",
-                                            },
-                                            colon: Node {
-                                                span: 14..15,
-                                                data: (),
-                                            },
-                                            value: Node {
-                                                span: 16..19,
-                                                data: Int(
-                                                    120,
-                                                ),
+                        objects: [
+                            Node {
+                                span: 0..174,
+                                data: Object {
+                                    name: Node {
+                                        span: 0..4,
+                                        data: "Song",
+                                    },
+                                    lbrace: Node {
+                                        span: 5..6,
+                                        data: (),
+                                    },
+                                    attrs: [
+                                        Node {
+                                            span: 11..19,
+                                            data: Attribute {
+                                                name: Node {
+                                                    span: 11..14,
+                                                    data: "bpm",
+                                                },
+                                                colon: Node {
+                                                    span: 14..15,
+                                                    data: (),
+                                                },
+                                                value: Node {
+                                                    span: 16..19,
+                                                    data: Int(
+                                                        120,
+                                                    ),
+                                                },
                                             },
                                         },
-                                    },
-                                ],
-                                children: [
-                                    Node {
-                                        span: 70..117,
-                                        data: Object {
-                                            name: Node {
-                                                span: 70..75,
-                                                data: "Track",
-                                            },
-                                            lbrace: Node {
-                                                span: 76..77,
-                                                data: (),
-                                            },
-                                            attrs: [
-                                                Node {
-                                                    span: 86..94,
-                                                    data: Attribute {
-                                                        name: Node {
-                                                            span: 86..88,
-                                                            data: "id",
-                                                        },
-                                                        colon: Node {
-                                                            span: 88..89,
-                                                            data: (),
-                                                        },
-                                                        value: Node {
-                                                            span: 90..94,
-                                                            data: Var(
-                                                                "lead",
-                                                            ),
+                                    ],
+                                    children: [
+                                        Node {
+                                            span: 70..117,
+                                            data: Object {
+                                                name: Node {
+                                                    span: 70..75,
+                                                    data: "Track",
+                                                },
+                                                lbrace: Node {
+                                                    span: 76..77,
+                                                    data: (),
+                                                },
+                                                attrs: [
+                                                    Node {
+                                                        span: 86..94,
+                                                        data: Attribute {
+                                                            name: Node {
+                                                                span: 86..88,
+                                                                data: "id",
+                                                            },
+                                                            colon: Node {
+                                                                span: 88..89,
+                                                                data: (),
+                                                            },
+                                                            value: Node {
+                                                                span: 90..94,
+                                                                data: Var(
+                                                                    "lead",
+                                                                ),
+                                                            },
                                                         },
                                                     },
-                                                },
-                                                Node {
-                                                    span: 103..111,
-                                                    data: Attribute {
-                                                        name: Node {
-                                                            span: 103..107,
-                                                            data: "frob",
-                                                        },
-                                                        colon: Node {
-                                                            span: 107..108,
-                                                            data: (),
-                                                        },
-                                                        value: Node {
-                                                            span: 109..111,
-                                                            data: Int(
-                                                                42,
-                                                            ),
+                                                    Node {
+                                                        span: 103..111,
+                                                        data: Attribute {
+                                                            name: Node {
+                                                                span: 103..107,
+                                                                data: "frob",
+                                                            },
+                                                            colon: Node {
+                                                                span: 107..108,
+                                                                data: (),
+                                                            },
+                                                            value: Node {
+                                                                span: 109..111,
+                                                                data: Int(
+                                                                    42,
+                                                                ),
+                                                            },
                                                         },
                                                     },
+                                                ],
+                                                children: [],
+                                                rbrace: Node {
+                                                    span: 116..117,
+                                                    data: (),
                                                 },
-                                            ],
-                                            children: [],
-                                            rbrace: Node {
-                                                span: 116..117,
-                                                data: (),
                                             },
                                         },
-                                    },
-                                    Node {
-                                        span: 122..172,
-                                        data: Object {
-                                            name: Node {
-                                                span: 122..127,
-                                                data: "Track",
-                                            },
-                                            lbrace: Node {
-                                                span: 128..129,
-                                                data: (),
-                                            },
-                                            attrs: [
-                                                Node {
-                                                    span: 138..147,
-                                                    data: Attribute {
-                                                        name: Node {
-                                                            span: 138..140,
-                                                            data: "id",
-                                                        },
-                                                        colon: Node {
-                                                            span: 140..141,
-                                                            data: (),
-                                                        },
-                                                        value: Node {
-                                                            span: 142..147,
-                                                            data: Var(
-                                                                "drums",
-                                                            ),
+                                        Node {
+                                            span: 122..172,
+                                            data: Object {
+                                                name: Node {
+                                                    span: 122..127,
+                                                    data: "Track",
+                                                },
+                                                lbrace: Node {
+                                                    span: 128..129,
+                                                    data: (),
+                                                },
+                                                attrs: [
+                                                    Node {
+                                                        span: 138..147,
+                                                        data: Attribute {
+                                                            name: Node {
+                                                                span: 138..140,
+                                                                data: "id",
+                                                            },
+                                                            colon: Node {
+                                                                span: 140..141,
+                                                                data: (),
+                                                            },
+                                                            value: Node {
+                                                                span: 142..147,
+                                                                data: Var(
+                                                                    "drums",
+                                                                ),
+                                                            },
                                                         },
                                                     },
-                                                },
-                                                Node {
-                                                    span: 156..166,
-                                                    data: Attribute {
-                                                        name: Node {
-                                                            span: 156..160,
-                                                            data: "frob",
-                                                        },
-                                                        colon: Node {
-                                                            span: 160..161,
-                                                            data: (),
-                                                        },
-                                                        value: Node {
-                                                            span: 162..166,
-                                                            data: Int(
-                                                                1337,
-                                                            ),
+                                                    Node {
+                                                        span: 156..166,
+                                                        data: Attribute {
+                                                            name: Node {
+                                                                span: 156..160,
+                                                                data: "frob",
+                                                            },
+                                                            colon: Node {
+                                                                span: 160..161,
+                                                                data: (),
+                                                            },
+                                                            value: Node {
+                                                                span: 162..166,
+                                                                data: Int(
+                                                                    1337,
+                                                                ),
+                                                            },
                                                         },
                                                     },
+                                                ],
+                                                children: [],
+                                                rbrace: Node {
+                                                    span: 171..172,
+                                                    data: (),
                                                 },
-                                            ],
-                                            children: [],
-                                            rbrace: Node {
-                                                span: 171..172,
-                                                data: (),
                                             },
                                         },
+                                    ],
+                                    rbrace: Node {
+                                        span: 173..174,
+                                        data: (),
                                     },
-                                ],
-                                rbrace: Node {
-                                    span: 173..174,
-                                    data: (),
                                 },
                             },
-                        },
+                        ],
                     },
                 },
             )"#]],
@@ -368,159 +368,161 @@ fn parse_attr_objects() {
                 Node {
                     span: 0..160,
                     data: Root {
-                        object: Node {
-                            span: 0..160,
-                            data: Object {
-                                name: Node {
-                                    span: 0..4,
-                                    data: "Song",
-                                },
-                                lbrace: Node {
-                                    span: 5..6,
-                                    data: (),
-                                },
-                                attrs: [
-                                    Node {
-                                        span: 11..19,
-                                        data: Attribute {
-                                            name: Node {
-                                                span: 11..14,
-                                                data: "bpm",
-                                            },
-                                            colon: Node {
-                                                span: 14..15,
-                                                data: (),
-                                            },
-                                            value: Node {
-                                                span: 16..19,
-                                                data: Int(
-                                                    120,
-                                                ),
+                        objects: [
+                            Node {
+                                span: 0..160,
+                                data: Object {
+                                    name: Node {
+                                        span: 0..4,
+                                        data: "Song",
+                                    },
+                                    lbrace: Node {
+                                        span: 5..6,
+                                        data: (),
+                                    },
+                                    attrs: [
+                                        Node {
+                                            span: 11..19,
+                                            data: Attribute {
+                                                name: Node {
+                                                    span: 11..14,
+                                                    data: "bpm",
+                                                },
+                                                colon: Node {
+                                                    span: 14..15,
+                                                    data: (),
+                                                },
+                                                value: Node {
+                                                    span: 16..19,
+                                                    data: Int(
+                                                        120,
+                                                    ),
+                                                },
                                             },
                                         },
-                                    },
-                                    Node {
-                                        span: 24..158,
-                                        data: Attribute {
-                                            name: Node {
-                                                span: 24..28,
-                                                data: "meta",
-                                            },
-                                            colon: Node {
-                                                span: 28..29,
-                                                data: (),
-                                            },
-                                            value: Node {
-                                                span: 30..158,
-                                                data: Object(
-                                                    Node {
-                                                        span: 30..158,
-                                                        data: Object {
-                                                            name: Node {
-                                                                span: 30..34,
-                                                                data: "Meta",
-                                                            },
-                                                            lbrace: Node {
-                                                                span: 35..36,
-                                                                data: (),
-                                                            },
-                                                            attrs: [
-                                                                Node {
-                                                                    span: 45..65,
-                                                                    data: Attribute {
-                                                                        name: Node {
-                                                                            span: 45..49,
-                                                                            data: "name",
-                                                                        },
-                                                                        colon: Node {
-                                                                            span: 49..50,
-                                                                            data: (),
-                                                                        },
-                                                                        value: Node {
-                                                                            span: 51..65,
-                                                                            data: String(
-                                                                                "Example Song",
-                                                                            ),
+                                        Node {
+                                            span: 24..158,
+                                            data: Attribute {
+                                                name: Node {
+                                                    span: 24..28,
+                                                    data: "meta",
+                                                },
+                                                colon: Node {
+                                                    span: 28..29,
+                                                    data: (),
+                                                },
+                                                value: Node {
+                                                    span: 30..158,
+                                                    data: Object(
+                                                        Node {
+                                                            span: 30..158,
+                                                            data: Object {
+                                                                name: Node {
+                                                                    span: 30..34,
+                                                                    data: "Meta",
+                                                                },
+                                                                lbrace: Node {
+                                                                    span: 35..36,
+                                                                    data: (),
+                                                                },
+                                                                attrs: [
+                                                                    Node {
+                                                                        span: 45..65,
+                                                                        data: Attribute {
+                                                                            name: Node {
+                                                                                span: 45..49,
+                                                                                data: "name",
+                                                                            },
+                                                                            colon: Node {
+                                                                                span: 49..50,
+                                                                                data: (),
+                                                                            },
+                                                                            value: Node {
+                                                                                span: 51..65,
+                                                                                data: String(
+                                                                                    "Example Song",
+                                                                                ),
+                                                                            },
                                                                         },
                                                                     },
-                                                                },
-                                                                Node {
-                                                                    span: 74..92,
-                                                                    data: Attribute {
-                                                                        name: Node {
-                                                                            span: 74..80,
-                                                                            data: "author",
-                                                                        },
-                                                                        colon: Node {
-                                                                            span: 80..81,
-                                                                            data: (),
-                                                                        },
-                                                                        value: Node {
-                                                                            span: 82..92,
-                                                                            data: String(
-                                                                                "John Doe",
-                                                                            ),
-                                                                        },
-                                                                    },
-                                                                },
-                                                                Node {
-                                                                    span: 101..111,
-                                                                    data: Attribute {
-                                                                        name: Node {
-                                                                            span: 101..105,
-                                                                            data: "year",
-                                                                        },
-                                                                        colon: Node {
-                                                                            span: 105..106,
-                                                                            data: (),
-                                                                        },
-                                                                        value: Node {
-                                                                            span: 107..111,
-                                                                            data: Int(
-                                                                                2021,
-                                                                            ),
+                                                                    Node {
+                                                                        span: 74..92,
+                                                                        data: Attribute {
+                                                                            name: Node {
+                                                                                span: 74..80,
+                                                                                data: "author",
+                                                                            },
+                                                                            colon: Node {
+                                                                                span: 80..81,
+                                                                                data: (),
+                                                                            },
+                                                                            value: Node {
+                                                                                span: 82..92,
+                                                                                data: String(
+                                                                                    "John Doe",
+                                                                                ),
+                                                                            },
                                                                         },
                                                                     },
-                                                                },
-                                                                Node {
-                                                                    span: 120..152,
-                                                                    data: Attribute {
-                                                                        name: Node {
-                                                                            span: 120..131,
-                                                                            data: "description",
-                                                                        },
-                                                                        colon: Node {
-                                                                            span: 131..132,
-                                                                            data: (),
-                                                                        },
-                                                                        value: Node {
-                                                                            span: 133..152,
-                                                                            data: String(
-                                                                                "Simply.\nAwesome.",
-                                                                            ),
+                                                                    Node {
+                                                                        span: 101..111,
+                                                                        data: Attribute {
+                                                                            name: Node {
+                                                                                span: 101..105,
+                                                                                data: "year",
+                                                                            },
+                                                                            colon: Node {
+                                                                                span: 105..106,
+                                                                                data: (),
+                                                                            },
+                                                                            value: Node {
+                                                                                span: 107..111,
+                                                                                data: Int(
+                                                                                    2021,
+                                                                                ),
+                                                                            },
                                                                         },
                                                                     },
+                                                                    Node {
+                                                                        span: 120..152,
+                                                                        data: Attribute {
+                                                                            name: Node {
+                                                                                span: 120..131,
+                                                                                data: "description",
+                                                                            },
+                                                                            colon: Node {
+                                                                                span: 131..132,
+                                                                                data: (),
+                                                                            },
+                                                                            value: Node {
+                                                                                span: 133..152,
+                                                                                data: String(
+                                                                                    "Simply.\nAwesome.",
+                                                                                ),
+                                                                            },
+                                                                        },
+                                                                    },
+                                                                ],
+                                                                children: [],
+                                                                rbrace: Node {
+                                                                    span: 157..158,
+                                                                    data: (),
                                                                 },
-                                                            ],
-                                                            children: [],
-                                                            rbrace: Node {
-                                                                span: 157..158,
-                                                                data: (),
                                                             },
                                                         },
-                                                    },
-                                                ),
+                                                    ),
+                                                },
                                             },
                                         },
+                                    ],
+                                    children: [],
+                                    rbrace: Node {
+                                        span: 159..160,
+                                        data: (),
                                     },
-                                ],
-                                children: [],
-                                rbrace: Node {
-                                    span: 159..160,
-                                    data: (),
                                 },
                             },
-                        },
+                        ],
                     },
                 },
             )"#]],
@@ -1137,6 +1139,515 @@ fn parse_call() {
                         },
                     },
                 },
+            )"#]],
+    );
+}
+
+
+#[test]
+fn parse_recover_from_errors() {
+    check(
+        r#"Song {
+    bpm: 120
+    sampleRate: 44_100
+    meta: Meta {
+        name: "Example Song"
+        author: "John Doe"
+        year: 2021
+        description: "Simply.\nAwesome."
+        awesome: true and not false
+    }
+    Track {
+      name: "Lead" "bla"
+
+      {}
+
+      wtf: call(1, 2, 3 "fpp", 3, 4, 5 "Bla")
+
+      Sequence {
+        start: 8/4
+      }
+    }
+    // Test for comments
+    Track {
+      name: "Drums"
+    }
+}"#,
+        expect![[r#"
+            Err(
+                (
+                    Node {
+                        span: 0..427,
+                        data: Root {
+                            objects: [
+                                Node {
+                                    span: 0..427,
+                                    data: Object {
+                                        name: Node {
+                                            span: 0..4,
+                                            data: "Song",
+                                        },
+                                        lbrace: Node {
+                                            span: 5..6,
+                                            data: (),
+                                        },
+                                        attrs: [
+                                            Node {
+                                                span: 11..19,
+                                                data: Attribute {
+                                                    name: Node {
+                                                        span: 11..14,
+                                                        data: "bpm",
+                                                    },
+                                                    colon: Node {
+                                                        span: 14..15,
+                                                        data: (),
+                                                    },
+                                                    value: Node {
+                                                        span: 16..19,
+                                                        data: Int(
+                                                            120,
+                                                        ),
+                                                    },
+                                                },
+                                            },
+                                            Node {
+                                                span: 24..42,
+                                                data: Attribute {
+                                                    name: Node {
+                                                        span: 24..34,
+                                                        data: "sampleRate",
+                                                    },
+                                                    colon: Node {
+                                                        span: 34..35,
+                                                        data: (),
+                                                    },
+                                                    value: Node {
+                                                        span: 36..42,
+                                                        data: Int(
+                                                            44100,
+                                                        ),
+                                                    },
+                                                },
+                                            },
+                                            Node {
+                                                span: 47..217,
+                                                data: Attribute {
+                                                    name: Node {
+                                                        span: 47..51,
+                                                        data: "meta",
+                                                    },
+                                                    colon: Node {
+                                                        span: 51..52,
+                                                        data: (),
+                                                    },
+                                                    value: Node {
+                                                        span: 53..217,
+                                                        data: Object(
+                                                            Node {
+                                                                span: 53..217,
+                                                                data: Object {
+                                                                    name: Node {
+                                                                        span: 53..57,
+                                                                        data: "Meta",
+                                                                    },
+                                                                    lbrace: Node {
+                                                                        span: 58..59,
+                                                                        data: (),
+                                                                    },
+                                                                    attrs: [
+                                                                        Node {
+                                                                            span: 68..88,
+                                                                            data: Attribute {
+                                                                                name: Node {
+                                                                                    span: 68..72,
+                                                                                    data: "name",
+                                                                                },
+                                                                                colon: Node {
+                                                                                    span: 72..73,
+                                                                                    data: (),
+                                                                                },
+                                                                                value: Node {
+                                                                                    span: 74..88,
+                                                                                    data: String(
+                                                                                        "Example Song",
+                                                                                    ),
+                                                                                },
+                                                                            },
+                                                                        },
+                                                                        Node {
+                                                                            span: 97..115,
+                                                                            data: Attribute {
+                                                                                name: Node {
+                                                                                    span: 97..103,
+                                                                                    data: "author",
+                                                                                },
+                                                                                colon: Node {
+                                                                                    span: 103..104,
+                                                                                    data: (),
+                                                                                },
+                                                                                value: Node {
+                                                                                    span: 105..115,
+                                                                                    data: String(
+                                                                                        "John Doe",
+                                                                                    ),
+                                                                                },
+                                                                            },
+                                                                        },
+                                                                        Node {
+                                                                            span: 124..134,
+                                                                            data: Attribute {
+                                                                                name: Node {
+                                                                                    span: 124..128,
+                                                                                    data: "year",
+                                                                                },
+                                                                                colon: Node {
+                                                                                    span: 128..129,
+                                                                                    data: (),
+                                                                                },
+                                                                                value: Node {
+                                                                                    span: 130..134,
+                                                                                    data: Int(
+                                                                                        2021,
+                                                                                    ),
+                                                                                },
+                                                                            },
+                                                                        },
+                                                                        Node {
+                                                                            span: 143..175,
+                                                                            data: Attribute {
+                                                                                name: Node {
+                                                                                    span: 143..154,
+                                                                                    data: "description",
+                                                                                },
+                                                                                colon: Node {
+                                                                                    span: 154..155,
+                                                                                    data: (),
+                                                                                },
+                                                                                value: Node {
+                                                                                    span: 156..175,
+                                                                                    data: String(
+                                                                                        "Simply.\nAwesome.",
+                                                                                    ),
+                                                                                },
+                                                                            },
+                                                                        },
+                                                                        Node {
+                                                                            span: 184..211,
+                                                                            data: Attribute {
+                                                                                name: Node {
+                                                                                    span: 184..191,
+                                                                                    data: "awesome",
+                                                                                },
+                                                                                colon: Node {
+                                                                                    span: 191..192,
+                                                                                    data: (),
+                                                                                },
+                                                                                value: Node {
+                                                                                    span: 193..211,
+                                                                                    data: Binary {
+                                                                                        left: Node {
+                                                                                            span: 193..197,
+                                                                                            data: Bool(
+                                                                                                true,
+                                                                                            ),
+                                                                                        },
+                                                                                        operator: Node {
+                                                                                            span: 198..201,
+                                                                                            data: And,
+                                                                                        },
+                                                                                        right: Node {
+                                                                                            span: 202..211,
+                                                                                            data: Unary {
+                                                                                                operator: Node {
+                                                                                                    span: 202..205,
+                                                                                                    data: Not,
+                                                                                                },
+                                                                                                operand: Node {
+                                                                                                    span: 206..211,
+                                                                                                    data: Bool(
+                                                                                                        false,
+                                                                                                    ),
+                                                                                                },
+                                                                                            },
+                                                                                        },
+                                                                                    },
+                                                                                },
+                                                                            },
+                                                                        },
+                                                                    ],
+                                                                    children: [],
+                                                                    rbrace: Node {
+                                                                        span: 216..217,
+                                                                        data: (),
+                                                                    },
+                                                                },
+                                                            },
+                                                        ),
+                                                    },
+                                                },
+                                            },
+                                        ],
+                                        children: [
+                                            Node {
+                                                span: 222..362,
+                                                data: Object {
+                                                    name: Node {
+                                                        span: 222..227,
+                                                        data: "Track",
+                                                    },
+                                                    lbrace: Node {
+                                                        span: 228..229,
+                                                        data: (),
+                                                    },
+                                                    attrs: [
+                                                        Node {
+                                                            span: 236..248,
+                                                            data: Attribute {
+                                                                name: Node {
+                                                                    span: 236..240,
+                                                                    data: "name",
+                                                                },
+                                                                colon: Node {
+                                                                    span: 240..241,
+                                                                    data: (),
+                                                                },
+                                                                value: Node {
+                                                                    span: 242..248,
+                                                                    data: String(
+                                                                        "Lead",
+                                                                    ),
+                                                                },
+                                                            },
+                                                        },
+                                                        Node {
+                                                            span: 272..311,
+                                                            data: Attribute {
+                                                                name: Node {
+                                                                    span: 272..275,
+                                                                    data: "wtf",
+                                                                },
+                                                                colon: Node {
+                                                                    span: 275..276,
+                                                                    data: (),
+                                                                },
+                                                                value: Node {
+                                                                    span: 277..311,
+                                                                    data: Call {
+                                                                        callee: Node {
+                                                                            span: 277..281,
+                                                                            data: Var(
+                                                                                "call",
+                                                                            ),
+                                                                        },
+                                                                        lparen: Node {
+                                                                            span: 281..282,
+                                                                            data: (),
+                                                                        },
+                                                                        arguments: [
+                                                                            Node {
+                                                                                span: 282..283,
+                                                                                data: Int(
+                                                                                    1,
+                                                                                ),
+                                                                            },
+                                                                            Node {
+                                                                                span: 285..286,
+                                                                                data: Int(
+                                                                                    2,
+                                                                                ),
+                                                                            },
+                                                                            Node {
+                                                                                span: 288..289,
+                                                                                data: Int(
+                                                                                    3,
+                                                                                ),
+                                                                            },
+                                                                            Node {
+                                                                                span: 297..298,
+                                                                                data: Int(
+                                                                                    3,
+                                                                                ),
+                                                                            },
+                                                                            Node {
+                                                                                span: 300..301,
+                                                                                data: Int(
+                                                                                    4,
+                                                                                ),
+                                                                            },
+                                                                            Node {
+                                                                                span: 303..304,
+                                                                                data: Int(
+                                                                                    5,
+                                                                                ),
+                                                                            },
+                                                                        ],
+                                                                        rparen: Node {
+                                                                            span: 310..311,
+                                                                            data: (),
+                                                                        },
+                                                                    },
+                                                                },
+                                                            },
+                                                        },
+                                                    ],
+                                                    children: [
+                                                        Node {
+                                                            span: 319..356,
+                                                            data: Object {
+                                                                name: Node {
+                                                                    span: 319..327,
+                                                                    data: "Sequence",
+                                                                },
+                                                                lbrace: Node {
+                                                                    span: 328..329,
+                                                                    data: (),
+                                                                },
+                                                                attrs: [
+                                                                    Node {
+                                                                        span: 338..348,
+                                                                        data: Attribute {
+                                                                            name: Node {
+                                                                                span: 338..343,
+                                                                                data: "start",
+                                                                            },
+                                                                            colon: Node {
+                                                                                span: 343..344,
+                                                                                data: (),
+                                                                            },
+                                                                            value: Node {
+                                                                                span: 345..348,
+                                                                                data: Ratio(
+                                                                                    Rational {
+                                                                                        num: 2,
+                                                                                        denom: 1,
+                                                                                    },
+                                                                                ),
+                                                                            },
+                                                                        },
+                                                                    },
+                                                                ],
+                                                                children: [],
+                                                                rbrace: Node {
+                                                                    span: 355..356,
+                                                                    data: (),
+                                                                },
+                                                            },
+                                                        },
+                                                    ],
+                                                    rbrace: Node {
+                                                        span: 361..362,
+                                                        data: (),
+                                                    },
+                                                },
+                                            },
+                                            Node {
+                                                span: 392..425,
+                                                data: Object {
+                                                    name: Node {
+                                                        span: 392..397,
+                                                        data: "Track",
+                                                    },
+                                                    lbrace: Node {
+                                                        span: 398..399,
+                                                        data: (),
+                                                    },
+                                                    attrs: [
+                                                        Node {
+                                                            span: 406..419,
+                                                            data: Attribute {
+                                                                name: Node {
+                                                                    span: 406..410,
+                                                                    data: "name",
+                                                                },
+                                                                colon: Node {
+                                                                    span: 410..411,
+                                                                    data: (),
+                                                                },
+                                                                value: Node {
+                                                                    span: 412..419,
+                                                                    data: String(
+                                                                        "Drums",
+                                                                    ),
+                                                                },
+                                                            },
+                                                        },
+                                                    ],
+                                                    children: [],
+                                                    rbrace: Node {
+                                                        span: 424..425,
+                                                        data: (),
+                                                    },
+                                                },
+                                            },
+                                        ],
+                                        rbrace: Node {
+                                            span: 426..427,
+                                            data: (),
+                                        },
+                                    },
+                                },
+                            ],
+                        },
+                    },
+                    [
+                        ParseError {
+                            span: 249..254,
+                            pos: Pos {
+                                line: 12,
+                                column: 20,
+                            }..Pos {
+                                line: 12,
+                                column: 25,
+                            },
+                            message: "Expected one of [Ident, RBrace], but got LitString",
+                        },
+                        ParseError {
+                            span: 262..263,
+                            pos: Pos {
+                                line: 14,
+                                column: 7,
+                            }..Pos {
+                                line: 14,
+                                column: 8,
+                            },
+                            message: "Expected one of [Ident, RBrace], but got LBrace",
+                        },
+                        ParseError {
+                            span: 290..295,
+                            pos: Pos {
+                                line: 16,
+                                column: 25,
+                            }..Pos {
+                                line: 16,
+                                column: 30,
+                            },
+                            message: "Expected one of [RParen, Comma], but got LitString",
+                        },
+                        ParseError {
+                            span: 295..296,
+                            pos: Pos {
+                                line: 16,
+                                column: 30,
+                            }..Pos {
+                                line: 16,
+                                column: 31,
+                            },
+                            message: "Expected expression, but got Comma",
+                        },
+                        ParseError {
+                            span: 305..310,
+                            pos: Pos {
+                                line: 16,
+                                column: 40,
+                            }..Pos {
+                                line: 16,
+                                column: 45,
+                            },
+                            message: "Expected one of [RParen, Comma], but got LitString",
+                        },
+                    ],
+                ),
             )"#]],
     );
 }

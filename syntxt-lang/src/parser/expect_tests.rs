@@ -608,6 +608,34 @@ fn parse_expr_ratio_lit_underscores() {
     );
 }
 
+
+#[test]
+fn parse_expr_float_lit() {
+    check_expr(
+        "-+1.337_424",
+        expect![[r#"
+            Ok(
+                Node {
+                    span: 0..11,
+                    data: Unary {
+                        operator: Node {
+                            span: 0..1,
+                            data: Minus,
+                        },
+                        operand: Node {
+                            span: 1..11,
+                            data: Float(
+                                F64N(
+                                    1.337424,
+                                ),
+                            ),
+                        },
+                    },
+                },
+            )"#]],
+    );
+}
+
 #[test]
 fn parse_expr_invalid_ratio() {
     check_expr(

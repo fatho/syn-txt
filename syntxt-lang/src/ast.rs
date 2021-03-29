@@ -17,9 +17,9 @@
 use std::sync::Arc;
 
 use crate::lexer::Span;
-use syntxt_core::rational::Rational;
+use syntxt_core::{nonnan::F64N, rational::Rational};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Node<T> {
     pub span: Span,
     pub data: T,
@@ -27,12 +27,12 @@ pub struct Node<T> {
 
 pub type NodePtr<T> = Arc<Node<T>>;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Root {
     pub objects: Vec<Node<Object>>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Object {
     pub name: Node<String>,
     pub lbrace: Node<()>,
@@ -41,19 +41,19 @@ pub struct Object {
     pub rbrace: Node<()>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Attribute {
     pub name: Node<String>,
     pub colon: Node<()>,
     pub value: Node<Expr>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Expr {
     String(String),
     Int(i64),
     Ratio(Rational),
-    Float(f64),
+    Float(F64N),
     Bool(bool),
     Unary {
         operator: Node<UnaryOp>,
@@ -85,14 +85,14 @@ pub enum Expr {
     },
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum UnaryOp {
     Plus,
     Minus,
     Not,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BinaryOp {
     Add,
     Sub,

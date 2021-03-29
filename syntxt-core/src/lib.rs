@@ -18,3 +18,4 @@
 pub mod note;
 pub mod rational;
 pub mod util;
+pub mod nonnan;

@@ -1,22 +1,17 @@
 <!DOCTYPE html>
 <html>
+
 <head>
     <meta http-equiv="Content-Type" content="text/html;charset=utf-8">
     <link rel="preconnect" href="https://fonts.gstatic.com">
     <link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/style.css">
     <title>syn.txt</title>
-</head>
-<body>
-    <img src="logo.png" class="popup" />
-
     <script src="monaco-editor/min/vs/loader.js"></script>
-    <script type="module">
-        import wasm, * as syntxt from "./pkg/syntxt_web_wasm.js";
+    <script>
         require.config({ paths: { 'vs': 'monaco-editor/min/vs' } });
+        require(['vs/editor/editor.main'], function () {
+            var containerElem = document.getElementById('container');
 
-        require(['vs/editor/editor.main'], function() {
-            // Initialize editor styles
             monaco.languages.register({ id: 'syntxt' });
             monaco.languages.setLanguageConfiguration("syntxt", {
                 brackets: [
@@ -103,83 +98,127 @@
                 },
             });
 
-            window.syntxt_helpers = {
-                createEditor: function(container) {
-                    let editor = monaco.editor.create(container, {
-                        value: [
-                            'Song {',
-                            '    bpm: 120',
-                            '    sampleRate: 44_100',
-                            '    meta: Meta {',
-                            '        name: "Example Song"',
-                            '        author: "John Doe"',
-                            '        year: 2021',
-                            '        description: "Simply.\\nAwesome."',
-                            '        awesome: true and not false',
-                            '    }',
-                            '    Track {',
-                            '      name: "Lead"',
-                            '',
-                            '      Sequence {',
-                            '        start: 8/4',
-                            '      }',
-                            '    }',
-                            '    // Test for comments',
-                            '    Track {',
-                            '      name: "Drums"',
-                            '    }',
-                            '}',
-                        ].join('\n'),
-                        language: 'syntxt',
-                    });
-
-                    // Resize the editor when element size changes
-                    const resizeObserver = new ResizeObserver(entries => {
-                        editor.layout();
-                    });
-                    resizeObserver.observe(container);
-
-                    return {
-                        editor: editor,
-                        resizeObserver: resizeObserver,
-                        changeHandler: null,
-                    };
-                },
-                destroyEditor: function(state) {
-                    state.resizeObserver.disconnect();
-                    state.changeHandler.dispose();
-                    state.editor.dispose();
-
-                    state.changeHandler = null;
-                    state.resizeObserver = null;
-                    state.editor = null;
-                },
-                onContentChanged: function(state, newCallback) {
-                    if(state.changeHandler) {
-                        state.changeHandler.dispose()
-                        state.changeHandler = null;
-                    }
-                    if(newCallback) {
-                        state.changeHandler = state.editor.getModel().onDidChangeContent((event) => {
-                            // Probably very inefficient, might want to work with the provided deltas
-                            newCallback(state.editor.getModel().getValue());
-                        });
-                    }
-                },
-                jumpTo: function(state, line, column) {
-                    state.editor.setPosition({column: column, lineNumber: line});
-                    state.editor.focus();
-                },
-                setModelMarkers: function(state, markers) {
-                    monaco.editor.setModelMarkers(state.editor.getModel(), "owner", markers);
-                }
-            };
-
-            // Only initialize WASM UI after editor component has been loaded
-            wasm().then((module) => {
-                window.syntxt = syntxt;
+            var editor = monaco.editor.create(containerElem, {
+                value: [
+                    'Song {',
+                    '    bpm: 120',
+                    '    sampleRate: 44_100',
+                    '    meta: Meta {',
+                    '        name: "Example Song"',
+                    '        author: "John Doe"',
+                    '        year: 2021',
+                    '        description: "Simply.\\nAwesome."',
+                    '        awesome: true and not false',
+                    '    }',
+                    '    Track {',
+                    '      name: "Lead"',
+                    '',
+                    '      Sequence {',
+                    '        start: 8/4',
+                    '      }',
+                    '    }',
+                    '    // Test for comments',
+                    '    Track {',
+                    '      name: "Drums"',
+                    '    }',
+                    '}',
+                ].join('\n'),
+                language: 'syntxt',
+	            glyphMargin: true,
             });
+
+            // Resize the editor when element size changes
+            const resizeObserver = new ResizeObserver(entries => {
+                editor.layout();
+            });
+            resizeObserver.observe(containerElem);
+
+            window.editor = editor;
+
+            editor.getModel().onDidChangeContent((event) => {
+                if(window.syntxt) {
+                    let result = window.syntxt.parse(editor.getModel().getValue());
+                    if(result .length > 0) {
+                        monaco.editor.setModelMarkers(editor.getModel(), "syntxt", [
+                            {
+                                startLineNumber: result[0],
+                                startColumn: result[1],
+                                endLineNumber: result[2],
+                                endColumn: result[3],
+                                message: result[4],
+                                severity: monaco.MarkerSeverity.Error,
+                            },
+                        ]);
+                    } else {
+                        monaco.editor.setModelMarkers(editor.getModel(), "syntxt", [])
+                    }
+                    document.getElementById("compileStatus").innerText = result;
+                }
+            });
+
+            editor.focus();
+
         });
     </script>
+    <script type="module">
+        import wasm, * as syntxt from "./pkg/syntxt_web_wasm.js";
+
+        wasm().then((module) => {
+            window.syntxt = syntxt;
+        });
+      </script>
+
+    <style type="text/css">
+        * {
+            margin: 0;
+        }
+
+        html,
+        body {
+            height: 100%;
+            overflow: hidden;
+            background-color: #1b1b1b;
+            color: white;
+            font-family: 'Roboto', sans-serif;
+        }
+
+        .root {
+            height: 100vh;
+        }
+
+        .header {
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            height: 48px;
+            width: 100%;
+        }
+
+        .footer {
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            height: 24px;
+            width: 100%;
+        }
+
+        .fill {
+            height: calc(100vh - 24px - 48px);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="root" id="root">
+        <div class="header">
+            <img src="logo.png" height="40px" />
+            <span style="font-size: 20pt;">syn.txt editor</span>
+        </div>
+        <div class="fill" id="container"></div>
+        <div class="footer">
+            <span id="compileStatus"></span>
+        </div>
+    </div>
 </body>
+
 </html>

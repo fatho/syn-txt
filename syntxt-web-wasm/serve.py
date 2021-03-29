@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import subprocess
 import os
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 
@@ -18,6 +19,11 @@ class RequestHandler(SimpleHTTPRequestHandler):
             self.directory = os.path.join(ROOT, '../doc')
         else:
             self.directory = ROOT
+
+        if self.path == '/pkg/syntxt_web_wasm.js':
+            # Recompile WASM before serving loader
+            subprocess.run(['make', 'web-debug'])
+
         super().do_GET()
 
 

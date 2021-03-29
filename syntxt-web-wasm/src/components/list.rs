@@ -20,7 +20,7 @@ use yew::prelude::*;
 pub struct List<Item: ListItem + 'static> {
     link: ComponentLink<Self>,
     items: Vec<Item>,
-    onclick: Callback<usize>,
+    onaction: Callback<usize>,
     empty_text: String,
 }
 
@@ -31,7 +31,7 @@ pub trait ListItem: PartialEq + Clone {
 #[derive(Properties, Clone)]
 pub struct Props<Item: Clone> {
     #[prop_or_default]
-    pub onclick: Callback<usize>,
+    pub onaction: Callback<usize>,
     #[prop_or_default]
     pub items: Vec<Item>,
     #[prop_or("Empty".into())]
@@ -46,7 +46,7 @@ impl<Item: ListItem + 'static> Component for List<Item> {
         Self {
             link,
             items: props.items,
-            onclick: props.onclick,
+            onaction: props.onaction,
             empty_text: props.empty_text,
         }
     }
@@ -61,8 +61,8 @@ impl<Item: ListItem + 'static> Component for List<Item> {
             self.items = props.items;
             changed = true;
         }
-        if props.onclick != self.onclick {
-            self.onclick = props.onclick;
+        if props.onaction != self.onaction {
+            self.onaction = props.onaction;
             changed = true;
         }
         if props.empty_text != self.empty_text {
@@ -97,12 +97,21 @@ impl<Item: ListItem + 'static> Component for List<Item> {
 
 impl<Item: ListItem + 'static> List<Item> {
     fn render_item(&self, index: usize, item: &Item) -> Html {
-        let onclick = self.onclick.reform(move |e: MouseEvent| {
+        let ondblclick = self.onaction.reform(move |e: MouseEvent| {
             e.stop_propagation();
             index
         });
+        let onkeyup = super::reform_filter(&self.onaction, move |e: KeyboardEvent| {
+            let key = e.key();
+            if key == "Enter" || key == " " {
+                e.stop_propagation();
+                Some(index)
+            } else {
+                None
+            }
+        });
         html! {
-            <div class=classes!("list-item-flat") tabindex={index} onclick=onclick>
+            <div class=classes!("list-item-flat") tabindex=0 ondblclick=ondblclick onkeyup=onkeyup>
                 { item.view() }
             </div>
         }

@@ -64,3 +64,19 @@ impl<C: Component> WeakComponentLink<C> {
         }
     }
 }
+
+/// Contravariantly map a callback and allow suppresion.
+/// Based on `Callback::reform`.
+pub fn reform_filter<F, T, U>(callback: &Callback<T>, func: F) -> Callback<U>
+where
+    T: 'static,
+    F: Fn(U) -> Option<T> + 'static,
+{
+    let this = callback.clone();
+    let func = move |input| {
+        if let Some(output) = func(input) {
+            this.emit(output);
+        }
+    };
+    Callback::from(func)
+}

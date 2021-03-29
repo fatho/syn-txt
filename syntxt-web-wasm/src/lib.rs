@@ -135,7 +135,7 @@ impl Component for AppModel {
                     <List<Issue>
                         items=self.issues.clone()
                         empty_text="No issues detected"
-                        onclick=self.link.callback(|index| Msg::GoToIssue(index))
+                        onaction=self.link.callback(|index| Msg::GoToIssue(index))
                         />
                 </div>
                 <footer class=classes!("footer") style="flex: 0 0 24px;">

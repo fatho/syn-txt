@@ -60,6 +60,7 @@ html, body {
     width: 100%;
     word-wrap: normal;
     overflow: hidden;
+    user-select: none;
 }
 .list-item-flat[disabled] {
     color: gray;

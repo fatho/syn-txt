@@ -1,3 +1,19 @@
+// syn.txt -- a text based synthesizer and audio workstation
+// Copyright (C) 2021  Fabian Thorand
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 use syntxt_lang::line_map::Pos;
 use wasm_bindgen::prelude::*;
 use yew::prelude::*;
@@ -5,31 +21,20 @@ use yew::prelude::*;
 pub mod components;
 pub mod console;
 
-use components::{editor::{MarkerSeverity, ModelMarker}, list::List};
 use components::{
     editor::{self, Editor},
     list::ListItem,
     WeakComponentLink,
+};
+use components::{
+    editor::{MarkerSeverity, ModelMarker},
+    list::List,
 };
 
 #[wasm_bindgen(start)]
 pub fn run() {
     console_error_panic_hook::set_once();
     App::<AppModel>::new().mount_to_body();
-}
-
-#[wasm_bindgen]
-pub fn parse(code: &str) -> Box<[JsValue]> {
-    match syntxt_lang::parser::Parser::parse(code) {
-        Err(err) => Box::new([
-            JsValue::from_f64(err.pos.start.line as f64),
-            JsValue::from_f64(err.pos.start.column as f64),
-            JsValue::from_f64(err.pos.end.line as f64),
-            JsValue::from_f64(err.pos.end.column as f64),
-            JsValue::from_str(&err.message),
-        ]),
-        Ok(_) => Box::new([]),
-    }
 }
 
 struct AppModel {
@@ -63,11 +68,15 @@ impl Component for AppModel {
                 self.issues.clear();
                 match syntxt_lang::parser::Parser::parse(&code) {
                     Ok(_) => {}
-                    Err(err) => self.issues.push(Issue {
-                        message: err.message,
-                        start: err.pos.start,
-                        end: err.pos.end,
-                    }),
+                    Err((_partial_ast, errors)) => {
+                        for err in errors {
+                            self.issues.push(Issue {
+                                message: err.message,
+                                start: err.pos.start,
+                                end: err.pos.end,
+                            })
+                        }
+                    }
                 }
                 true
             }

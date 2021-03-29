@@ -178,6 +178,36 @@ impl Component for AppModel {
             </section>
         }
     }
+
+    fn rendered(&mut self, first_render: bool) {
+        if first_render {
+            // Show demo song
+            let demo_song = r#"Song {
+    bpm: 120
+    sampleRate: 44_100
+    meta: Meta {
+        name: "Example Song"
+        author: "John Doe"
+        year: 2021
+        description: "Simply.\nAwesome."
+        awesome: true and not false
+    }
+    Track {
+      name: "Lead"
+
+      Sequence {
+        start: 8/4
+      }
+    }
+    // Test for comments
+    Track {
+      name: "Drums"
+    }
+}"#.to_string();
+            self.editor.send_message(editor::Msg::Load { text: demo_song.clone() });
+            self.link.send_message(Msg::SourceCodeChanged(demo_song));
+        }
+    }
 }
 
 #[derive(PartialEq, Clone, Debug)]

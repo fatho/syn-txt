@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+pub mod ast;
 pub mod lexer;
-pub mod parser;
 pub mod line_map;
+pub mod parser;

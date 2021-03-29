@@ -16,101 +16,16 @@
 
 use std::{fmt::Display, iter::Peekable, ops::Range, str::FromStr, sync::Arc};
 
-use ast::BinaryOp;
+use crate::ast::{self, Node};
 use logos::Logos;
 
-use crate::{lexer::{Span, Token}, line_map::{LineMap, Pos}};
+use crate::{
+    lexer::{Span, Token},
+    line_map::{LineMap, Pos},
+};
 
 #[cfg(test)]
 mod expect_tests;
-
-#[derive(Debug, Clone)]
-pub struct Node<T> {
-    pub span: Span,
-    pub data: T,
-}
-
-pub type NodePtr<T> = Arc<Node<T>>;
-
-pub mod ast {
-    use super::{Node, NodePtr};
-    use syntxt_core::rational::Rational;
-
-    #[derive(Debug, Clone)]
-    pub struct Root {
-        pub object: Node<Object>,
-    }
-
-    #[derive(Debug, Clone)]
-    pub struct Object {
-        pub name: Node<String>,
-        pub lbrace: Node<()>,
-        pub attrs: Vec<Node<Attribute>>,
-        pub children: Vec<Node<Object>>,
-        pub rbrace: Node<()>,
-    }
-
-    #[derive(Debug, Clone)]
-    pub struct Attribute {
-        pub name: Node<String>,
-        pub colon: Node<()>,
-        pub value: Node<Expr>,
-    }
-
-    #[derive(Debug, Clone)]
-    pub enum Expr {
-        String(String),
-        Int(i64),
-        Ratio(Rational),
-        Float(f64),
-        Bool(bool),
-        Unary {
-            operator: Node<UnaryOp>,
-            operand: NodePtr<Expr>,
-        },
-        Binary {
-            left: NodePtr<Expr>,
-            operator: Node<BinaryOp>,
-            right: NodePtr<Expr>,
-        },
-        Paren {
-            lparen: Node<()>,
-            expr: NodePtr<Expr>,
-            rparen: Node<()>,
-        },
-        Object(NodePtr<Object>),
-        Var(String),
-        Accessor {
-            expr: NodePtr<Expr>,
-            dot: Node<()>,
-            attribute: Node<String>,
-        },
-        Call {
-            callee: NodePtr<Expr>,
-            lparen: Node<()>,
-            // TODO: Also keep track of commas in argument list
-            arguments: Vec<Node<Expr>>,
-            rparen: Node<()>,
-        },
-    }
-
-    #[derive(Debug, Clone)]
-    pub enum UnaryOp {
-        Plus,
-        Minus,
-        Not,
-    }
-
-    #[derive(Debug, Clone)]
-    pub enum BinaryOp {
-        Add,
-        Sub,
-        Mult,
-        Div,
-        And,
-        Or,
-    }
-}
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct ParseError {
@@ -214,10 +129,7 @@ impl<'a> Parser<'a> {
     }
 
     pub fn expected_str_but_got(&self, span: Span, expected: &str, got: Token) -> ParseError {
-        self.make_error(
-            span,
-            format!("Expected {}, but got {:?}", expected, got),
-        )
+        self.make_error(span, format!("Expected {}, but got {:?}", expected, got))
     }
 
     pub fn unexpected_eof(&self, span: Span, expected: &[Token]) -> ParseError {
@@ -240,7 +152,7 @@ impl<'a> Parser<'a> {
         let object = self.parse_object()?;
         // Must be all there is
         if let Some((token, span)) = self.consume() {
-            return Err(self.expected_str_but_got(span, "eof", token))
+            return Err(self.expected_str_but_got(span, "eof", token));
         }
 
         Ok(Node {
@@ -283,9 +195,7 @@ impl<'a> Parser<'a> {
                             let child_object = self.parse_object_body(inner_name)?;
                             children.push(child_object);
                         }
-                        Some(other) => {
-                            return Err(self.expected_but_got(span, EXPECTATION, other))
-                        }
+                        Some(other) => return Err(self.expected_but_got(span, EXPECTATION, other)),
                         None => {
                             return Err(self.unexpected_eof(span, EXPECTATION));
                         }
@@ -338,7 +248,7 @@ impl<'a> Parser<'a> {
                     left,
                     Node {
                         span,
-                        data: BinaryOp::Or,
+                        data: ast::BinaryOp::Or,
                     },
                     Prec::DISJUNCTIVE.succ(),
                 )?,
@@ -346,7 +256,7 @@ impl<'a> Parser<'a> {
                     left,
                     Node {
                         span,
-                        data: BinaryOp::And,
+                        data: ast::BinaryOp::And,
                     },
                     Prec::CONJUNCTIVE.succ(),
                 )?,
@@ -354,7 +264,7 @@ impl<'a> Parser<'a> {
                     left,
                     Node {
                         span,
-                        data: BinaryOp::Add,
+                        data: ast::BinaryOp::Add,
                     },
                     Prec::ADDITIVE.succ(),
                 )?,
@@ -362,7 +272,7 @@ impl<'a> Parser<'a> {
                     left,
                     Node {
                         span,
-                        data: BinaryOp::Sub,
+                        data: ast::BinaryOp::Sub,
                     },
                     Prec::ADDITIVE.succ(),
                 )?,
@@ -370,7 +280,7 @@ impl<'a> Parser<'a> {
                     left,
                     Node {
                         span,
-                        data: BinaryOp::Mult,
+                        data: ast::BinaryOp::Mult,
                     },
                     Prec::MULTIPLICATIVE.succ(),
                 )?,
@@ -378,7 +288,7 @@ impl<'a> Parser<'a> {
                     left,
                     Node {
                         span,
-                        data: BinaryOp::Div,
+                        data: ast::BinaryOp::Div,
                     },
                     Prec::MULTIPLICATIVE.succ(),
                 )?,
@@ -518,18 +428,9 @@ impl<'a> Parser<'a> {
                 }
                 Some(other) if other == end => break,
                 Some(got) => {
-                    return Err(self.expected_but_got(
-                        span,
-                        &[Token::LParen, Token::Comma],
-                        got,
-                    ))
+                    return Err(self.expected_but_got(span, &[Token::LParen, Token::Comma], got))
                 }
-                None => {
-                    return Err(self.unexpected_eof(
-                        span,
-                        &[Token::LParen, Token::Comma],
-                    ))
-                }
+                None => return Err(self.unexpected_eof(span, &[Token::LParen, Token::Comma])),
             }
         }
 
@@ -557,10 +458,7 @@ impl<'a> Parser<'a> {
                 span: node.span,
                 data: int,
             }),
-            Err(err) => Err(self.make_error(
-                node.span,
-                format!("{}", err),
-            )),
+            Err(err) => Err(self.make_error(node.span, format!("{}", err))),
         }
     }
 
@@ -617,7 +515,7 @@ impl<'a> Parser<'a> {
                     None => {
                         return Err(self.make_error(
                             start_index..start_index + 1,
-                            "unterminated escape sequence".into()
+                            "unterminated escape sequence".into(),
                         ))
                     }
                     Some((index, ch)) => {

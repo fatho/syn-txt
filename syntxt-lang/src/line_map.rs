@@ -17,17 +17,23 @@
 
 //! Bits and pieces for working with ranges of text.
 
-use std::fmt::{self, Write};
+use std::fmt::{self, Debug, Write};
 
 pub use logos::Span;
 
 /// Position inside a text in a form that's useful for human readers.
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+#[derive(Clone, Copy, Eq, PartialEq)]
 pub struct Pos {
     /// Line number, starting at 1
     pub line: usize,
     /// Position within the line, in characters, starting at 1
     pub column: usize,
+}
+
+impl Debug for Pos {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}:{}", self.line, self.column)
+    }
 }
 
 impl Pos {

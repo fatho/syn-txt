@@ -20,6 +20,7 @@ use yew::prelude::*;
 
 pub mod editor;
 pub mod list;
+pub mod tree;
 
 pub struct WeakComponentLink<C: Component>(Rc<RefCell<Option<ComponentLink<C>>>>);
 
@@ -65,7 +66,7 @@ impl<C: Component> WeakComponentLink<C> {
     }
 }
 
-/// Contravariantly map a callback and allow suppresion.
+/// Contravariantly map a callback and allow supressing the callback from bubbling up further.
 /// Based on `Callback::reform`.
 pub fn reform_filter<F, T, U>(callback: &Callback<T>, func: F) -> Callback<U>
 where

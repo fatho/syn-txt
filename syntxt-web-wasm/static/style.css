@@ -4,6 +4,7 @@ html, body {
     overflow: hidden;
     background-color: white;
     font-family: 'Roboto', sans-serif;
+    font-size: 16px;
 }
 
 .popup {
@@ -40,13 +41,10 @@ html, body {
 .tab {
     border-style: solid;
     border-width: 1px 0 0 0;
-    border-color: black;
+    border-color: lightgray;
 }
 .tab-inactive {
-    visibility: collapse;
-}
-.tab-active {
-    visibility: visible;
+    display: none;
 }
 
 
@@ -75,3 +73,60 @@ html, body {
     border-width: 1px;
     padding: 4px 4px 4px 4px;
 }
+
+
+.header {
+    user-select: none;
+    border-style: solid;
+    border-width: 0px 0 1px 0;
+    border-color: lightgray;
+    padding: 5px;
+}
+
+.sidebar-right {
+    border-style: solid;
+    border-width: 0 0 0 1px;
+    border-color: lightgray;
+}
+
+
+.tree-node-label {
+    user-select: none;
+    padding: 5px 5px 5px 5px;
+}
+.tree-node-inner::before {
+    content: ">";
+    color: gray;
+    display: inline-block;
+    cursor: pointer;
+    font-weight: bold;
+    margin-right: 6px;
+}
+.tree-node-expanded::before {
+    transform: rotate(90deg);
+}
+.tree-node-children {
+    margin-left: 8px;
+    padding-left: 12px;
+    border-color: gray;
+    border-width: 0 0 0 1px;
+    border-style: solid;
+}
+.tree-node-label[disabled] {
+    color: gray;
+}
+.tree-node-label:not([disabled]):hover {
+    background-color: rgba(0, 163, 114, 0.2);
+}
+.tree-node-label:not([disabled]):active, .tree-node-label:not([disabled]):focus {
+    background-color: rgba(0, 163, 114, 0.5);
+    border-style: dotted;
+    border-color: gray;
+    border-width: 1px;
+    padding: 4px 4px 4px 4px;
+}
+
+  /*
+  .caret-down::before {
+    transform: rotate(90deg);
+  } */

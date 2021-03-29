@@ -29,6 +29,7 @@ use components::{
 use components::{
     editor::{MarkerSeverity, ModelMarker},
     list::List,
+    tree::TreeNode,
 };
 
 #[wasm_bindgen(start)]
@@ -107,7 +108,7 @@ impl Component for AppModel {
     fn view(&self) -> Html {
         let showing_issues = self.showing_issues;
         let issue_tab_class = if self.showing_issues {
-            "tab-active"
+            ""
         } else {
             "tab-inactive"
         };
@@ -115,21 +116,38 @@ impl Component for AppModel {
             <section style="height: 100vh; display: flex; flex-direction: column">
                 <header style="flex: 0 0 0px; background-color: black">
                 </header>
-                <div style="flex: 1 1 0px; min-height: 0; min-width: 0;">
-                    <Editor
-                        weak_link=&self.editor
-                        markers=self.issues.iter().map(|issue| {
-                            ModelMarker {
-                                start_line_number: issue.start.line as u32,
-                                start_column: issue.start.column as u32,
-                                end_line_number: issue.end.line as u32,
-                                end_column: issue.end.column as u32,
-                                message: issue.message.clone(),
-                                severity: MarkerSeverity::Error,
-                            }
-                        }).collect::<Vec<_>>()
-                        on_content_changed=self.link.callback(|code| Msg::SourceCodeChanged(code))
-                        />
+                <div style="flex: 1 1 0px; min-height: 0; min-width: 0; display: flex; flex-direction: row;">
+                    <div style="flex: 1 1 0px; min-height: 0; min-width: 0;">
+                        <Editor
+                            weak_link=&self.editor
+                            markers=self.issues.iter().map(|issue| {
+                                ModelMarker {
+                                    start_line_number: issue.start.line as u32,
+                                    start_column: issue.start.column as u32,
+                                    end_line_number: issue.end.line as u32,
+                                    end_column: issue.end.column as u32,
+                                    message: issue.message.clone(),
+                                    severity: MarkerSeverity::Error,
+                                }
+                            }).collect::<Vec<_>>()
+                            on_content_changed=self.link.callback(|code| Msg::SourceCodeChanged(code))
+                            />
+                    </div>
+                    <section class="sidebar-right" style="flex: 0 0 20%; min-width: 0; height: 100%; display: flex; flex-direction: column">
+                        <header class="header" style="flex: 0 0;">
+                            { "Outline" }
+                        </header>
+                        <div style="margin: 5px;">
+                            <TreeNode label="Root">
+                                <TreeNode label="Child 1">
+                                </TreeNode>
+                                <TreeNode label="Child 2">
+                                </TreeNode>
+                                <TreeNode label="Child 3">
+                                </TreeNode>
+                            </TreeNode>
+                        </div>
+                    </section>
                 </div>
                 <div class=classes!("tab", issue_tab_class) style="flex: 0 0 20%; min-height: 0; overflow: auto">
                     <List<Issue>

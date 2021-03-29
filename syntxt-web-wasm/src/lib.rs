@@ -14,7 +14,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use syntxt_lang::line_map::Pos;
+use std::vec;
+
+use syntxt_lang::{
+    ast::{self, Walk},
+    line_map::Pos,
+};
 use wasm_bindgen::prelude::*;
 use yew::prelude::*;
 
@@ -42,6 +47,7 @@ struct AppModel {
     link: ComponentLink<Self>,
     editor: WeakComponentLink<Editor>,
     showing_issues: bool,
+    ast: ast::Node<ast::Root>,
     issues: Vec<Issue>,
 }
 
@@ -49,6 +55,7 @@ enum Msg {
     SourceCodeChanged(String),
     ShowIssues(bool),
     GoToIssue(usize),
+    JumpToEditor { line: u32, column: u32 },
 }
 
 impl Component for AppModel {
@@ -59,6 +66,10 @@ impl Component for AppModel {
             link,
             editor: WeakComponentLink::default(),
             showing_issues: true,
+            ast: ast::Node {
+                span: 0..0,
+                data: ast::Root { objects: vec![] },
+            },
             issues: Vec::new(),
         }
     }
@@ -68,8 +79,11 @@ impl Component for AppModel {
             Msg::SourceCodeChanged(code) => {
                 self.issues.clear();
                 match syntxt_lang::parser::Parser::parse(&code) {
-                    Ok(_) => {}
-                    Err((_partial_ast, errors)) => {
+                    Ok(ast) => {
+                        self.ast = ast;
+                    }
+                    Err((partial_ast, errors)) => {
+                        self.ast = partial_ast;
                         for err in errors {
                             self.issues.push(Issue {
                                 message: err.message,
@@ -96,6 +110,13 @@ impl Component for AppModel {
                         column: issue.start.column as u32,
                     });
                 }
+                false
+            }
+            Msg::JumpToEditor { line, column } => {
+                self.editor.send_message(editor::Msg::GoTo {
+                    line,
+                    column,
+                });
                 false
             }
         }
@@ -137,15 +158,8 @@ impl Component for AppModel {
                         <header class="header" style="flex: 0 0;">
                             { "Outline" }
                         </header>
-                        <div style="margin: 5px;">
-                            <TreeNode label="Root">
-                                <TreeNode label="Child 1">
-                                </TreeNode>
-                                <TreeNode label="Child 2">
-                                </TreeNode>
-                                <TreeNode label="Child 3">
-                                </TreeNode>
-                            </TreeNode>
+                        <div style="margin: 5px; flex: 1 1 0; min-height: 0; overflow-y: auto">
+                            { AstTreeVisitor::view(&self.ast, self.link.clone()) }
                         </div>
                     </section>
                 </div>
@@ -183,6 +197,88 @@ impl ListItem for Issue {
                 <span>{&self.message}</span>
                 <span style="color:gray; margin-left: 5px">{self.start.line}{":"}{self.start.column}</span>
             </>
+        }
+    }
+}
+
+struct AstTreeVisitor {
+    children: Vec<Html>,
+    stack: Vec<usize>,
+    link: ComponentLink<AppModel>,
+}
+
+impl AstTreeVisitor {
+    pub fn view(ast: &ast::Node<ast::Root>, link: ComponentLink<AppModel>) -> Html {
+        let mut visitor = AstTreeVisitor {
+            children: vec![],
+            stack: vec![],
+            link: link.clone(),
+        };
+        ast.walk(&mut visitor);
+        visitor.children.drain(..).collect::<Html>()
+    }
+
+    fn begin(&mut self) {
+        self.stack.push(self.children.len());
+    }
+
+    fn finish<S: AsRef<str>>(&mut self, label: S) {
+        let scope_start = self.stack.pop().unwrap();
+        let node = html! {
+            <TreeNode
+                label=label.as_ref()
+                onaction=self.link.callback(|()| Msg::JumpToEditor { line: 1, column: 1})
+                >
+                { self.children.drain(scope_start..).collect::<Html>() }
+            </TreeNode>
+        };
+        self.children.push(node);
+    }
+
+    fn leaf<S: AsRef<str>>(&mut self, label: S) {
+        self.children
+            .push(html! { <TreeNode label=label.as_ref() /> });
+    }
+
+    fn nested<S: AsRef<str>, T: Walk>(&mut self, label: S, node: &ast::Node<T>) {
+        self.begin();
+        node.walk(self);
+        self.finish(label);
+    }
+}
+
+impl ast::Visitor for AstTreeVisitor {
+    fn root(&mut self, node: &ast::Node<ast::Root>) {
+        self.nested("Root", node);
+    }
+
+    fn object(&mut self, node: &ast::Node<ast::Object>) {
+        self.nested(format!("Object: {}", node.data.name.data), node);
+    }
+
+    fn attribute(&mut self, node: &ast::Node<ast::Attribute>) {
+        self.nested(format!("{}:", node.data.name.data), node);
+    }
+
+    fn expression(&mut self, node: &ast::Node<ast::Expr>) {
+        match &node.data {
+            // leaf nodes
+            ast::Expr::String(x) => self.leaf(format!("{:?}", x)),
+            ast::Expr::Int(x) => self.leaf(format!("{}", x)),
+            ast::Expr::Ratio(x) => self.leaf(format!("{}", x)),
+            ast::Expr::Float(x) => self.leaf(format!("{}", x)),
+            ast::Expr::Bool(x) => self.leaf(format!("{:?}", x)),
+            ast::Expr::Var(x) => self.leaf(format!("{}", x)),
+            // nested expressions
+            ast::Expr::Unary { operator, .. } => self.nested(format!("{:?}", operator.data), node),
+            ast::Expr::Binary { operator, .. } => self.nested(format!("{:?}", operator.data), node),
+            ast::Expr::Paren { .. } => self.nested("()", node),
+            ast::Expr::Accessor { attribute, .. } => {
+                self.nested(format!(".{}", attribute.data), node)
+            }
+            ast::Expr::Call { .. } => self.nested("Call", node),
+            // nested, but not an expression, hide expression node
+            ast::Expr::Object(obj) => obj.walk(self),
         }
     }
 }

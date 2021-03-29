@@ -14,6 +14,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+#[allow(unused_imports)]
+use crate::console_log;
 use yew::prelude::*;
 
 #[derive(Properties, Clone)]
@@ -22,13 +24,14 @@ pub struct TreeNodeProps {
     pub children: Children,
     #[prop_or_default]
     pub label: String,
-    #[prop_or(true)]
-    pub expanded: bool,
+    #[prop_or_default]
+    pub onaction: Callback<()>,
 }
 
 pub struct TreeNode {
     link: ComponentLink<Self>,
     props: TreeNodeProps,
+    expanded: bool,
 }
 
 pub enum Msg {
@@ -43,6 +46,7 @@ impl Component for TreeNode {
         Self {
             link,
             props,
+            expanded: true,
         }
     }
 
@@ -50,7 +54,7 @@ impl Component for TreeNode {
         match msg {
             Msg::Toggle => {
                 if ! self.props.children.is_empty() {
-                    self.props.expanded = !self.props.expanded;
+                    self.expanded = !self.expanded;
                     true
                 } else {
                     false
@@ -67,28 +71,32 @@ impl Component for TreeNode {
     fn view(&self) -> Html {
         // what type of node is this? Leaf node or inner node
         let type_class = self.props.children.is_empty().then(|| "").unwrap_or("tree-node-inner");
-        let expanded_class = self.props.expanded.then(|| "tree-node-expanded").unwrap_or("");
+        let expanded_class = self.expanded.then(|| "tree-node-expanded").unwrap_or("");
+        let container_visible = self.expanded && ! self.props.children.is_empty();
+        let container_class = container_visible.then(|| "").unwrap_or("invisible");
+
+        let ondblclick = self.props.onaction.reform(|e: MouseEvent| {
+            e.stop_propagation();
+        });
 
         html! {
             <div>
                 <div
-                    class=classes!("tree-node-label", type_class, expanded_class)
+                    class=classes!("tree-node-label")
                     tabindex=0
-                    onclick=self.link.callback(|e: MouseEvent| { e.stop_propagation(); Msg::Toggle })
+                    ondblclick=ondblclick
                     >
-                    {&self.props.label}
+                    <span
+                        class=classes!(type_class, expanded_class)
+                        onclick=self.link.callback(|e: MouseEvent| { e.stop_propagation(); Msg::Toggle })
+                        />
+                    <span>
+                        {&self.props.label}
+                    </span>
                 </div>
-                {
-                    if ! self.props.children.is_empty() && self.props.expanded {
-                        html! {
-                            <div class="tree-node-children">
-                                { for self.props.children.iter() }
-                            </div>
-                        }
-                    } else {
-                        html! {}
-                    }
-                }
+                <div class=classes!("tree-node-children", container_class)>
+                    { for self.props.children.iter() }
+                </div>
             </div>
         }
     }

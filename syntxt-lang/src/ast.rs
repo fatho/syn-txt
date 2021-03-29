@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use std::{ops::Deref, sync::Arc};
 
 use crate::lexer::Span;
 use syntxt_core::{nonnan::F64N, rational::Rational};
@@ -100,4 +100,136 @@ pub enum BinaryOp {
     Div,
     And,
     Or,
+}
+
+
+
+pub trait Visit {
+    fn visit(&self, visitor: &mut dyn Visitor);
+}
+
+pub trait Walk {
+    fn walk(&self, visitor: &mut dyn Visitor);
+}
+
+impl<T: Visit> Visit for &[T] {
+    fn visit(&self, visitor: &mut dyn Visitor) {
+        for node in self.iter() {
+            node.visit(visitor);
+        }
+    }
+}
+
+impl<T: Visit> Visit for Vec<T> {
+    fn visit(&self, visitor: &mut dyn Visitor) {
+        for node in self.iter() {
+            node.visit(visitor);
+        }
+    }
+}
+
+impl<T: Walk> Walk for Arc<T> {
+    fn walk(&self, visitor: &mut dyn Visitor) {
+        self.deref().walk(visitor)
+    }
+}
+
+impl<T: Visit> Visit for Arc<T> {
+    fn visit(&self, visitor: &mut dyn Visitor) {
+        self.deref().visit(visitor)
+    }
+}
+
+
+impl Visit for Node<Root> {
+    fn visit(&self, visitor: &mut dyn Visitor) {
+        visitor.root(self)
+    }
+}
+
+impl Visit for Node<Object> {
+    fn visit(&self, visitor: &mut dyn Visitor) {
+        visitor.object(self)
+    }
+}
+
+impl Visit for Node<Attribute> {
+    fn visit(&self, visitor: &mut dyn Visitor) {
+        visitor.attribute(self)
+    }
+}
+
+impl Visit for Node<Expr> {
+    fn visit(&self, visitor: &mut dyn Visitor) {
+        visitor.expression(self)
+    }
+}
+
+
+impl<T: Walk> Walk for Node<T> {
+    fn walk(&self, visitor: &mut dyn Visitor) {
+        self.data.walk(visitor);
+    }
+}
+
+
+impl Walk for Root {
+    fn walk(&self, visitor: &mut dyn Visitor) {
+        self.objects.visit(visitor)
+    }
+}
+
+impl Walk for Object {
+    fn walk(&self, visitor: &mut dyn Visitor) {
+        self.attrs.visit(visitor);
+        self.children.visit(visitor);
+    }
+}
+
+impl Walk for Attribute {
+    fn walk(&self, visitor: &mut dyn Visitor) {
+        self.value.visit(visitor);
+    }
+}
+
+impl Walk for Expr {
+    #[allow(unused_variables)]
+    fn walk(&self, visitor: &mut dyn Visitor) {
+        match self {
+            Expr::String(_) => {}
+            Expr::Int(_) => {}
+            Expr::Ratio(_) => {}
+            Expr::Float(_) => {}
+            Expr::Bool(_) => {}
+            Expr::Var(_) => {}
+            Expr::Unary { operator, operand } => {
+                operand.visit(visitor);
+            }
+            Expr::Binary { left, operator, right } => {
+                left.visit(visitor);
+                right.visit(visitor);
+            }
+            Expr::Paren { lparen, expr, rparen } => {
+                expr.visit(visitor);
+            }
+            Expr::Object(obj) => {
+                obj.visit(visitor);
+            }
+            Expr::Accessor { expr, dot, attribute } => {
+                expr.visit(visitor);
+            }
+            Expr::Call { callee, lparen, arguments, rparen } => {
+                callee.visit(visitor);
+                arguments.visit(visitor);
+            }
+        }
+    }
+}
+
+#[allow(unused_variables)]
+pub trait Visitor {
+    fn root(&mut self, node: &Node<Root>) {}
+    fn object(&mut self, node: &Node<Object>) {}
+    fn attribute(&mut self, node: &Node<Attribute>) {}
+    fn expression(&mut self, node: &Node<Expr>) {}
 }

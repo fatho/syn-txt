@@ -126,7 +126,6 @@ html, body {
     padding: 4px 4px 4px 4px;
 }
 
-  /*
-  .caret-down::before {
-    transform: rotate(90deg);
-  } */
+.invisible {
+    display: none;
+}

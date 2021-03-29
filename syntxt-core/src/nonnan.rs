@@ -68,6 +68,12 @@ impl FromStr for F64N {
     }
 }
 
+impl Display for F64N {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
 /// A non-nan f32.
 #[derive(Debug, Clone, Copy)]
 pub struct F32N(f32);
@@ -116,6 +122,12 @@ impl FromStr for F32N {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Self::new(s.parse::<f32>()?).ok_or(ParseNonNanError::Nan)
+    }
+}
+
+impl Display for F32N {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
     }
 }
 

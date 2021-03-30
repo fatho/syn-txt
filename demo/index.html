@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+    <link rel="preconnect" href="https://fonts.gstatic.com">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="static/style.css">
+    <title>syn.txt</title>
+</head>
+<body>
+    <img src="logo.png" class="popup" />
+
+    <script src="monaco-editor/min/vs/loader.js"></script>
+    <script type="module">
+        import wasm, * as syntxt from "./pkg/syntxt_web_wasm.js";
+        require.config({ paths: { 'vs': 'monaco-editor/min/vs' } });
+
+        require(['vs/editor/editor.main'], function() {
+            // Initialize editor styles
+            monaco.languages.register({ id: 'syntxt' });
+            monaco.languages.setLanguageConfiguration("syntxt", {
+                brackets: [
+                    ['{', '}'],
+                    ['(', ')'],
+                ],
+                comments: {
+                    lineComment: '//'
+                },
+            });
+            monaco.languages.setMonarchTokensProvider('syntxt', {
+                // Set defaultToken to invalid to see what you do not tokenize yet
+                defaultToken: 'invalid',
+
+                keywords: [
+                    'true', 'false', 'not', 'and', 'or'
+                ],
+
+                typeKeywords: [],
+
+                operators: [
+                    '+', '-', '*', '/'
+                ],
+
+                // we include these common regular expressions
+                symbols: /[=><!~?:&|+\-*\/\^%]+/,
+
+                // C# style strings
+                escapes: /\\(?:[abfnrtv\\"']|x[0-9A-Fa-f]{1,4}|u[0-9A-Fa-f]{4}|U[0-9A-Fa-f]{8})/,
+
+                // The main tokenizer for our languages
+                tokenizer: {
+                    root: [
+                        // identifiers and keywords
+                        [/[a-z_$][a-zA-Z0-9_$]*/,
+                            {
+                                cases:
+                                {
+                                    '@typeKeywords': 'keyword',
+                                    '@keywords': 'keyword',
+                                    '@default': 'identifier'
+                                }
+                            }
+                        ],
+                        [/[A-Z][\w\$]*/, 'type.identifier'],  // to show class names nicely
+
+                        // whitespace
+                        { include: '@whitespace' },
+
+                        // delimiters and operators
+                        [/[{}()\[\]]/, '@brackets'],
+                        [/[<>](?!@symbols)/, '@brackets'],
+                        [/@symbols/, {
+                            cases: {
+                                '@operators': 'operator',
+                                '@default': ''
+                            }
+                        }],
+
+                        // numbers
+                        [/\d(:?[\d_])*\/\d(:?[\d_])*/, 'number.float'],
+                        [/\d(:?[\d_])*\.\d(:?[\d_])*/, 'number.float'],
+                        [/\d(:?[\d_])*/, 'number'],
+
+                        // delimiter: after number because of .\d floats
+                        [/[;,.]/, 'delimiter'],
+
+                        // strings
+                        [/"([^"\\]|\\.)*$/, 'string.invalid'],  // non-teminated string
+                        [/"/, { token: 'string.quote', bracket: '@open', next: '@string' }],
+                    ],
+
+                    string: [
+                        [/[^\\"]+/, 'string'],
+                        [/@escapes/, 'string.escape'],
+                        [/\\./, 'string.escape.invalid'],
+                        [/"/, { token: 'string.quote', bracket: '@close', next: '@pop' }]
+                    ],
+
+                    whitespace: [
+                        [/[ \t\r\n]+/, 'white'],
+                        [/\/\/.*$/, 'comment'],
+                    ],
+                },
+            });
+
+            window.syntxt_helpers = {
+                createEditor: function(container) {
+                    let editor = monaco.editor.create(container, {
+                        value: "",
+                        language: 'syntxt',
+                    });
+
+                    // Resize the editor when element size changes
+                    const resizeObserver = new ResizeObserver(entries => {
+                        editor.layout();
+                    });
+                    resizeObserver.observe(container);
+
+                    return {
+                        editor: editor,
+                        resizeObserver: resizeObserver,
+                        changeHandler: null,
+                    };
+                },
+                destroyEditor: function(state) {
+                    state.resizeObserver.disconnect();
+                    state.changeHandler.dispose();
+                    state.editor.dispose();
+
+                    state.changeHandler = null;
+                    state.resizeObserver = null;
+                    state.editor = null;
+                },
+                onContentChanged: function(state, newCallback) {
+                    if(state.changeHandler) {
+                        state.changeHandler.dispose()
+                        state.changeHandler = null;
+                    }
+                    if(newCallback) {
+                        state.changeHandler = state.editor.getModel().onDidChangeContent((event) => {
+                            // Probably very inefficient, might want to work with the provided deltas
+                            newCallback(state.editor.getModel().getValue());
+                        });
+                    }
+                },
+                jumpTo: function(state, line, column) {
+                    state.editor.setPosition({column: column, lineNumber: line});
+                    state.editor.focus();
+                },
+                setModelMarkers: function(state, markers) {
+                    monaco.editor.setModelMarkers(state.editor.getModel(), "owner", markers);
+                },
+                load: function(state, value) {
+                    state.editor.setModel(monaco.editor.createModel(value, "syntxt"));
+                },
+            };
+
+            // Only initialize WASM UI after editor component has been loaded
+            wasm().then((module) => {
+                window.syntxt = syntxt;
+            });
+        });
+    </script>
+</body>
+</html>

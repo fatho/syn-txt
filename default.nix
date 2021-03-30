@@ -18,7 +18,6 @@ rec {
           filter =
             let
               gitignore = ''
-                ${builtins.readFile ./.gitignore}
                 *
                 !syntxt-audio/
                 !syntxt-core/
@@ -27,6 +26,7 @@ rec {
                 !Cargo.toml
                 !Cargo.lock
                 !LICENSE
+                ${builtins.readFile ./.gitignore}
               '';
               extraFilter = path: type: true;
             in

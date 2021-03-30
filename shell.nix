@@ -14,6 +14,7 @@ nixpkgs.mkShell {
     # For web stuff
     cargo-generate
     wasm-pack
+    wasm-bindgen-cli
     geckodriver
     # Allows running the update script right from this shell
     niv

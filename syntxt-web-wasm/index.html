@@ -4,7 +4,7 @@
     <meta http-equiv="Content-Type" content="text/html;charset=utf-8">
     <link rel="preconnect" href="https://fonts.gstatic.com">
     <link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="static/style.css">
     <title>syn.txt</title>
 </head>
 <body>
@@ -106,30 +106,7 @@
             window.syntxt_helpers = {
                 createEditor: function(container) {
                     let editor = monaco.editor.create(container, {
-                        value: [
-                            'Song {',
-                            '    bpm: 120',
-                            '    sampleRate: 44_100',
-                            '    meta: Meta {',
-                            '        name: "Example Song"',
-                            '        author: "John Doe"',
-                            '        year: 2021',
-                            '        description: "Simply.\\nAwesome."',
-                            '        awesome: true and not false',
-                            '    }',
-                            '    Track {',
-                            '      name: "Lead"',
-                            '',
-                            '      Sequence {',
-                            '        start: 8/4',
-                            '      }',
-                            '    }',
-                            '    // Test for comments',
-                            '    Track {',
-                            '      name: "Drums"',
-                            '    }',
-                            '}',
-                        ].join('\n'),
+                        value: "",
                         language: 'syntxt',
                     });
 
@@ -172,7 +149,10 @@
                 },
                 setModelMarkers: function(state, markers) {
                     monaco.editor.setModelMarkers(state.editor.getModel(), "owner", markers);
-                }
+                },
+                load: function(state, value) {
+                    state.editor.setModel(monaco.editor.createModel(value, "syntxt"));
+                },
             };
 
             // Only initialize WASM UI after editor component has been loaded

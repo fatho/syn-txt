@@ -14,14 +14,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use serde::{Deserialize, Serialize};
+use serde_repr::*;
 use wasm_bindgen::prelude::*;
 use yew::Properties;
 use yew::{prelude::*, web_sys::HtmlElement};
-use serde_repr::*;
-use serde::{Serialize, Deserialize};
 
 use super::WeakComponentLink;
-
 
 pub struct Editor {
     #[allow(unused)]
@@ -65,7 +64,16 @@ pub enum MarkerSeverity {
 }
 
 pub enum Msg {
+    Load { text: String },
     GoTo { line: u32, column: u32 },
+}
+
+impl Editor {
+    fn register_on_content_changed(&mut self) {
+        if let Some(editor) = self.editor.clone() {
+            onContentChanged(editor, &self.change_handler);
+        }
+    }
 }
 
 impl Component for Editor {
@@ -95,25 +103,29 @@ impl Component for Editor {
                     jumpTo(editor, line, column);
                 }
             }
+            Msg::Load { text } => {
+                if let Some(editor) = self.editor.clone() {
+                    load(editor, text);
+                }
+                self.register_on_content_changed();
+            }
         }
         false
     }
 
     fn change(&mut self, props: Self::Properties) -> ShouldRender {
         if self.on_content_changed != props.on_content_changed {
-            let on_content_changed = props.on_content_changed.clone();
             self.on_content_changed = props.on_content_changed;
 
-            // Update handler
+            let on_content_changed = self.on_content_changed.clone();
             let new_change_handler = Closure::wrap(Box::new(move |value| {
                 on_content_changed.emit(value);
             }) as Box<dyn Fn(String)>);
-
-            if let Some(editor) = self.editor.clone() {
-                onContentChanged(editor, &new_change_handler);
-            }
-
-            self.change_handler = new_change_handler;
+            // Must keep the handler alive until we unregistered it
+            let old_change_handler =
+                std::mem::replace(&mut self.change_handler, new_change_handler);
+            self.register_on_content_changed();
+            drop(old_change_handler);
         }
         if self.markers != props.markers {
             self.markers = props.markers;
@@ -171,4 +183,7 @@ extern "C" {
 
     #[wasm_bindgen(js_namespace = syntxt_helpers, js_name = setModelMarkers)]
     fn setModelMarkers(editor: &JsValue, markers: &JsValue);
+
+    #[wasm_bindgen(js_namespace = syntxt_helpers, js_name = load)]
+    fn load(editor: JsValue, text: String);
 }

@@ -130,3 +130,26 @@ html, body {
 .invisible {
     display: none;
 }
+
+.song-view-track {
+    width: 100%;
+    height: 48px;
+    margin-bottom: 4px;
+    box-shadow: 0 2px 8px 0 rgba(0, 0, 0, 0.2);
+}
+.song-view-track:nth-child(even) {
+    background-color: rgba(0, 163, 114, 0.1);
+}
+.song-view-track:nth-child(odd) {
+    background-color: rgba(204, 237, 226, 0.2);
+}
+.song-view-track-header {
+    height: 100%;
+    border-style: solid;
+    border-color: lightgray;
+    border-width: 0 1px 0 0;
+}
+.song-view-track-name {
+    cursor: pointer;
+    padding: 5px;
+}

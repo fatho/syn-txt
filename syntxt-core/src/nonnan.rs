@@ -96,7 +96,6 @@ impl F32N {
     }
 }
 
-
 impl PartialEq for F32N {
     fn eq(&self, other: &Self) -> bool {
         self.0 == other.0

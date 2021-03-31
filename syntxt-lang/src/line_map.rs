@@ -14,7 +14,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-
 //! Bits and pieces for working with ranges of text.
 
 use std::fmt::{self, Debug, Write};
@@ -38,10 +37,7 @@ impl Debug for Pos {
 
 impl Pos {
     pub fn origin() -> Self {
-        Self {
-            line: 0,
-            column: 0,
-        }
+        Self { line: 0, column: 0 }
     }
 }
 

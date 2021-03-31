@@ -16,10 +16,7 @@
 
 use std::{sync::Arc, vec};
 
-use syntxt_lang::{
-    ast,
-    line_map::Pos,
-};
+use syntxt_lang::{ast, line_map::Pos};
 use wasm_bindgen::prelude::*;
 use yew::prelude::*;
 
@@ -27,17 +24,17 @@ pub mod components;
 pub mod console;
 
 use components::{
-    editor::{self, Editor},
-    list::ListItem,
-    WeakComponentLink,
-};
-use components::{
-    Size,
     ast_view::AstView,
     editor::{MarkerSeverity, ModelMarker},
     list::List,
     song_view::SongView,
-    splitter::{SplitContainer, SplitPane, Orientation},
+    splitter::{Orientation, SplitContainer, SplitPane},
+    Size,
+};
+use components::{
+    editor::{self, Editor},
+    list::ListItem,
+    WeakComponentLink,
 };
 
 #[wasm_bindgen(start)]
@@ -221,8 +218,11 @@ impl Component for AppModel {
     Track {
       name: "Drums"
     }
-}"#.to_string();
-            self.editor.send_message(editor::Msg::Load { text: demo_song.clone() });
+}"#
+            .to_string();
+            self.editor.send_message(editor::Msg::Load {
+                text: demo_song.clone(),
+            });
             self.link.send_message(Msg::SourceCodeChanged(demo_song));
         }
     }

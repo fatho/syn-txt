@@ -699,7 +699,6 @@ fn parse_expr_ratio_lit_underscores() {
     );
 }
 
-
 #[test]
 fn parse_expr_float_lit() {
     check_expr(
@@ -1318,7 +1317,6 @@ fn parse_call() {
             )"#]],
     );
 }
-
 
 #[test]
 fn parse_recover_from_errors() {

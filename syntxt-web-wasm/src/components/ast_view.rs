@@ -1,4 +1,7 @@
-use syntxt_lang::{ast::{self, Walk}, line_map::Pos};
+use syntxt_lang::{
+    ast::{self, Walk},
+    line_map::Pos,
+};
 use yew::prelude::*;
 
 use crate::components::tree::TreeNode;
@@ -21,9 +24,7 @@ impl Component for AstView {
     type Properties = AstViewProps;
 
     fn create(props: Self::Properties, _link: ComponentLink<Self>) -> Self {
-        Self {
-            props,
-        }
+        Self { props }
     }
 
     fn update(&mut self, _msg: Self::Message) -> ShouldRender {
@@ -39,7 +40,6 @@ impl Component for AstView {
         AstTreeVisitor::view(&self.props.ast, self.props.onjump.clone())
     }
 }
-
 
 /// Visitor constructing a HTML tree view while traversing the AST.
 struct AstTreeVisitor {

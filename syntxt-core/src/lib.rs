@@ -15,7 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 // modules for making sounds
+pub mod nonnan;
 pub mod note;
 pub mod rational;
 pub mod util;
-pub mod nonnan;

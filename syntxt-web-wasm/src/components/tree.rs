@@ -35,7 +35,7 @@ pub struct TreeNode {
 }
 
 pub enum Msg {
-    Toggle
+    Toggle,
 }
 
 impl Component for TreeNode {
@@ -53,7 +53,7 @@ impl Component for TreeNode {
     fn update(&mut self, msg: Self::Message) -> ShouldRender {
         match msg {
             Msg::Toggle => {
-                if ! self.props.children.is_empty() {
+                if !self.props.children.is_empty() {
                     self.expanded = !self.expanded;
                     true
                 } else {
@@ -70,9 +70,14 @@ impl Component for TreeNode {
 
     fn view(&self) -> Html {
         // what type of node is this? Leaf node or inner node
-        let type_class = self.props.children.is_empty().then(|| "").unwrap_or("tree-node-inner");
+        let type_class = self
+            .props
+            .children
+            .is_empty()
+            .then(|| "")
+            .unwrap_or("tree-node-inner");
         let expanded_class = self.expanded.then(|| "tree-node-expanded").unwrap_or("");
-        let container_visible = self.expanded && ! self.props.children.is_empty();
+        let container_visible = self.expanded && !self.props.children.is_empty();
         let container_class = container_visible.then(|| "").unwrap_or("invisible");
 
         let ondblclick = self.props.onaction.reform(|e: MouseEvent| {
@@ -100,5 +105,4 @@ impl Component for TreeNode {
             </div>
         }
     }
-
 }

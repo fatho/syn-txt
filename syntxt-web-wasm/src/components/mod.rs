@@ -22,8 +22,8 @@ pub mod ast_view;
 pub mod editor;
 pub mod list;
 pub mod song_view;
-pub mod tree;
 pub mod splitter;
+pub mod tree;
 
 pub struct WeakComponentLink<C: Component>(Rc<RefCell<Option<ComponentLink<C>>>>);
 
@@ -85,8 +85,6 @@ where
     Callback::from(func)
 }
 
-
-
 /// Subset of CSS sizes
 #[derive(Debug, Clone, PartialEq)]
 pub enum Size {
@@ -99,10 +97,18 @@ pub enum Size {
 impl Display for Size {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Size::Pixels(x) => { write!(f, "{}px", x) }
-            Size::Percent(x) => { write!(f, "{}%", x) }
-            Size::VH(x) => { write!(f, "{}vh", x) }
-            Size::Auto => { write!(f, "auto") }
+            Size::Pixels(x) => {
+                write!(f, "{}px", x)
+            }
+            Size::Percent(x) => {
+                write!(f, "{}%", x)
+            }
+            Size::VH(x) => {
+                write!(f, "{}vh", x)
+            }
+            Size::Auto => {
+                write!(f, "auto")
+            }
         }
     }
 }

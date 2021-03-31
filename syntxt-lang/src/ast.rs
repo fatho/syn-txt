@@ -14,7 +14,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::{ops::{Deref, Range}, sync::Arc};
+use std::{
+    ops::{Deref, Range},
+    sync::Arc,
+};
 
 use crate::{lexer::Span, line_map::Pos};
 use syntxt_core::{nonnan::F64N, rational::Rational};
@@ -103,8 +106,6 @@ pub enum BinaryOp {
     Or,
 }
 
-
-
 pub trait Visit {
     fn visit(&self, visitor: &mut dyn Visitor);
 }
@@ -141,7 +142,6 @@ impl<T: Visit> Visit for Arc<T> {
     }
 }
 
-
 impl Visit for Node<Root> {
     fn visit(&self, visitor: &mut dyn Visitor) {
         visitor.root(self)
@@ -166,13 +166,11 @@ impl Visit for Node<Expr> {
     }
 }
 
-
 impl<T: Walk> Walk for Node<T> {
     fn walk(&self, visitor: &mut dyn Visitor) {
         self.data.walk(visitor);
     }
 }
-
 
 impl Walk for Root {
     fn walk(&self, visitor: &mut dyn Visitor) {
@@ -206,20 +204,37 @@ impl Walk for Expr {
             Expr::Unary { operator, operand } => {
                 operand.visit(visitor);
             }
-            Expr::Binary { left, operator, right } => {
+            Expr::Binary {
+                left,
+                operator,
+                right,
+            } => {
                 left.visit(visitor);
                 right.visit(visitor);
             }
-            Expr::Paren { lparen, expr, rparen } => {
+            Expr::Paren {
+                lparen,
+                expr,
+                rparen,
+            } => {
                 expr.visit(visitor);
             }
             Expr::Object(obj) => {
                 obj.visit(visitor);
             }
-            Expr::Accessor { expr, dot, attribute } => {
+            Expr::Accessor {
+                expr,
+                dot,
+                attribute,
+            } => {
                 expr.visit(visitor);
             }
-            Expr::Call { callee, lparen, arguments, rparen } => {
+            Expr::Call {
+                callee,
+                lparen,
+                arguments,
+                rparen,
+            } => {
                 callee.visit(visitor);
                 arguments.visit(visitor);
             }

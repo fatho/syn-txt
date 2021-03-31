@@ -97,7 +97,11 @@ impl Component for SplitPane {
     }
 
     fn view(&self) -> Html {
-        let display = if self.props.collapsed { "display: none;" } else {""};
+        let display = if self.props.collapsed {
+            "display: none;"
+        } else {
+            ""
+        };
         let style = format!(
             "flex: {} {} {}; min-width: 0; min-height: 0; {}{}",
             self.props.weight, self.props.weight, self.props.base, display, self.props.style

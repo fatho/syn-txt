@@ -32,9 +32,11 @@ use components::{
     WeakComponentLink,
 };
 use components::{
+    Size,
     editor::{MarkerSeverity, ModelMarker},
     list::List,
     tree::TreeNode,
+    splitter::{SplitContainer, SplitPane, Orientation},
 };
 
 #[wasm_bindgen(start)]
@@ -126,56 +128,53 @@ impl Component for AppModel {
 
     fn view(&self) -> Html {
         let showing_issues = self.showing_issues;
-        let issue_tab_class = if self.showing_issues {
-            ""
-        } else {
-            "tab-inactive"
-        };
         html! {
-            <section style="height: 100vh; display: flex; flex-direction: column">
-                <header style="flex: 0 0 0px; background-color: black">
-                </header>
-                <div style="flex: 1 1 0px; min-height: 0; min-width: 0; display: flex; flex-direction: row;">
-                    <div style="flex: 1 1 0px; min-height: 0; min-width: 0;">
-                        <Editor
-                            weak_link=&self.editor
-                            markers=self.issues.iter().map(|issue| {
-                                ModelMarker {
-                                    start_line_number: issue.start.line as u32,
-                                    start_column: issue.start.column as u32,
-                                    end_line_number: issue.end.line as u32,
-                                    end_column: issue.end.column as u32,
-                                    message: issue.message.clone(),
-                                    severity: MarkerSeverity::Error,
-                                }
-                            }).collect::<Vec<_>>()
-                            on_content_changed=self.link.callback(|code| Msg::SourceCodeChanged(code))
-                            />
-                    </div>
-                    <section class="sidebar-right" style="flex: 0 0 20%; min-width: 0; height: 100%; display: flex; flex-direction: column">
-                        <header class="header" style="flex: 0 0;">
-                            { "Outline" }
-                        </header>
-                        <div style="margin: 5px; flex: 1 1 0; min-height: 0; overflow-y: auto">
-                            { AstTreeVisitor::view(&self.ast, self.link.clone()) }
-                        </div>
-                    </section>
-                </div>
-                <div class=classes!("tab", issue_tab_class) style="flex: 0 0 20%; min-height: 0; overflow: auto">
+            <SplitContainer orientation=Orientation::Vertical style="height: 100vh">
+                <SplitPane weight=1.0 base=Size::Pixels(0.0)>
+                    <SplitContainer orientation=Orientation::Horizontal style="height: 100%; width: 100%">
+                        <SplitPane weight=1. base=Size::Pixels(0.)>
+                            <Editor
+                                weak_link=&self.editor
+                                markers=self.issues.iter().map(|issue| {
+                                    ModelMarker {
+                                        start_line_number: issue.start.line as u32,
+                                        start_column: issue.start.column as u32,
+                                        end_line_number: issue.end.line as u32,
+                                        end_column: issue.end.column as u32,
+                                        message: issue.message.clone(),
+                                        severity: MarkerSeverity::Error,
+                                    }
+                                }).collect::<Vec<_>>()
+                                on_content_changed=self.link.callback(|code| Msg::SourceCodeChanged(code))
+                                />
+                        </SplitPane>
+                        <SplitPane weight=0. base=Size::Percent(20.) class=classes!("sidebar-right")>
+                            <SplitContainer orientation=Orientation::Vertical>
+                                <SplitPane weight=0.0 base=Size::Auto class=classes!("header")>
+                                    { "Outline" }
+                                </SplitPane>
+                                <SplitPane weight=1.0 base=Size::Pixels(0.0) style="margin: 5px">
+                                    { AstTreeVisitor::view(&self.ast, self.link.clone()) }
+                                </SplitPane>
+                            </SplitContainer>
+                        </SplitPane>
+                    </SplitContainer>
+                </SplitPane>
+                <SplitPane weight=0. base=Size::Percent(20.) collapsed=!showing_issues class=classes!("tab")>
                     <List<Issue>
                         items=self.issues.clone()
                         empty_text="No issues detected"
                         onaction=self.link.callback(|index| Msg::GoToIssue(index))
                         />
-                </div>
-                <footer class=classes!("footer") style="flex: 0 0 24px;">
+                </SplitPane>
+                <SplitPane weight=0. base=Size::Pixels(24.0) class=classes!("footer")>
                     <button
                         class=classes!("button-flat")
                         style="height: 100%;"
                         onclick=self.link.callback(move |_| Msg::ShowIssues(!showing_issues))
                         >{ format!("ⓧ {}", self.issues.len()) }</button>
-                </footer>
-            </section>
+                </SplitPane>
+            </SplitContainer>
         }
     }
 

@@ -14,13 +14,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::{cell::RefCell, ops::Deref, rc::Rc};
+use std::{cell::RefCell, fmt::Display, ops::Deref, rc::Rc};
 
 use yew::prelude::*;
 
 pub mod editor;
 pub mod list;
 pub mod tree;
+pub mod splitter;
 
 pub struct WeakComponentLink<C: Component>(Rc<RefCell<Option<ComponentLink<C>>>>);
 
@@ -80,4 +81,26 @@ where
         }
     };
     Callback::from(func)
+}
+
+
+
+/// Subset of CSS sizes
+#[derive(Debug, Clone, PartialEq)]
+pub enum Size {
+    Pixels(f64),
+    Percent(f64),
+    VH(f64),
+    Auto,
+}
+
+impl Display for Size {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Size::Pixels(x) => { write!(f, "{}px", x) }
+            Size::Percent(x) => { write!(f, "{}%", x) }
+            Size::VH(x) => { write!(f, "{}vh", x) }
+            Size::Auto => { write!(f, "auto") }
+        }
+    }
 }

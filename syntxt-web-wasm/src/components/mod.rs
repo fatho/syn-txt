@@ -18,6 +18,7 @@ use std::{cell::RefCell, fmt::Display, ops::Deref, rc::Rc};
 
 use yew::prelude::*;
 
+pub mod ast_view;
 pub mod editor;
 pub mod list;
 pub mod tree;

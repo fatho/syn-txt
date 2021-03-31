@@ -14,10 +14,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::vec;
+use std::{sync::Arc, vec};
 
 use syntxt_lang::{
-    ast::{self, Walk},
+    ast,
     line_map::Pos,
 };
 use wasm_bindgen::prelude::*;
@@ -33,9 +33,9 @@ use components::{
 };
 use components::{
     Size,
+    ast_view::AstView,
     editor::{MarkerSeverity, ModelMarker},
     list::List,
-    tree::TreeNode,
     splitter::{SplitContainer, SplitPane, Orientation},
 };
 
@@ -49,7 +49,7 @@ struct AppModel {
     link: ComponentLink<Self>,
     editor: WeakComponentLink<Editor>,
     showing_issues: bool,
-    ast: ast::Node<ast::Root>,
+    ast: ast::NodePtr<ast::Root>,
     issues: Vec<Issue>,
 }
 
@@ -68,11 +68,11 @@ impl Component for AppModel {
             link,
             editor: WeakComponentLink::default(),
             showing_issues: true,
-            ast: ast::Node {
+            ast: Arc::new(ast::Node {
                 span: 0..0,
                 pos: Pos::origin()..Pos::origin(),
                 data: ast::Root { objects: vec![] },
-            },
+            }),
             issues: Vec::new(),
         }
     }
@@ -83,10 +83,10 @@ impl Component for AppModel {
                 self.issues.clear();
                 match syntxt_lang::parser::Parser::parse(&code) {
                     Ok(ast) => {
-                        self.ast = ast;
+                        self.ast = Arc::new(ast);
                     }
                     Err((partial_ast, errors)) => {
-                        self.ast = partial_ast;
+                        self.ast = Arc::new(partial_ast);
                         for err in errors {
                             self.issues.push(Issue {
                                 message: err.message,
@@ -154,7 +154,12 @@ impl Component for AppModel {
                                     { "Outline" }
                                 </SplitPane>
                                 <SplitPane weight=1.0 base=Size::Pixels(0.0) style="margin: 5px">
-                                    { AstTreeVisitor::view(&self.ast, self.link.clone()) }
+                                    <AstView
+                                        ast=self.ast.clone()
+                                        onjump=self.link.callback(|pos: Pos| Msg::JumpToEditor {
+                                            line: pos.line as u32, column: pos.column as u32
+                                        })
+                                        />
                                 </SplitPane>
                             </SplitContainer>
                         </SplitPane>
@@ -224,98 +229,6 @@ impl ListItem for Issue {
                 <span>{&self.message}</span>
                 <span style="color:gray; margin-left: 5px">{self.start.line}{":"}{self.start.column}</span>
             </>
-        }
-    }
-}
-
-struct AstTreeVisitor {
-    children: Vec<Html>,
-    stack: Vec<usize>,
-    link: ComponentLink<AppModel>,
-}
-
-impl AstTreeVisitor {
-    pub fn view(ast: &ast::Node<ast::Root>, link: ComponentLink<AppModel>) -> Html {
-        let mut visitor = AstTreeVisitor {
-            children: vec![],
-            stack: vec![],
-            link: link.clone(),
-        };
-        ast.walk(&mut visitor);
-        visitor.children.drain(..).collect::<Html>()
-    }
-
-    fn begin(&mut self) {
-        self.stack.push(self.children.len());
-    }
-
-    fn finish<S: AsRef<str>>(&mut self, label: S, pos: Pos) {
-        let scope_start = self.stack.pop().unwrap();
-        let onaction = self.link.callback(move |()| Msg::JumpToEditor {
-            line: pos.line as u32,
-            column: pos.column as u32,
-        });
-        let node = if scope_start < self.children.len() {
-            html! {
-                <TreeNode
-                    label=label.as_ref()
-                    onaction=onaction
-                    >
-                    { self.children.drain(scope_start..).collect::<Html>() }
-                </TreeNode>
-            }
-        } else {
-            html! {
-                <TreeNode label=label.as_ref() onaction=onaction />
-            }
-        };
-        self.children.push(node);
-    }
-
-    fn leaf<S: AsRef<str>, T>(&mut self, label: S, node: &ast::Node<T>) {
-        self.begin();
-        self.finish(label, node.pos.start)
-    }
-
-    fn nested<S: AsRef<str>, T: Walk>(&mut self, label: S, node: &ast::Node<T>) {
-        self.begin();
-        node.walk(self);
-        self.finish(label, node.pos.start);
-    }
-}
-
-impl ast::Visitor for AstTreeVisitor {
-    fn root(&mut self, node: &ast::Node<ast::Root>) {
-        self.nested("Root", node);
-    }
-
-    fn object(&mut self, node: &ast::Node<ast::Object>) {
-        self.nested(format!("Object: {}", node.data.name.data), node);
-    }
-
-    fn attribute(&mut self, node: &ast::Node<ast::Attribute>) {
-        self.nested(format!("{}:", node.data.name.data), node);
-    }
-
-    fn expression(&mut self, node: &ast::Node<ast::Expr>) {
-        match &node.data {
-            // leaf nodes
-            ast::Expr::String(x) => self.leaf(format!("{:?}", x), node),
-            ast::Expr::Int(x) => self.leaf(format!("{}", x), node),
-            ast::Expr::Ratio(x) => self.leaf(format!("{}", x), node),
-            ast::Expr::Float(x) => self.leaf(format!("{}", x), node),
-            ast::Expr::Bool(x) => self.leaf(format!("{:?}", x), node),
-            ast::Expr::Var(x) => self.leaf(format!("{}", x), node),
-            // nested expressions
-            ast::Expr::Unary { operator, .. } => self.nested(format!("{:?}", operator.data), node),
-            ast::Expr::Binary { operator, .. } => self.nested(format!("{:?}", operator.data), node),
-            ast::Expr::Paren { .. } => self.nested("()", node),
-            ast::Expr::Accessor { attribute, .. } => {
-                self.nested(format!(".{}", attribute.data), node)
-            }
-            ast::Expr::Call { .. } => self.nested("Call", node),
-            // nested, but not an expression, hide expression node
-            ast::Expr::Object(obj) => obj.walk(self),
         }
     }
 }

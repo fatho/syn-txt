@@ -60,7 +60,6 @@ impl Component for SplitContainer {
 }
 
 pub struct SplitPane {
-    link: ComponentLink<Self>,
     props: SplitPaneProperties,
 }
 
@@ -84,8 +83,8 @@ impl Component for SplitPane {
     type Message = ();
     type Properties = SplitPaneProperties;
 
-    fn create(props: Self::Properties, link: ComponentLink<Self>) -> Self {
-        Self { link, props }
+    fn create(props: Self::Properties, _link: ComponentLink<Self>) -> Self {
+        Self { props }
     }
 
     fn update(&mut self, _msg: Self::Message) -> ShouldRender {

@@ -36,6 +36,7 @@ use components::{
     ast_view::AstView,
     editor::{MarkerSeverity, ModelMarker},
     list::List,
+    song_view::SongView,
     splitter::{SplitContainer, SplitPane, Orientation},
 };
 
@@ -67,7 +68,7 @@ impl Component for AppModel {
         Self {
             link,
             editor: WeakComponentLink::default(),
-            showing_issues: true,
+            showing_issues: false,
             ast: Arc::new(ast::Node {
                 span: 0..0,
                 pos: Pos::origin()..Pos::origin(),
@@ -133,27 +134,39 @@ impl Component for AppModel {
                 <SplitPane weight=1.0 base=Size::Pixels(0.0)>
                     <SplitContainer orientation=Orientation::Horizontal style="height: 100%; width: 100%">
                         <SplitPane weight=1. base=Size::Pixels(0.)>
-                            <Editor
-                                weak_link=&self.editor
-                                markers=self.issues.iter().map(|issue| {
-                                    ModelMarker {
-                                        start_line_number: issue.start.line as u32,
-                                        start_column: issue.start.column as u32,
-                                        end_line_number: issue.end.line as u32,
-                                        end_column: issue.end.column as u32,
-                                        message: issue.message.clone(),
-                                        severity: MarkerSeverity::Error,
-                                    }
-                                }).collect::<Vec<_>>()
-                                on_content_changed=self.link.callback(|code| Msg::SourceCodeChanged(code))
-                                />
+                            <SplitContainer orientation=Orientation::Vertical style="height: 100%">
+                                <SplitPane weight=1.0 base=Size::Pixels(0.0)>
+                                    <Editor
+                                        weak_link=&self.editor
+                                        markers=self.issues.iter().map(|issue| {
+                                            ModelMarker {
+                                                start_line_number: issue.start.line as u32,
+                                                start_column: issue.start.column as u32,
+                                                end_line_number: issue.end.line as u32,
+                                                end_column: issue.end.column as u32,
+                                                message: issue.message.clone(),
+                                                severity: MarkerSeverity::Error,
+                                            }
+                                        }).collect::<Vec<_>>()
+                                        on_content_changed=self.link.callback(|code| Msg::SourceCodeChanged(code))
+                                        />
+                                </SplitPane>
+                                <SplitPane weight=0. base=Size::Percent(20.) collapsed=!showing_issues class=classes!("tab")>
+                                    <List<Issue>
+                                        items=self.issues.clone()
+                                        empty_text="No issues detected"
+                                        onaction=self.link.callback(|index| Msg::GoToIssue(index))
+                                        />
+                                </SplitPane>
+                            </SplitContainer>
                         </SplitPane>
+
                         <SplitPane weight=0. base=Size::Percent(20.) class=classes!("sidebar-right")>
-                            <SplitContainer orientation=Orientation::Vertical>
+                            <SplitContainer orientation=Orientation::Vertical style="height: 100%; overflow-y: auto">
                                 <SplitPane weight=0.0 base=Size::Auto class=classes!("header")>
                                     { "Outline" }
                                 </SplitPane>
-                                <SplitPane weight=1.0 base=Size::Pixels(0.0) style="margin: 5px">
+                                <SplitPane weight=1.0 base=Size::Pixels(0.0) style="margin: 5px;">
                                     <AstView
                                         ast=self.ast.clone()
                                         onjump=self.link.callback(|pos: Pos| Msg::JumpToEditor {
@@ -165,11 +178,12 @@ impl Component for AppModel {
                         </SplitPane>
                     </SplitContainer>
                 </SplitPane>
-                <SplitPane weight=0. base=Size::Percent(20.) collapsed=!showing_issues class=classes!("tab")>
-                    <List<Issue>
-                        items=self.issues.clone()
-                        empty_text="No issues detected"
-                        onaction=self.link.callback(|index| Msg::GoToIssue(index))
+                <SplitPane weight=0. base=Size::Percent(20.) class=classes!("tab")>
+                    <SongView
+                        ast=self.ast.clone()
+                        onjump=self.link.callback(|pos: Pos| Msg::JumpToEditor {
+                            line: pos.line as u32, column: pos.column as u32
+                        })
                         />
                 </SplitPane>
                 <SplitPane weight=0. base=Size::Pixels(24.0) class=classes!("footer")>

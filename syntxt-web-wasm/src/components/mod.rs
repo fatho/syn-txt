@@ -21,6 +21,7 @@ use yew::prelude::*;
 pub mod ast_view;
 pub mod editor;
 pub mod list;
+pub mod song_view;
 pub mod tree;
 pub mod splitter;
 

@@ -15,8 +15,11 @@ class RequestHandler(SimpleHTTPRequestHandler):
         if self.path.startswith(MONACO_ROOT):
             self.path = self.path[len(MONACO_ROOT):]
             self.directory = MONACO_EDITOR_SRC
-        elif self.path in ('/logo.png', '/favicon.ico'):
+        elif self.path == '/logo.png':
             self.directory = os.path.join(ROOT, '../doc')
+        elif self.path == '/static/favicon.ico':
+            self.directory = os.path.join(ROOT, '../doc')
+            self.path = '/favicon.ico'
         else:
             self.directory = ROOT
 

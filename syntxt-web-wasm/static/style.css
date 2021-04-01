@@ -152,4 +152,5 @@ html, body {
 .song-view-track-name {
     cursor: pointer;
     padding: 5px;
+    user-select: none;
 }

@@ -174,6 +174,83 @@ impl Rational {
     pub const fn denominator(self) -> Int {
         self.denom
     }
+
+    // ==================== Checked Ops ====================
+
+    // TODO: Implement addition using LCM instead of naive multiplication of denominators
+    // so that we don't overflow as easily.
+
+    /// Addition with overflow check.
+    ///
+    /// ```
+    /// use syntxt_core::rational::*;
+    ///
+    /// assert_eq!(Rational::new(1, 4294967296).checked_add(Rational::new(3, 4294967296)), None);
+    /// assert_eq!(Rational::new(3, 4).checked_add(Rational::new(3, 4)), Some(Rational::new(3, 2)));
+    /// ```
+    pub fn checked_add(self, rhs: Rational) -> Option<Self> {
+        Some(Rational::new(
+            self.num
+                .checked_mul(rhs.denom)?
+                .checked_add(self.denom.checked_mul(rhs.num)?)?,
+            self.denom.checked_mul(rhs.denom)?,
+        ))
+    }
+
+    /// Subtraction with overflow check.
+    pub fn checked_sub(self, rhs: Rational) -> Option<Self> {
+        self.checked_add(-rhs)
+    }
+
+    /// Multiplication with overflow check.
+    pub fn checked_mul(self, rhs: Rational) -> Option<Self> {
+        Some(Rational::new(
+            self.num.checked_mul(rhs.num)?,
+            self.denom.checked_mul(rhs.denom)?,
+        ))
+    }
+
+    /// Division with overflow check.
+    pub fn checked_div(self, rhs: Rational) -> Option<Self> {
+        self.checked_mul(rhs.recip())
+    }
+
+    /// Compute an integer power of the rational.
+    ///
+    /// ```
+    /// # use syntxt_core::rational::*;
+    /// assert_eq!(Rational::int(2).checked_powi(0), Some(Rational::int(1)));
+    /// assert_eq!(Rational::int(2).checked_powi(1), Some(Rational::int(2)));
+    /// assert_eq!(Rational::int(2).checked_powi(2), Some(Rational::int(4)));
+    /// assert_eq!(Rational::int(2).checked_powi(3), Some(Rational::int(8)));
+    /// assert_eq!(Rational::int(2).checked_powi(5), Some(Rational::int(32)));
+    /// assert_eq!(Rational::int(2).checked_powi(10), Some(Rational::int(1024)));
+    /// assert_eq!(Rational::int(2).checked_powi(11), Some(Rational::int(2048)));
+    /// assert_eq!(Rational::int(2).checked_powi(-1), Some(Rational::new(1, 2)));
+    /// assert_eq!(Rational::int(2).checked_powi(-2), Some(Rational::new(1, 4)));
+    /// assert_eq!(Rational::int(2).checked_powi(-3), Some(Rational::new(1, 8)));
+    /// assert_eq!(Rational::int(2).checked_powi(-9), Some(Rational::new(1, 512)));
+    /// assert_eq!(Rational::int(2).checked_powi(64), None);
+    /// ```
+    pub fn checked_powi(self, power: Int) -> Option<Self> {
+        if power == 0 {
+            return Some(Self::one());
+        }
+        let mut accum = if power > 0 { self } else { self.recip() };
+        let mut correction = Rational::one();
+        let mut remaining_power = power.abs();
+
+        while remaining_power > 1 {
+            if remaining_power % 2 == 1 {
+                correction = correction.checked_mul(accum)?;
+                remaining_power -= 1;
+            }
+            accum = accum.checked_mul(accum)?;
+            remaining_power /= 2;
+        }
+
+        accum.checked_mul(correction)
+    }
 }
 
 /// # Examples

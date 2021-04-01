@@ -739,13 +739,13 @@ fn note_sym_from_str(input: &str) -> Option<ast::SeqSym> {
             dots += 1;
         }
         // Then put everything together
-        let mut duration = Rational::int(2).powi(power);
+        let mut duration = Rational::int(2).checked_powi(power)?;
         for i in 0..dots {
             // each dot is worth half of the previous note duration
-            duration += Rational::int(2).powi(power - i - 1);
+            duration = duration.checked_add(Rational::int(2).checked_powi(power - i - 1)?)?;
         }
 
-        full_duration += duration;
+        full_duration = full_duration.checked_add(duration)?;
 
         // Check for tie to next note of the same pitch
         if let Some('_') = chars.peek() {

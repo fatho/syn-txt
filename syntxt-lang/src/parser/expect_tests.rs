@@ -1881,6 +1881,106 @@ fn parse_expr_sequence() {
             a4 a4 a4 a4
             a4+_.. a4--
           ]]"#,
-        expect![[]],
+        expect![[r#"
+            Ok(
+                Node {
+                    span: 0..63,
+                    pos: 1:1..4:13,
+                    data: Sequence(
+                        Sequence {
+                            llbracket: Node {
+                                span: 0..2,
+                                pos: 1:1..1:3,
+                                data: (),
+                            },
+                            symbols: [
+                                Node {
+                                    span: 15..17,
+                                    pos: 2:13..2:15,
+                                    data: Note {
+                                        note: Note(
+                                            69,
+                                        ),
+                                        duration: Rational {
+                                            num: 1,
+                                            denom: 4,
+                                        },
+                                    },
+                                },
+                                Node {
+                                    span: 18..20,
+                                    pos: 2:16..2:18,
+                                    data: Note {
+                                        note: Note(
+                                            69,
+                                        ),
+                                        duration: Rational {
+                                            num: 1,
+                                            denom: 4,
+                                        },
+                                    },
+                                },
+                                Node {
+                                    span: 21..23,
+                                    pos: 2:19..2:21,
+                                    data: Note {
+                                        note: Note(
+                                            69,
+                                        ),
+                                        duration: Rational {
+                                            num: 1,
+                                            denom: 4,
+                                        },
+                                    },
+                                },
+                                Node {
+                                    span: 24..26,
+                                    pos: 2:22..2:24,
+                                    data: Note {
+                                        note: Note(
+                                            69,
+                                        ),
+                                        duration: Rational {
+                                            num: 1,
+                                            denom: 4,
+                                        },
+                                    },
+                                },
+                                Node {
+                                    span: 39..45,
+                                    pos: 3:13..3:19,
+                                    data: Note {
+                                        note: Note(
+                                            69,
+                                        ),
+                                        duration: Rational {
+                                            num: 15,
+                                            denom: 16,
+                                        },
+                                    },
+                                },
+                                Node {
+                                    span: 46..50,
+                                    pos: 3:20..3:24,
+                                    data: Note {
+                                        note: Note(
+                                            69,
+                                        ),
+                                        duration: Rational {
+                                            num: 1,
+                                            denom: 16,
+                                        },
+                                    },
+                                },
+                            ],
+                            rrbracket: Node {
+                                span: 61..63,
+                                pos: 4:11..4:13,
+                                data: (),
+                            },
+                        },
+                    ),
+                },
+            )"#]],
     );
 }

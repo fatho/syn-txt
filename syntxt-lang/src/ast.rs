@@ -20,7 +20,7 @@ use std::{
 };
 
 use crate::{lexer::Span, line_map::Pos};
-use syntxt_core::{nonnan::F64N, rational::Rational};
+use syntxt_core::{nonnan::F64N, note::Note, rational::Rational};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Node<T> {
@@ -87,6 +87,21 @@ pub enum Expr {
         arguments: Vec<Node<Expr>>,
         rparen: Node<()>,
     },
+    Sequence(Sequence),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Sequence {
+    pub llbracket: Node<()>,
+    pub symbols: Vec<Node<SeqSym>>,
+    pub rrbracket: Node<()>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SeqSym {
+    Note { note: Note, duration: Rational },
+    Rest { duration: Rational },
+    Group(Sequence),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -238,6 +253,8 @@ impl Walk for Expr {
                 callee.visit(visitor);
                 arguments.visit(visitor);
             }
+            // TODO: Implement AST visitor for notes
+            Expr::Sequence(_) => {}
         }
     }
 }

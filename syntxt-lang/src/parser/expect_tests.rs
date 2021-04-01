@@ -1873,3 +1873,14 @@ fn parse_recover_from_errors() {
             )"#]],
     );
 }
+
+#[test]
+fn parse_expr_sequence() {
+    check_expr(
+        r#"[[
+            a4 a4 a4 a4
+            a4+_.. a4--
+          ]]"#,
+        expect![[]],
+    );
+}

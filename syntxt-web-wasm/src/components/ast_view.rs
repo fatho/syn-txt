@@ -130,6 +130,8 @@ impl ast::Visitor for AstTreeVisitor {
             ast::Expr::Call { .. } => self.nested("Call", node),
             // nested, but not an expression, hide expression node
             ast::Expr::Object(obj) => obj.walk(self),
+            // TODO: Implement AST walking for notes
+            ast::Expr::Sequence(seq) => self.leaf(format!("{:?}", seq), node),
         }
     }
 }

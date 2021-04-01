@@ -18,6 +18,10 @@ use std::{fmt::Display, iter::Peekable, ops::Range, str::FromStr, sync::Arc};
 
 use crate::ast::{self, Node};
 use logos::Logos;
+use syntxt_core::{
+    note::{Accidental, Note, NoteName},
+    rational::Rational,
+};
 
 use crate::{
     lexer::{Span, Token},
@@ -413,6 +417,7 @@ impl<'a> Parser<'a> {
             Token::Minus => self.parse_unary_operand(ast::UnaryOp::Minus, span),
             Token::Not => self.parse_unary_operand(ast::UnaryOp::Not, span),
             Token::LParen => self.parse_paren_expr(),
+            Token::LLBracket => self.parse_sequence_expr(),
             Token::LitInt => self.parse_int_expr(),
             Token::LitFloat => self.parse_float_expr(),
             Token::LitRatio => self.parse_ratio_expr(),
@@ -614,4 +619,144 @@ impl<'a> Parser<'a> {
         let string = self.parse_string()?;
         Ok(self.make_node(string.span, ast::Expr::String(string.data)))
     }
+
+    fn parse_sequence_expr(&mut self) -> Parse<ast::Expr> {
+        let sequence = self.parse_sequence_group()?;
+        Ok(self.make_node(sequence.span, ast::Expr::Sequence(sequence.data)))
+    }
+
+    fn parse_sequence_group(&mut self) -> Parse<ast::Sequence> {
+        let llbracket = self.parse_expect_token(Token::LLBracket)?;
+        let mut symbols = Vec::new();
+        loop {
+            let (token, span) = self.peek();
+            match token {
+                Some(Token::LLBracket) => {
+                    todo!("nested group")
+                }
+                Some(Token::Note) => {
+                    self.consume();
+                    let note_str = &self.source[span.clone()];
+                    if let Some(note) = note_sym_from_str(note_str) {
+                        symbols.push(self.make_node(span, note));
+                    } else {
+                        self.errors
+                            .push(self.make_error(span, format!("Invalid note: {}", note_str)));
+                    }
+                }
+                Some(Token::RRBracket) => {
+                    break;
+                }
+                Some(other) => {
+                    self.errors.push(self.expected_but_got(
+                        span,
+                        &[Token::LLBracket, Token::RRBracket, Token::Note],
+                        other,
+                    ));
+                    let _ = self.consume();
+                }
+                None => {
+                    break;
+                }
+            }
+        }
+
+        let rrbracket_parse = self.parse_expect_token(Token::RRBracket);
+        let rrbracket = self.recover_replace(rrbracket_parse, ());
+
+        Ok(self.make_node(
+            llbracket.span.start..rrbracket.span.end,
+            ast::Sequence {
+                llbracket,
+                symbols,
+                rrbracket,
+            },
+        ))
+    }
+}
+
+fn note_sym_from_str(input: &str) -> Option<ast::SeqSym> {
+    let mut chars = input.chars().peekable();
+    // First comes the name
+    let name = match chars.next()? {
+        'a' | 'A' => NoteName::A,
+        'b' | 'B' => NoteName::B,
+        'c' | 'C' => NoteName::C,
+        'd' | 'D' => NoteName::D,
+        'e' | 'E' => NoteName::E,
+        'f' | 'F' => NoteName::F,
+        'g' | 'G' => NoteName::G,
+        _ => return None,
+    };
+    // Then any accidental
+    let accidental = match chars.peek().copied() {
+        Some(ch) => {
+            if ch == '♯' || ch == '#' {
+                chars.next();
+                Accidental::Sharp
+            } else if ch == '♭' || ch == 'b' {
+                chars.next();
+                Accidental::Flat
+            } else {
+                Accidental::Base
+            }
+        }
+        _ => Accidental::Base,
+    };
+    // Then the octave
+    let octave = match chars.peek().copied() {
+        Some(ch) if ch.is_ascii_digit() => {
+            chars.next();
+            ch.to_digit(10).unwrap() as i32
+        }
+        _ => return None,
+    };
+
+    let note = Note::try_named(name, accidental, octave)?;
+
+    let mut full_duration = Rational::zero();
+    loop {
+        // Then comes the duration,
+        // first in powers of two
+        let mut power: i64 = -2; // quarters, 2^(-2) == 1 / 2^2 == 1 / 4
+        loop {
+            match chars.peek() {
+                Some('+') => {
+                    chars.next();
+                    power += 1;
+                }
+                Some('-') => {
+                    chars.next();
+                    power -= 1;
+                }
+                _ => break,
+            }
+        }
+        // then the dots
+        let mut dots = 0;
+        while let Some('.') = chars.peek() {
+            chars.next();
+            dots += 1;
+        }
+        // Then put everything together
+        let mut duration = Rational::int(2).powi(power);
+        for i in 0..dots {
+            // each dot is worth half of the previous note duration
+            duration += Rational::int(2).powi(power - i - 1);
+        }
+
+        full_duration += duration;
+
+        // Check for tie to next note of the same pitch
+        if let Some('_') = chars.peek() {
+            chars.next();
+        } else {
+            break;
+        }
+    }
+
+    Some(ast::SeqSym::Note {
+        note,
+        duration: full_duration,
+    })
 }

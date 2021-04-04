@@ -622,7 +622,10 @@ impl<'a> Parser<'a> {
 
     fn parse_sequence_expr(&mut self) -> Parse<ast::Expr> {
         let sequence = self.parse_sequence_group()?;
-        Ok(self.make_node(sequence.span, ast::Expr::Sequence(sequence.data)))
+        Ok(self.make_node(
+            sequence.span.clone(),
+            ast::Expr::Sequence(Arc::new(sequence)),
+        ))
     }
 
     fn parse_sequence_group(&mut self) -> Parse<ast::Sequence> {
@@ -688,14 +691,11 @@ fn seq_sym_from_str(input: &str) -> Option<ast::SeqSym> {
         let note = parse_note(&mut chars)?;
         let duration = parse_duration(&mut chars)?;
 
-        Some(ast::SeqSym::Note {
-            note,
-            duration,
-        })
+        Some(ast::SeqSym::Note { note, duration })
     }
 }
 
-fn parse_note<I: Iterator<Item=char>>(chars: &mut Peekable<I>) -> Option<Note> {
+fn parse_note<I: Iterator<Item = char>>(chars: &mut Peekable<I>) -> Option<Note> {
     // First comes the name
     let name = match chars.next()? {
         'a' | 'A' => NoteName::A,
@@ -739,7 +739,7 @@ fn parse_note<I: Iterator<Item=char>>(chars: &mut Peekable<I>) -> Option<Note> {
 /// respectively, optionally followed by one or more dots `.` for dotted lengths.
 /// Tied repetitions of the same note or rest are separated by `_`.
 /// For example, the duration `+_` is `1/2 + 1/4 = 3/4`, and `-_-.` is `1/8 + 1/8 + 1/16 = 5/16`.
-fn parse_duration<I: Iterator<Item=char>>(chars: &mut Peekable<I>) -> Option<Rational> {
+fn parse_duration<I: Iterator<Item = char>>(chars: &mut Peekable<I>) -> Option<Rational> {
     let mut full_duration = Rational::zero();
     loop {
         // Then comes the duration,

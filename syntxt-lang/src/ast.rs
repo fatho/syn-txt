@@ -87,7 +87,7 @@ pub enum Expr {
         arguments: Vec<Node<Expr>>,
         rparen: Node<()>,
     },
-    Sequence(Sequence),
+    Sequence(NodePtr<Sequence>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -101,7 +101,7 @@ pub struct Sequence {
 pub enum SeqSym {
     Note { note: Note, duration: Rational },
     Rest { duration: Rational },
-    Group(Sequence),
+    Group(NodePtr<Sequence>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -177,7 +177,19 @@ impl Visit for Node<Attribute> {
 
 impl Visit for Node<Expr> {
     fn visit(&self, visitor: &mut dyn Visitor) {
-        visitor.expression(self)
+        visitor.expr(self)
+    }
+}
+
+impl Visit for Node<Sequence> {
+    fn visit(&self, visitor: &mut dyn Visitor) {
+        visitor.sequence(self);
+    }
+}
+
+impl Visit for Node<SeqSym> {
+    fn visit(&self, visitor: &mut dyn Visitor) {
+        visitor.seq_sym(self);
     }
 }
 
@@ -253,16 +265,40 @@ impl Walk for Expr {
                 callee.visit(visitor);
                 arguments.visit(visitor);
             }
-            // TODO: Implement AST visitor for notes
-            Expr::Sequence(_) => {}
+            Expr::Sequence(seq) => {
+                seq.visit(visitor);
+            }
         }
     }
 }
+
+impl Walk for Sequence {
+    fn walk(&self, visitor: &mut dyn Visitor) {
+        self.symbols.visit(visitor);
+    }
+}
+
+impl Walk for SeqSym {
+    fn walk(&self, visitor: &mut dyn Visitor) {
+        match self {
+            // These are leaves that cannot be walked further
+            SeqSym::Note { .. } => {}
+            SeqSym::Rest { .. } => {}
+            // Visit the nested group
+            SeqSym::Group(seq) => {
+                seq.visit(visitor);
+            }
+        }
+    }
+}
+
 
 #[allow(unused_variables)]
 pub trait Visitor {
     fn root(&mut self, node: &Node<Root>) {}
     fn object(&mut self, node: &Node<Object>) {}
     fn attribute(&mut self, node: &Node<Attribute>) {}
-    fn expression(&mut self, node: &Node<Expr>) {}
+    fn expr(&mut self, node: &Node<Expr>) {}
+    fn sequence(&mut self, node: &Node<Sequence>) {}
+    fn seq_sym(&mut self, node: &Node<SeqSym>) {}
 }

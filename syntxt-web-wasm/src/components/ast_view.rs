@@ -111,7 +111,7 @@ impl ast::Visitor for AstTreeVisitor {
         self.nested(format!("{}:", node.data.name.data), node);
     }
 
-    fn expression(&mut self, node: &ast::Node<ast::Expr>) {
+    fn expr(&mut self, node: &ast::Node<ast::Expr>) {
         match &node.data {
             // leaf nodes
             ast::Expr::String(x) => self.leaf(format!("{:?}", x), node),
@@ -130,8 +130,21 @@ impl ast::Visitor for AstTreeVisitor {
             ast::Expr::Call { .. } => self.nested("Call", node),
             // nested, but not an expression, hide expression node
             ast::Expr::Object(obj) => obj.walk(self),
-            // TODO: Implement AST walking for notes
-            ast::Expr::Sequence(seq) => self.leaf(format!("{:?}", seq), node),
+            ast::Expr::Sequence(seq) => seq.walk(self),
+        }
+    }
+
+    fn sequence(&mut self, node: &ast::Node<ast::Sequence>) {
+        self.nested("Sequence", node);
+    }
+
+    fn seq_sym(&mut self, node: &ast::Node<ast::SeqSym>) {
+        match &node.data {
+            ast::SeqSym::Note { note, duration } => {
+                self.leaf(format!("{} @ {}", note.to_midi(), duration), node)
+            }
+            ast::SeqSym::Rest { duration } => self.leaf(format!("R @ {}", duration), node),
+            ast::SeqSym::Group(_) => self.nested("Group", node),
         }
     }
 }

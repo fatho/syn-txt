@@ -161,7 +161,7 @@ impl Component for AppModel {
                         <SplitPane weight=0. base=Size::Percent(20.) class=classes!("sidebar-right")>
                             <SplitContainer orientation=Orientation::Vertical style="height: 100%; overflow-y: auto">
                                 <SplitPane weight=0.0 base=Size::Auto class=classes!("header")>
-                                    { "Outline" }
+                                    { "AST" }
                                 </SplitPane>
                                 <SplitPane weight=1.0 base=Size::Pixels(0.0) style="margin: 5px;">
                                     <AstView

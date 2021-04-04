@@ -635,7 +635,10 @@ impl<'a> Parser<'a> {
             let (token, span) = self.peek();
             match token {
                 Some(Token::LLBracket) => {
-                    todo!("nested group")
+                    let group = self.parse_sequence_group()?;
+                    symbols.push(
+                        self.make_node(group.span.clone(), ast::SeqSym::Group(Arc::new(group))),
+                    );
                 }
                 Some(Token::Note) => {
                     self.consume();

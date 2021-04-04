@@ -1,7 +1,4 @@
-use syntxt_lang::{
-    ast::{self, Walk},
-    line_map::Pos,
-};
+use syntxt_lang::{ast::{self, Visit, Walk}, line_map::Pos};
 use yew::prelude::*;
 
 use crate::components::tree::TreeNode;
@@ -129,8 +126,8 @@ impl ast::Visitor for AstTreeVisitor {
             }
             ast::Expr::Call { .. } => self.nested("Call", node),
             // nested, but not an expression, hide expression node
-            ast::Expr::Object(obj) => obj.walk(self),
-            ast::Expr::Sequence(seq) => seq.walk(self),
+            ast::Expr::Object(obj) => obj.visit(self),
+            ast::Expr::Sequence(seq) => seq.visit(self),
         }
     }
 

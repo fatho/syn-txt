@@ -15,6 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 pub mod ast;
+pub mod eval;
 pub mod lexer;
 pub mod line_map;
 pub mod parser;

@@ -49,7 +49,7 @@ pub struct Object {
 pub struct Attribute {
     pub name: Node<String>,
     pub colon: Node<()>,
-    pub value: Node<Expr>,
+    pub value: NodePtr<Expr>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

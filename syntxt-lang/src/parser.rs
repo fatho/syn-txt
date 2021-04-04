@@ -269,7 +269,7 @@ impl<'a> Parser<'a> {
                                     ast::Attribute {
                                         name: inner_name,
                                         colon,
-                                        value,
+                                        value: Arc::new(value),
                                     },
                                 ))
                             }

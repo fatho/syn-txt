@@ -1888,106 +1888,110 @@ fn parse_expr_sequence() {
                     span: 0..79,
                     pos: 1:1..5:13,
                     data: Sequence(
-                        Sequence {
-                            llbracket: Node {
-                                span: 0..2,
-                                pos: 1:1..1:3,
-                                data: (),
-                            },
-                            symbols: [
-                                Node {
-                                    span: 15..17,
-                                    pos: 2:13..2:15,
-                                    data: Note {
-                                        note: Note(
-                                            69,
-                                        ),
-                                        duration: Rational {
-                                            num: 1,
-                                            denom: 4,
+                        Node {
+                            span: 0..79,
+                            pos: 1:1..5:13,
+                            data: Sequence {
+                                llbracket: Node {
+                                    span: 0..2,
+                                    pos: 1:1..1:3,
+                                    data: (),
+                                },
+                                symbols: [
+                                    Node {
+                                        span: 15..17,
+                                        pos: 2:13..2:15,
+                                        data: Note {
+                                            note: Note(
+                                                69,
+                                            ),
+                                            duration: Rational {
+                                                num: 1,
+                                                denom: 4,
+                                            },
                                         },
                                     },
-                                },
-                                Node {
-                                    span: 18..20,
-                                    pos: 2:16..2:18,
-                                    data: Note {
-                                        note: Note(
-                                            69,
-                                        ),
-                                        duration: Rational {
-                                            num: 1,
-                                            denom: 4,
+                                    Node {
+                                        span: 18..20,
+                                        pos: 2:16..2:18,
+                                        data: Note {
+                                            note: Note(
+                                                69,
+                                            ),
+                                            duration: Rational {
+                                                num: 1,
+                                                denom: 4,
+                                            },
                                         },
                                     },
-                                },
-                                Node {
-                                    span: 21..23,
-                                    pos: 2:19..2:21,
-                                    data: Note {
-                                        note: Note(
-                                            69,
-                                        ),
-                                        duration: Rational {
-                                            num: 1,
-                                            denom: 4,
+                                    Node {
+                                        span: 21..23,
+                                        pos: 2:19..2:21,
+                                        data: Note {
+                                            note: Note(
+                                                69,
+                                            ),
+                                            duration: Rational {
+                                                num: 1,
+                                                denom: 4,
+                                            },
                                         },
                                     },
-                                },
-                                Node {
-                                    span: 24..26,
-                                    pos: 2:22..2:24,
-                                    data: Note {
-                                        note: Note(
-                                            69,
-                                        ),
-                                        duration: Rational {
-                                            num: 1,
-                                            denom: 4,
+                                    Node {
+                                        span: 24..26,
+                                        pos: 2:22..2:24,
+                                        data: Note {
+                                            note: Note(
+                                                69,
+                                            ),
+                                            duration: Rational {
+                                                num: 1,
+                                                denom: 4,
+                                            },
                                         },
                                     },
-                                },
-                                Node {
-                                    span: 39..42,
-                                    pos: 3:13..3:16,
-                                    data: Rest {
-                                        duration: Rational {
-                                            num: 1,
-                                            denom: 1,
+                                    Node {
+                                        span: 39..42,
+                                        pos: 3:13..3:16,
+                                        data: Rest {
+                                            duration: Rational {
+                                                num: 1,
+                                                denom: 1,
+                                            },
                                         },
                                     },
-                                },
-                                Node {
-                                    span: 55..61,
-                                    pos: 4:13..4:19,
-                                    data: Note {
-                                        note: Note(
-                                            69,
-                                        ),
-                                        duration: Rational {
-                                            num: 15,
-                                            denom: 16,
+                                    Node {
+                                        span: 55..61,
+                                        pos: 4:13..4:19,
+                                        data: Note {
+                                            note: Note(
+                                                69,
+                                            ),
+                                            duration: Rational {
+                                                num: 15,
+                                                denom: 16,
+                                            },
                                         },
                                     },
-                                },
-                                Node {
-                                    span: 62..66,
-                                    pos: 4:20..4:24,
-                                    data: Note {
-                                        note: Note(
-                                            69,
-                                        ),
-                                        duration: Rational {
-                                            num: 1,
-                                            denom: 16,
+                                    Node {
+                                        span: 62..66,
+                                        pos: 4:20..4:24,
+                                        data: Note {
+                                            note: Note(
+                                                69,
+                                            ),
+                                            duration: Rational {
+                                                num: 1,
+                                                denom: 16,
+                                            },
                                         },
                                     },
+                                ],
+                                rrbracket: Node {
+                                    span: 77..79,
+                                    pos: 5:11..5:13,
+                                    data: (),
                                 },
-                            ],
-                            rrbracket: Node {
-                                span: 77..79,
-                                pos: 5:11..5:13,
-                                data: (),
                             },
                         },
                     ),

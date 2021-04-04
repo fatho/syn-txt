@@ -16,10 +16,7 @@
 
 //! Evaluating the AST into a more concrete description of the song.
 
-use std::{
-    collections::HashMap,
-    ops::Range,
-};
+use std::{collections::HashMap, ops::Range};
 
 use syntxt_core::rational::Rational;
 
@@ -41,8 +38,13 @@ pub struct ObjectId(usize);
 
 #[derive(Debug)]
 pub enum Thunk {
-    Unevaluated(NodePtr<ast::Expr>),
-    Evaluating,
+    Unevaluated {
+        scope: ScopeId,
+        expr: NodePtr<ast::Expr>,
+    },
+    Evaluating {
+        expr: NodePtr<ast::Expr>,
+    },
     Evaluated(Value),
 }
 
@@ -53,6 +55,7 @@ pub struct ThunkId(usize);
 pub struct Context {
     thunks: Vec<Thunk>,
     objects: Vec<Object>,
+    scopes: Vec<Scope>,
     errors: Vec<EvalError>,
 }
 
@@ -61,6 +64,7 @@ impl Context {
         Self {
             thunks: Vec::new(),
             objects: Vec::new(),
+            scopes: Vec::new(),
             errors: Vec::new(),
         }
     }
@@ -80,10 +84,41 @@ impl Context {
         &mut self.objects[id.0]
     }
 
-    pub fn create_thunk(&mut self, expr: NodePtr<ast::Expr>) -> ThunkId {
+    pub fn create_thunk(&mut self, thunk: Thunk) -> ThunkId {
         let id = ThunkId(self.thunks.len());
-        self.thunks.push(Thunk::Unevaluated(expr));
+        self.thunks.push(thunk);
         id
+    }
+
+    pub fn create_scope(&mut self, parent: Option<ScopeId>) -> ScopeId {
+        let id = ScopeId(self.scopes.len());
+        self.scopes.push(Scope::new(parent));
+        id
+    }
+
+    pub fn bind(&mut self, scope: ScopeId, var: &Node<String>, value: ThunkId) {
+        if self.scopes[scope.0]
+            .bindings
+            .insert(var.data.clone(), value)
+            .is_some()
+        {
+            self.error(
+                var,
+                format!("'{}' defined more than once in scope {}", var.data, scope.0),
+            );
+        }
+    }
+
+    pub fn lookup(&mut self, scope: ScopeId, var: &Node<&str>) -> Option<ThunkId> {
+        let mut current = Some(scope);
+        while let Some(here) = current {
+            if let Some(value) = self.scopes[here.0].bindings.get(var.data) {
+                return Some(*value);
+            }
+            current = self.scopes[here.0].parent;
+        }
+        self.error(var, format!("Variable {} not defined", var.data));
+        None
     }
 
     pub fn error<T, S: Into<String>>(&mut self, source: &Node<T>, message: S) {
@@ -98,26 +133,34 @@ impl Context {
         &self.errors
     }
 
-
     pub fn eval(&mut self, node: &Node<ast::Root>) -> Vec<ObjectId> {
-        node.data
-        .objects
-        .iter()
-        .map(|child| self.build_hierarchy(child))
-        .collect()
+        let root_scope = self.create_scope(None);
+        let objects = node
+            .data
+            .objects
+            .iter()
+            .map(|child| self.build_hierarchy(child, root_scope))
+            .collect();
+        self.force_all();
+        objects
     }
 
-    fn build_hierarchy(&mut self, node: &Node<ast::Object>) -> ObjectId {
+    /// Traverse the object tree and register all id'd objects in the given scope.
+    fn build_hierarchy(&mut self, node: &Node<ast::Object>, scope: ScopeId) -> ObjectId {
         let obj = self.create_object(node.data.name.data.clone());
 
-        let mut id: Option<String> = None;
+        let mut id: Option<Node<String>> = None;
         let mut attrs: HashMap<String, ThunkId> = HashMap::new();
 
         for attr in &node.data.attrs {
             if attr.data.name.data == "id" {
                 if let ast::Expr::Var(var) = &attr.data.value.data {
                     if id.is_none() {
-                        id = Some(var.into())
+                        id = Some(Node {
+                            span: attr.data.value.span.clone(),
+                            pos: attr.data.value.pos.clone(),
+                            data: var.into(),
+                        });
                     } else {
                         self.error(attr, "'id' set more than once");
                     }
@@ -126,30 +169,197 @@ impl Context {
                 }
             } else {
                 let name = attr.data.name.data.clone();
-                if attrs.contains_key(&name) {
-                    self.error(attr, format!("'{}' set more than once", name));
-                } else {
-                    let value = self.create_thunk(attr.data.value.clone());
-                    attrs.insert(name, value);
+                let value = self.create_thunk(Thunk::Unevaluated {
+                    scope,
+                    expr: attr.data.value.clone(),
+                });
+                if attrs.insert(name, value).is_some() {
+                    self.error(
+                        attr,
+                        format!("'{}' set more than once", attr.data.name.data),
+                    );
                 }
             }
+        }
+
+        if let Some(id) = &id {
+            let object_value = self.create_thunk(Thunk::Evaluated(Value::Object(obj)));
+            self.bind(scope, id, object_value);
         }
 
         let children: Vec<ObjectId> = node
             .data
             .children
             .iter()
-            .map(|child| self.build_hierarchy(child))
+            .map(|child| self.build_hierarchy(child, scope))
             .collect();
 
         let mut_object = self.object_mut(obj);
-        mut_object.id = id;
+        mut_object.id = id.map(|node| node.data);
         mut_object.attrs = attrs;
         mut_object.children = children;
 
         obj
     }
+
+    /// Evaluate all thunks.
+    fn force_all(&mut self) {
+        let mut index = 0;
+        // Evaluating thunks may create new thunks,
+        // hence we cannot use for ... in 0..self.thunks.len()
+        while index < self.thunks.len() {
+            self.force_thunk(ThunkId(index));
+            index += 1;
+        }
+    }
+
+    fn force_thunk(&mut self, thunk_id: ThunkId) -> Option<Value> {
+        match &self.thunks[thunk_id.0] {
+            Thunk::Unevaluated { scope, expr } => {
+                let expr = expr.clone();
+                let scope = *scope;
+                self.thunks[thunk_id.0] = Thunk::Evaluating { expr: expr.clone() };
+                if let Some(result) = self.eval_expr(&expr, scope) {
+                    self.thunks[thunk_id.0] = Thunk::Evaluated(result.clone());
+                    Some(result)
+                } else {
+                    self.error(&expr, format!("Failed to evaluate thunk {}", thunk_id.0));
+                    None
+                }
+            }
+            Thunk::Evaluating { expr } => {
+                let expr = expr.clone(); // appease the borrow checker
+                self.error(
+                    &expr,
+                    format!("Evaluating thunk {} caused endless recursion", thunk_id.0),
+                );
+                None
+            }
+            Thunk::Evaluated(value) => Some(value.clone()),
+        }
+    }
+
+    fn eval_expr(&mut self, expr: &Node<ast::Expr>, scope: ScopeId) -> Option<Value> {
+        // TODO: fill remaining cases
+        match &expr.data {
+            ast::Expr::String(x) => Some(Value::String(x.clone())),
+            ast::Expr::Int(x) => Some(Value::Int(x.clone())),
+            ast::Expr::Ratio(x) => Some(Value::Ratio(x.clone())),
+            ast::Expr::Float(x) => Some(Value::Float(x.into_inner())),
+            ast::Expr::Bool(x) => Some(Value::Bool(x.clone())),
+            ast::Expr::Unary { operator, operand } => match operator.data {
+                ast::UnaryOp::Plus => None,
+                ast::UnaryOp::Minus => None,
+                ast::UnaryOp::Not => {
+                    let operand_value = self.eval_expr(operand, scope)?;
+                    let b = self.expect_bool(operand, operand_value)?;
+                    Some(Value::Bool(!b))
+                }
+            },
+            ast::Expr::Binary {
+                left,
+                operator,
+                right,
+            } => match operator.data {
+                ast::BinaryOp::Add => None,
+                ast::BinaryOp::Sub => None,
+                ast::BinaryOp::Mult => None,
+                ast::BinaryOp::Div => None,
+                ast::BinaryOp::And => {
+                    let left_value = self.eval_expr(left, scope)?;
+                    let l = self.expect_bool(left, left_value)?;
+                    if l {
+                        let right_value = self.eval_expr(right, scope)?;
+                        let r = self.expect_bool(right, right_value)?;
+                        Some(Value::Bool(r))
+                    } else {
+                        Some(Value::Bool(false))
+                    }
+                }
+                ast::BinaryOp::Or => {
+                    let left_value = self.eval_expr(left, scope)?;
+                    let l = self.expect_bool(left, left_value)?;
+                    if l {
+                        Some(Value::Bool(true))
+                    } else {
+                        let right_value = self.eval_expr(right, scope)?;
+                        let r = self.expect_bool(right, right_value)?;
+                        Some(Value::Bool(r))
+                    }
+                }
+            },
+            ast::Expr::Paren { expr, .. } => self.eval_expr(expr, scope),
+            ast::Expr::Object(node) => {
+                // evaluate anonymous objects in their own scope
+                let nested = self.create_scope(Some(scope));
+                let object = self.build_hierarchy(&node, nested);
+                Some(Value::Object(object))
+            }
+            ast::Expr::Var(var) => {
+                let thunk = self.lookup(
+                    scope,
+                    &Node {
+                        span: expr.span.clone(),
+                        pos: expr.pos.clone(),
+                        data: var.as_str(),
+                    },
+                )?;
+                self.force_thunk(thunk)
+            }
+            ast::Expr::Accessor {
+                expr,
+                attribute,
+                ..
+            } => {
+                let accessee = self.eval_expr(expr, scope)?;
+                if let Some(obj) = accessee.as_object() {
+                    if let Some(thunk) = self.objects[obj.0].attrs.get(&attribute.data).cloned() {
+                        self.force_thunk(thunk)
+                    } else {
+                        self.error(attribute, "attribute missing");
+                        None
+                    }
+                } else {
+                    self.error(expr, "cannot access attribute of non-object");
+                    None
+                }
+            },
+            ast::Expr::Call {
+                callee,
+                lparen,
+                arguments,
+                rparen,
+            } => None,
+            ast::Expr::Sequence(_) => None,
+        }
+    }
+
+    fn expect_bool<T>(&mut self, source: &Node<T>, value: Value) -> Option<bool> {
+        let result = value.as_bool();
+        if result.is_none() {
+            self.error(source, "expected bool");
+        }
+        result
+    }
 }
+
+#[derive(Debug)]
+pub struct Scope {
+    parent: Option<ScopeId>,
+    bindings: HashMap<String, ThunkId>,
+}
+
+impl Scope {
+    pub fn new(parent: Option<ScopeId>) -> Self {
+        Self {
+            parent,
+            bindings: HashMap::new(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ScopeId(usize);
 
 #[derive(Debug)]
 pub struct EvalError {
@@ -158,99 +368,30 @@ pub struct EvalError {
     pub message: String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Value {
     Int(i64),
     Float(f64),
     Ratio(Rational),
     String(String),
+    Bool(bool),
     Object(ObjectId),
 }
 
-
-#[allow(unused)]
-mod v1 {
-
-    use std::{
-        any::{Any, TypeId},
-        collections::HashMap,
-        marker::PhantomData,
-        rc::Rc,
-    };
-
-    use syntxt_core::rational::Rational;
-
-    use crate::ast::{self, Node, NodePtr};
-
-    /// Holds the data needed during evaluation.
-    pub struct Context {
-        thunks: Vec<Thunk>,
-        objects: Vec<Rc<dyn Object>>,
-        objects_by_name: HashMap<Rc<str>, ObjectRef>,
-    }
-
-    pub struct ObjectRef(usize);
-
-    pub enum Thunk {
-        Unevaluated(NodePtr<ast::Expr>),
-        Evaluating,
-        Evaluated(Value),
-    }
-
-    pub enum Value {
-        Int(i64),
-        Float(f64),
-        Ratio(Rational),
-        Sequence(ast::Sequence),
-        Object(ObjectRef),
-    }
-
-    pub struct ValueRef<T> {
-        id: usize,
-        _type: PhantomData<T>,
-    }
-
-    // pub struct Object {
-    //     id: String,
-    // }
-
-    pub struct Song {}
-
-    pub struct Meta {}
-
-    pub fn eval(source: &Node<ast::Root>, cxt: &mut Context) {}
-
-    fn constructor<T, F>(concrete: F) -> impl Fn(&mut Context) -> Box<dyn Object>
-    where
-        T: Object,
-        F: Fn(&mut Context) -> T + 'static,
-    {
-        move |cxt| Box::new(concrete(cxt))
-    }
-
-    pub trait Object: Any {
-        fn type_name(&self) -> &str;
-    }
-
-    impl dyn Object {
-        pub fn is<T: 'static>(&self) -> bool {
-            TypeId::of::<T>() == self.type_id()
+impl Value {
+    pub fn as_bool(&self) -> Option<bool> {
+        if let Self::Bool(v) = self {
+            Some(*v)
+        } else {
+            None
         }
+    }
 
-        pub fn downcast_rc<T: 'static>(self: Rc<Self>) -> Result<Rc<T>, Rc<Self>> {
-            if self.is::<T>() {
-                unsafe { Ok(Rc::from_raw(Rc::into_raw(self) as _)) }
-            } else {
-                Err(self)
-            }
-        }
-
-        pub fn downcast_box<T: 'static>(self: Box<Self>) -> Result<Box<T>, Box<Self>> {
-            if self.is::<T>() {
-                unsafe { Ok(Box::from_raw(Box::into_raw(self) as _)) }
-            } else {
-                Err(self)
-            }
+    pub fn as_object(&self) -> Option<ObjectId> {
+        if let Self::Object(v) = self {
+            Some(*v)
+        } else {
+            None
         }
     }
 }

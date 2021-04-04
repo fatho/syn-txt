@@ -637,7 +637,7 @@ impl<'a> Parser<'a> {
                 Some(Token::Note) => {
                     self.consume();
                     let note_str = &self.source[span.clone()];
-                    if let Some(note) = note_sym_from_str(note_str) {
+                    if let Some(note) = seq_sym_from_str(note_str) {
                         symbols.push(self.make_node(span, note));
                     } else {
                         self.errors
@@ -675,8 +675,27 @@ impl<'a> Parser<'a> {
     }
 }
 
-fn note_sym_from_str(input: &str) -> Option<ast::SeqSym> {
+/// Parse a symbol in sequence notation.
+fn seq_sym_from_str(input: &str) -> Option<ast::SeqSym> {
     let mut chars = input.chars().peekable();
+
+    if matches!(chars.peek(), Some('r') | Some('R')) {
+        chars.next();
+        let duration = parse_duration(&mut chars)?;
+        Some(ast::SeqSym::Rest { duration })
+    } else {
+        // If it's not a rest, it's a note.
+        let note = parse_note(&mut chars)?;
+        let duration = parse_duration(&mut chars)?;
+
+        Some(ast::SeqSym::Note {
+            note,
+            duration,
+        })
+    }
+}
+
+fn parse_note<I: Iterator<Item=char>>(chars: &mut Peekable<I>) -> Option<Note> {
     // First comes the name
     let name = match chars.next()? {
         'a' | 'A' => NoteName::A,
@@ -712,8 +731,15 @@ fn note_sym_from_str(input: &str) -> Option<ast::SeqSym> {
         _ => return None,
     };
 
-    let note = Note::try_named(name, accidental, octave)?;
+    Note::try_named(name, accidental, octave)
+}
 
+/// Parse the duration part of a note symbol.
+/// Individual note lengths start as quarters, and can be doubled or halved with `+` or `-`
+/// respectively, optionally followed by one or more dots `.` for dotted lengths.
+/// Tied repetitions of the same note or rest are separated by `_`.
+/// For example, the duration `+_` is `1/2 + 1/4 = 3/4`, and `-_-.` is `1/8 + 1/8 + 1/16 = 5/16`.
+fn parse_duration<I: Iterator<Item=char>>(chars: &mut Peekable<I>) -> Option<Rational> {
     let mut full_duration = Rational::zero();
     loop {
         // Then comes the duration,
@@ -754,9 +780,5 @@ fn note_sym_from_str(input: &str) -> Option<ast::SeqSym> {
             break;
         }
     }
-
-    Some(ast::SeqSym::Note {
-        note,
-        duration: full_duration,
-    })
+    Some(full_duration)
 }

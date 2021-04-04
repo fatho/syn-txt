@@ -1879,13 +1879,14 @@ fn parse_expr_sequence() {
     check_expr(
         r#"[[
             a4 a4 a4 a4
+            r++
             a4+_.. a4--
           ]]"#,
         expect![[r#"
             Ok(
                 Node {
-                    span: 0..63,
-                    pos: 1:1..4:13,
+                    span: 0..79,
+                    pos: 1:1..5:13,
                     data: Sequence(
                         Sequence {
                             llbracket: Node {
@@ -1947,8 +1948,18 @@ fn parse_expr_sequence() {
                                     },
                                 },
                                 Node {
-                                    span: 39..45,
-                                    pos: 3:13..3:19,
+                                    span: 39..42,
+                                    pos: 3:13..3:16,
+                                    data: Rest {
+                                        duration: Rational {
+                                            num: 1,
+                                            denom: 1,
+                                        },
+                                    },
+                                },
+                                Node {
+                                    span: 55..61,
+                                    pos: 4:13..4:19,
                                     data: Note {
                                         note: Note(
                                             69,
@@ -1960,8 +1971,8 @@ fn parse_expr_sequence() {
                                     },
                                 },
                                 Node {
-                                    span: 46..50,
-                                    pos: 3:20..3:24,
+                                    span: 62..66,
+                                    pos: 4:20..4:24,
                                     data: Note {
                                         note: Note(
                                             69,
@@ -1974,8 +1985,8 @@ fn parse_expr_sequence() {
                                 },
                             ],
                             rrbracket: Node {
-                                span: 61..63,
-                                pos: 4:11..4:13,
+                                span: 77..79,
+                                pos: 5:11..5:13,
                                 data: (),
                             },
                         },

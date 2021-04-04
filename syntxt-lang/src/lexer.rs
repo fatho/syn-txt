@@ -77,7 +77,7 @@ pub enum Token {
     Ident,
     // Note that this might conflict with identifiers. Normally though, one simply shouldn't
     // use identifiers that short anyways, so in practice, it might not be a big problem.
-    #[regex(r"[a-gA-G](♯|#|♭|b)?[0-9](?&notelen)(_(?&notelen))*", priority=2)]
+    #[regex(r"([a-gA-G](♯|#|♭|b)?[0-9]|[rR])(?&notelen)(_(?&notelen))*", priority=2)]
     Note,
 
     // Literals

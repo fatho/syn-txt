@@ -21,6 +21,7 @@ pub use logos::Span;
 
 #[derive(Logos, Debug, PartialEq, Clone, Copy)]
 #[logos(subpattern decimal = r"[0-9][_0-9]*")]
+#[logos(subpattern notelen = r"(\+*|-*)\.*")]
 pub enum Token {
     // Operators
     #[token("+")]
@@ -66,9 +67,18 @@ pub enum Token {
     #[token(")")]
     RParen,
 
+    #[token("[[")]
+    LLBracket,
+    #[token("]]")]
+    RRBracket,
+
     // Entities
     #[regex("[a-zA-Z_][a-zA-Z0-9_]*")]
     Ident,
+    // Note that this might conflict with identifiers. Normally though, one simply shouldn't
+    // use identifiers that short anyways, so in practice, it might not be a big problem.
+    #[regex(r"([a-gA-G](♯|#|♭|b)?[0-9]|[rR])(?&notelen)(_(?&notelen))*", priority=2)]
+    Note,
 
     // Literals
     #[regex(r#""([^"\\\n]|\\[^\u0000-\u001F])*""#)]
@@ -202,5 +212,14 @@ mod tests {
     fn bools() {
         check("true", expect![[r#"[(LitBool, 0..4)]"#]]);
         check("false", expect![[r#"[(LitBool, 0..5)]"#]]);
+    }
+
+    #[test]
+    fn notes() {
+        check("a4", expect![[r#"[(Note, 0..2)]"#]]);
+        check("c#4", expect![[r#"[(Note, 0..3)]"#]]);
+        check("g3++", expect![[r#"[(Note, 0..4)]"#]]);
+        check("c2-. d2--", expect![[r#"[(Note, 0..4), (Note, 5..9)]"#]]);
+        check("[[ c2+__-. d2-- ]]", expect![[r#"[(LLBracket, 0..2), (Note, 3..10), (Note, 11..15), (RRBracket, 16..18)]"#]]);
     }
 }

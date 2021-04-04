@@ -18,6 +18,10 @@ use std::{fmt::Display, iter::Peekable, ops::Range, str::FromStr, sync::Arc};
 
 use crate::ast::{self, Node};
 use logos::Logos;
+use syntxt_core::{
+    note::{Accidental, Note, NoteName},
+    rational::Rational,
+};
 
 use crate::{
     lexer::{Span, Token},
@@ -413,6 +417,7 @@ impl<'a> Parser<'a> {
             Token::Minus => self.parse_unary_operand(ast::UnaryOp::Minus, span),
             Token::Not => self.parse_unary_operand(ast::UnaryOp::Not, span),
             Token::LParen => self.parse_paren_expr(),
+            Token::LLBracket => self.parse_sequence_expr(),
             Token::LitInt => self.parse_int_expr(),
             Token::LitFloat => self.parse_float_expr(),
             Token::LitRatio => self.parse_ratio_expr(),
@@ -614,4 +619,166 @@ impl<'a> Parser<'a> {
         let string = self.parse_string()?;
         Ok(self.make_node(string.span, ast::Expr::String(string.data)))
     }
+
+    fn parse_sequence_expr(&mut self) -> Parse<ast::Expr> {
+        let sequence = self.parse_sequence_group()?;
+        Ok(self.make_node(
+            sequence.span.clone(),
+            ast::Expr::Sequence(Arc::new(sequence)),
+        ))
+    }
+
+    fn parse_sequence_group(&mut self) -> Parse<ast::Sequence> {
+        let llbracket = self.parse_expect_token(Token::LLBracket)?;
+        let mut symbols = Vec::new();
+        loop {
+            let (token, span) = self.peek();
+            match token {
+                Some(Token::LLBracket) => {
+                    todo!("nested group")
+                }
+                Some(Token::Note) => {
+                    self.consume();
+                    let note_str = &self.source[span.clone()];
+                    if let Some(note) = seq_sym_from_str(note_str) {
+                        symbols.push(self.make_node(span, note));
+                    } else {
+                        self.errors
+                            .push(self.make_error(span, format!("Invalid note: {}", note_str)));
+                    }
+                }
+                Some(Token::RRBracket) => {
+                    break;
+                }
+                Some(other) => {
+                    self.errors.push(self.expected_but_got(
+                        span,
+                        &[Token::LLBracket, Token::RRBracket, Token::Note],
+                        other,
+                    ));
+                    let _ = self.consume();
+                }
+                None => {
+                    break;
+                }
+            }
+        }
+
+        let rrbracket_parse = self.parse_expect_token(Token::RRBracket);
+        let rrbracket = self.recover_replace(rrbracket_parse, ());
+
+        Ok(self.make_node(
+            llbracket.span.start..rrbracket.span.end,
+            ast::Sequence {
+                llbracket,
+                symbols,
+                rrbracket,
+            },
+        ))
+    }
+}
+
+/// Parse a symbol in sequence notation.
+fn seq_sym_from_str(input: &str) -> Option<ast::SeqSym> {
+    let mut chars = input.chars().peekable();
+
+    if matches!(chars.peek(), Some('r') | Some('R')) {
+        chars.next();
+        let duration = parse_duration(&mut chars)?;
+        Some(ast::SeqSym::Rest { duration })
+    } else {
+        // If it's not a rest, it's a note.
+        let note = parse_note(&mut chars)?;
+        let duration = parse_duration(&mut chars)?;
+
+        Some(ast::SeqSym::Note { note, duration })
+    }
+}
+
+fn parse_note<I: Iterator<Item = char>>(chars: &mut Peekable<I>) -> Option<Note> {
+    // First comes the name
+    let name = match chars.next()? {
+        'a' | 'A' => NoteName::A,
+        'b' | 'B' => NoteName::B,
+        'c' | 'C' => NoteName::C,
+        'd' | 'D' => NoteName::D,
+        'e' | 'E' => NoteName::E,
+        'f' | 'F' => NoteName::F,
+        'g' | 'G' => NoteName::G,
+        _ => return None,
+    };
+    // Then any accidental
+    let accidental = match chars.peek().copied() {
+        Some(ch) => {
+            if ch == '♯' || ch == '#' {
+                chars.next();
+                Accidental::Sharp
+            } else if ch == '♭' || ch == 'b' {
+                chars.next();
+                Accidental::Flat
+            } else {
+                Accidental::Base
+            }
+        }
+        _ => Accidental::Base,
+    };
+    // Then the octave
+    let octave = match chars.peek().copied() {
+        Some(ch) if ch.is_ascii_digit() => {
+            chars.next();
+            ch.to_digit(10).unwrap() as i32
+        }
+        _ => return None,
+    };
+
+    Note::try_named(name, accidental, octave)
+}
+
+/// Parse the duration part of a note symbol.
+/// Individual note lengths start as quarters, and can be doubled or halved with `+` or `-`
+/// respectively, optionally followed by one or more dots `.` for dotted lengths.
+/// Tied repetitions of the same note or rest are separated by `_`.
+/// For example, the duration `+_` is `1/2 + 1/4 = 3/4`, and `-_-.` is `1/8 + 1/8 + 1/16 = 5/16`.
+fn parse_duration<I: Iterator<Item = char>>(chars: &mut Peekable<I>) -> Option<Rational> {
+    let mut full_duration = Rational::zero();
+    loop {
+        // Then comes the duration,
+        // first in powers of two
+        let mut power: i64 = -2; // quarters, 2^(-2) == 1 / 2^2 == 1 / 4
+        loop {
+            match chars.peek() {
+                Some('+') => {
+                    chars.next();
+                    power += 1;
+                }
+                Some('-') => {
+                    chars.next();
+                    power -= 1;
+                }
+                _ => break,
+            }
+        }
+        // then the dots
+        let mut dots = 0;
+        while let Some('.') = chars.peek() {
+            chars.next();
+            dots += 1;
+        }
+        // Then put everything together
+        let mut duration = Rational::int(2).checked_powi(power)?;
+        for i in 0..dots {
+            // each dot is worth half of the previous note duration
+            duration = duration.checked_add(Rational::int(2).checked_powi(power - i - 1)?)?;
+        }
+
+        full_duration = full_duration.checked_add(duration)?;
+
+        // Check for tie to next note of the same pitch
+        if let Some('_') = chars.peek() {
+            chars.next();
+        } else {
+            break;
+        }
+    }
+    Some(full_duration)
 }

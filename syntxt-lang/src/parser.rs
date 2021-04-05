@@ -429,9 +429,9 @@ impl<'a> Parser<'a> {
                 // Can either be an object or a normal identifier, depending on what follows
                 if let Some(Token::LBrace) = self.peek().0 {
                     let object = self.parse_object_body(name)?;
-                    Ok(self.make_node(object.span.clone(), ast::Expr::Object(Arc::new(object))))
+                    Ok(object.nest(ast::Expr::Object))
                 } else {
-                    Ok(self.make_node(name.span, ast::Expr::Var(name.data)))
+                    Ok(name.map(ast::Expr::Var))
                 }
             }
             _ => Err(self.expected_str_but_got(span, "expression", token)),
@@ -622,10 +622,7 @@ impl<'a> Parser<'a> {
 
     fn parse_sequence_expr(&mut self) -> Parse<ast::Expr> {
         let sequence = self.parse_sequence_group()?;
-        Ok(self.make_node(
-            sequence.span.clone(),
-            ast::Expr::Sequence(Arc::new(sequence)),
-        ))
+        Ok(sequence.nest(ast::Expr::Sequence))
     }
 
     fn parse_sequence_group(&mut self) -> Parse<ast::Sequence> {
@@ -636,9 +633,7 @@ impl<'a> Parser<'a> {
             match token {
                 Some(Token::LLBracket) => {
                     let group = self.parse_sequence_group()?;
-                    symbols.push(
-                        self.make_node(group.span.clone(), ast::SeqSym::Group(Arc::new(group))),
-                    );
+                    symbols.push(group.nest(ast::SeqSym::Group));
                 }
                 Some(Token::Note) => {
                     self.consume();

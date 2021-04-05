@@ -261,11 +261,7 @@ impl Context {
         match &self.thunks[thunk_id.0] {
             Thunk::Unevaluated { scope, expr } => {
                 let expr = expr.clone();
-                let entry_point = Node {
-                    span: expr.span.clone(),
-                    pos: expr.pos.clone(),
-                    data: (),
-                };
+                let entry_point = expr.replace(());
                 let scope = *scope;
                 self.thunks[thunk_id.0] = Thunk::Evaluating { entry_point };
                 if let Some(result) = self.eval_expr(&expr, scope) {
@@ -280,11 +276,7 @@ impl Context {
             Thunk::ObjectPrimitive { obj, prim } => {
                 let obj = obj.clone();
                 let prim = *prim;
-                let entry_point = Node {
-                    span: obj.span.clone(),
-                    pos: obj.pos.clone(),
-                    data: (),
-                };
+                let entry_point = obj.replace(());
                 self.thunks[thunk_id.0] = Thunk::Evaluating { entry_point };
                 if let Some(result) = prim.0(self, obj.clone()) {
                     self.thunks[thunk_id.0] = Thunk::Evaluated(result.clone());

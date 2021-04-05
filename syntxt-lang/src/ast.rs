@@ -29,6 +29,33 @@ pub struct Node<T> {
     pub data: T,
 }
 
+impl<T> Node<T> {
+    pub fn map<U, F: FnOnce(T) -> U>(self, f: F) -> Node<U> {
+        Node {
+            span: self.span,
+            pos: self.pos,
+            data: f(self.data)
+        }
+    }
+
+    pub fn nest<U, F: FnOnce(NodePtr<T>) -> U>(self, f: F) -> Node<U> {
+        Node {
+            span: self.span.clone(),
+            pos: self.pos.clone(),
+            data: f(Arc::new(self))
+        }
+    }
+
+    pub fn replace<U>(&self, data: U) -> Node<U> {
+        Node {
+            span: self.span.clone(),
+            pos: self.pos.clone(),
+            data,
+        }
+    }
+
+}
+
 pub type NodePtr<T> = Arc<Node<T>>;
 
 #[derive(Debug, Clone, PartialEq, Eq)]

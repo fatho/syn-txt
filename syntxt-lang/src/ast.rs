@@ -34,7 +34,7 @@ impl<T> Node<T> {
         Node {
             span: self.span,
             pos: self.pos,
-            data: f(self.data)
+            data: f(self.data),
         }
     }
 
@@ -42,7 +42,7 @@ impl<T> Node<T> {
         Node {
             span: self.span.clone(),
             pos: self.pos.clone(),
-            data: f(Arc::new(self))
+            data: f(Arc::new(self)),
         }
     }
 
@@ -53,7 +53,6 @@ impl<T> Node<T> {
             data,
         }
     }
-
 }
 
 pub type NodePtr<T> = Arc<Node<T>>;
@@ -126,9 +125,15 @@ pub struct Sequence {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SeqSym {
-    Note { note: Note, duration: Rational },
-    Rest { duration: Rational },
-    Group(NodePtr<Sequence>),
+    Note {
+        note: Note,
+        duration: Rational,
+    },
+    Rest {
+        duration: Rational,
+    },
+    /// A nested expression evaluating to a sequence again that is spliced in its place
+    Expr(NodePtr<Expr>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -311,14 +316,13 @@ impl Walk for SeqSym {
             // These are leaves that cannot be walked further
             SeqSym::Note { .. } => {}
             SeqSym::Rest { .. } => {}
-            // Visit the nested group
-            SeqSym::Group(seq) => {
-                seq.visit(visitor);
+            // Visit the nested parts
+            SeqSym::Expr(expr) => {
+                expr.visit(visitor);
             }
         }
     }
 }
-
 
 #[allow(unused_variables)]
 pub trait Visitor {

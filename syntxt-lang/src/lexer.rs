@@ -72,12 +72,18 @@ pub enum Token {
     #[token("]]")]
     RRBracket,
 
+    #[token("|")]
+    Pipe,
+
     // Entities
     #[regex("[a-zA-Z_][a-zA-Z0-9_]*")]
     Ident,
     // Note that this might conflict with identifiers. Normally though, one simply shouldn't
     // use identifiers that short anyways, so in practice, it might not be a big problem.
-    #[regex(r"([a-gA-G](♯|#|♭|b)?[0-9]|[rR])(?&notelen)(_(?&notelen))*", priority=2)]
+    #[regex(
+        r"([a-gA-G](♯|#|♭|b)?[0-9]|[rR])(?&notelen)(_(?&notelen))*",
+        priority = 2
+    )]
     Note,
 
     // Literals
@@ -220,6 +226,9 @@ mod tests {
         check("c#4", expect![[r#"[(Note, 0..3)]"#]]);
         check("g3++", expect![[r#"[(Note, 0..4)]"#]]);
         check("c2-. d2--", expect![[r#"[(Note, 0..4), (Note, 5..9)]"#]]);
-        check("[[ c2+__-. d2-- ]]", expect![[r#"[(LLBracket, 0..2), (Note, 3..10), (Note, 11..15), (RRBracket, 16..18)]"#]]);
+        check(
+            "[[ c2+__-. d2-- ]]",
+            expect![[r#"[(LLBracket, 0..2), (Note, 3..10), (Note, 11..15), (RRBracket, 16..18)]"#]],
+        );
     }
 }

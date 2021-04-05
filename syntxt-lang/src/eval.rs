@@ -18,7 +18,10 @@
 
 use std::{collections::HashMap, fmt::Debug, ops::Range};
 
-use syntxt_core::{rational::Rational, sequence::{SeqItem, Sequence}};
+use syntxt_core::{
+    rational::Rational,
+    sequence::{SeqItem, Sequence},
+};
 
 use crate::{
     ast::{self, Node, NodePtr},
@@ -396,19 +399,25 @@ impl Context {
             ast::Expr::Sequence(seq_expr) => {
                 let mut sequence = Sequence::new();
                 for sym in &seq_expr.data.symbols {
-                    let item = match sym.data {
-                        ast::SeqSym::Note { note, duration } => {
-                            SeqItem::Note { note, duration }
+                    match &sym.data {
+                        ast::SeqSym::Note { note, duration } => sequence.add(SeqItem::Note {
+                            note: *note,
+                            duration: *duration,
+                        }),
+                        ast::SeqSym::Rest { duration } => sequence.add(SeqItem::Rest {
+                            duration: *duration,
+                        }),
+                        ast::SeqSym::Expr(nested_expr) => {
+                            let result = self
+                                .eval_expr(&nested_expr, scope)?
+                                .try_into_sequence()
+                                .ok()?;
+                            sequence.extend(result);
                         }
-                        ast::SeqSym::Rest { duration } => {
-                            SeqItem::Rest { duration }
-                        }
-                        ast::SeqSym::Group(_) => todo!("ast::SeqSym::Group"),
-                    };
-                    sequence.add(item);
+                    }
                 }
                 Some(Value::Sequence(sequence))
-            },
+            }
         }
     }
 
@@ -538,10 +547,7 @@ mod builtins {
             } else {
                 cxt.error(
                     &obj,
-                    format!(
-                        "`len` attribute of object {} is not a rational",
-                        obj.data.0
-                    ),
+                    format!("`len` attribute of object {} is not a rational", obj.data.0),
                 );
                 return None;
             }

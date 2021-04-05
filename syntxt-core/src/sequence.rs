@@ -26,10 +26,17 @@ pub struct Sequence {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SeqItem {
-    Note { note: Note, duration: Rational },
-    Rest { duration: Rational },
+    Note {
+        note: Note,
+        duration: Rational,
+    },
+    Rest {
+        duration: Rational,
+    },
     /// Several sequences played at once.
-    Stack { sequences: Vec<Sequence> },
+    Stack {
+        sequences: Vec<Sequence>,
+    },
 }
 
 impl Sequence {

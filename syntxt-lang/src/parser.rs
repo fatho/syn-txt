@@ -631,10 +631,6 @@ impl<'a> Parser<'a> {
         loop {
             let (token, span) = self.peek();
             match token {
-                Some(Token::LLBracket) => {
-                    let group = self.parse_sequence_group()?;
-                    symbols.push(group.nest(ast::SeqSym::Group));
-                }
                 Some(Token::Note) => {
                     self.consume();
                     let note_str = &self.source[span.clone()];
@@ -648,14 +644,12 @@ impl<'a> Parser<'a> {
                 Some(Token::RRBracket) => {
                     break;
                 }
-                Some(other) => {
-                    self.errors.push(self.expected_but_got(
-                        span,
-                        &[Token::LLBracket, Token::RRBracket, Token::Note],
-                        other,
-                    ));
-                    let _ = self.consume();
-                }
+                Some(other) => match self.parse_expr() {
+                    Ok(expr) => {
+                        symbols.push(expr.nest(ast::SeqSym::Expr));
+                    }
+                    Err(err) => self.errors.push(err),
+                },
                 None => {
                     break;
                 }

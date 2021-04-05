@@ -14,7 +14,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use syntxt_lang::{ast::{self, Visit, Walk}, line_map::Pos};
+use syntxt_lang::{
+    ast::{self, Visit, Walk},
+    line_map::Pos,
+};
 use yew::prelude::*;
 
 use crate::components::tree::TreeNode;
@@ -157,7 +160,7 @@ impl ast::Visitor for AstTreeVisitor {
                 self.leaf(format!("{} @ {}", note.to_midi(), duration), node)
             }
             ast::SeqSym::Rest { duration } => self.leaf(format!("R @ {}", duration), node),
-            ast::SeqSym::Group(_) => self.nested("Group", node),
+            ast::SeqSym::Expr(expr) => expr.visit(self),
         }
     }
 }

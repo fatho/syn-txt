@@ -1999,3 +1999,139 @@ fn parse_expr_sequence() {
             )"#]],
     );
 }
+
+#[test]
+fn parse_expr_sequence_nested_exprs() {
+    check_expr(
+        r#"[[chord(a4, "min") a4 chord(a4, "min") a4]]"#,
+        expect![[r#"
+            Ok(
+                Node {
+                    span: 0..43,
+                    pos: 1:1..1:44,
+                    data: Sequence(
+                        Node {
+                            span: 0..43,
+                            pos: 1:1..1:44,
+                            data: Sequence {
+                                llbracket: Node {
+                                    span: 0..2,
+                                    pos: 1:1..1:3,
+                                    data: (),
+                                },
+                                symbols: [
+                                    Node {
+                                        span: 2..18,
+                                        pos: 1:3..1:19,
+                                        data: Expr(
+                                            Node {
+                                                span: 2..18,
+                                                pos: 1:3..1:19,
+                                                data: Call {
+                                                    callee: Node {
+                                                        span: 2..7,
+                                                        pos: 1:3..1:8,
+                                                        data: Var(
+                                                            "chord",
+                                                        ),
+                                                    },
+                                                    lparen: Node {
+                                                        span: 7..8,
+                                                        pos: 1:8..1:9,
+                                                        data: (),
+                                                    },
+                                                    arguments: [
+                                                        Node {
+                                                            span: 12..17,
+                                                            pos: 1:13..1:18,
+                                                            data: String(
+                                                                "min",
+                                                            ),
+                                                        },
+                                                    ],
+                                                    rparen: Node {
+                                                        span: 17..18,
+                                                        pos: 1:18..1:19,
+                                                        data: (),
+                                                    },
+                                                },
+                                            },
+                                        ),
+                                    },
+                                    Node {
+                                        span: 19..21,
+                                        pos: 1:20..1:22,
+                                        data: Note {
+                                            note: Note(
+                                                69,
+                                            ),
+                                            duration: Rational {
+                                                num: 1,
+                                                denom: 4,
+                                            },
+                                        },
+                                    },
+                                    Node {
+                                        span: 22..38,
+                                        pos: 1:23..1:39,
+                                        data: Expr(
+                                            Node {
+                                                span: 22..38,
+                                                pos: 1:23..1:39,
+                                                data: Call {
+                                                    callee: Node {
+                                                        span: 22..27,
+                                                        pos: 1:23..1:28,
+                                                        data: Var(
+                                                            "chord",
+                                                        ),
+                                                    },
+                                                    lparen: Node {
+                                                        span: 27..28,
+                                                        pos: 1:28..1:29,
+                                                        data: (),
+                                                    },
+                                                    arguments: [
+                                                        Node {
+                                                            span: 32..37,
+                                                            pos: 1:33..1:38,
+                                                            data: String(
+                                                                "min",
+                                                            ),
+                                                        },
+                                                    ],
+                                                    rparen: Node {
+                                                        span: 37..38,
+                                                        pos: 1:38..1:39,
+                                                        data: (),
+                                                    },
+                                                },
+                                            },
+                                        ),
+                                    },
+                                    Node {
+                                        span: 39..41,
+                                        pos: 1:40..1:42,
+                                        data: Note {
+                                            note: Note(
+                                                69,
+                                            ),
+                                            duration: Rational {
+                                                num: 1,
+                                                denom: 4,
+                                            },
+                                        },
+                                    },
+                                ],
+                                rrbracket: Node {
+                                    span: 41..43,
+                                    pos: 1:42..1:44,
+                                    data: (),
+                                },
+                            },
+                        },
+                    ),
+                },
+            )"#]],
+    );
+}

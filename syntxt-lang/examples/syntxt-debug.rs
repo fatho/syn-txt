@@ -16,9 +16,11 @@
 
 use syntxt_lang::{eval, parser::Parser};
 
-
 fn main() {
-    let filename = std::env::args_os().skip(1).next().expect("Usage: syntxt-debug <FILE>");
+    let filename = std::env::args_os()
+        .skip(1)
+        .next()
+        .expect("Usage: syntxt-debug <FILE>");
     let source = std::fs::read_to_string(filename).unwrap();
     let ast = match Parser::parse(&source) {
         Ok(ast) => ast,

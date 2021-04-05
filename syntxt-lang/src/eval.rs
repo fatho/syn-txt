@@ -16,7 +16,7 @@
 
 //! Evaluating the AST into a more concrete description of the song.
 
-use std::{collections::HashMap, ops::Range};
+use std::{collections::HashMap, fmt::Debug, ops::Range};
 
 use syntxt_core::rational::Rational;
 
@@ -25,6 +25,7 @@ use crate::{
     lexer,
     line_map::Pos,
 };
+
 #[derive(Debug, PartialEq, Eq)]
 pub struct Object {
     kind: String,
@@ -42,10 +43,15 @@ pub enum Thunk {
         scope: ScopeId,
         expr: NodePtr<ast::Expr>,
     },
+    ObjectPrimitive {
+        obj: Node<ObjectId>,
+        prim: Primitive,
+    },
     Evaluating {
-        expr: NodePtr<ast::Expr>,
+        entry_point: Node<()>,
     },
     Evaluated(Value),
+    Failed,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -152,6 +158,7 @@ impl Context {
         let mut id: Option<Node<String>> = None;
         let mut attrs: HashMap<String, ThunkId> = HashMap::new();
 
+        // Insert user-defined attributes
         for attr in &node.data.attrs {
             if attr.data.name.data == "id" {
                 if let ast::Expr::Var(var) = &attr.data.value.data {
@@ -173,13 +180,50 @@ impl Context {
                     scope,
                     expr: attr.data.value.clone(),
                 });
-                if attrs.insert(name, value).is_some() {
+                if let Some(old) = attrs.insert(name, value) {
+                    // restore old value
+                    *attrs.get_mut(&attr.data.name.data).unwrap() = old;
                     self.error(
                         attr,
                         format!("'{}' set more than once", attr.data.name.data),
                     );
                 }
             }
+        }
+
+        // Type-specific handling of objects
+        match node.data.name.data.as_str() {
+            "Sequence" => {
+                let has_start = attrs.contains_key("start");
+                let has_end = attrs.contains_key("end");
+                if has_start && has_end {
+                    self.error(
+                        node,
+                        "Sequence cannot have both `start` and `end` attributes",
+                    );
+                } else if has_end {
+                    todo!("Dynamic start attribute")
+                } else {
+                    if !has_start {
+                        self.error(node, "Sequence has neither `start` nor `end` attribute");
+                        // Default to beginning of song
+                        let start =
+                            self.create_thunk(Thunk::Evaluated(Value::Ratio(Rational::ZERO)));
+                        attrs.insert("start".into(), start);
+                    }
+                    let end = self.create_thunk(Thunk::ObjectPrimitive {
+                        obj: Node {
+                            span: node.span.clone(),
+                            pos: node.pos.clone(),
+                            data: obj,
+                        },
+                        prim: Primitive(builtins::sequence_end),
+                    });
+                    attrs.insert("end".into(), end);
+                }
+            }
+            // Regular object without special behavior
+            _ => {}
         }
 
         if let Some(id) = &id {
@@ -217,25 +261,53 @@ impl Context {
         match &self.thunks[thunk_id.0] {
             Thunk::Unevaluated { scope, expr } => {
                 let expr = expr.clone();
+                let entry_point = Node {
+                    span: expr.span.clone(),
+                    pos: expr.pos.clone(),
+                    data: (),
+                };
                 let scope = *scope;
-                self.thunks[thunk_id.0] = Thunk::Evaluating { expr: expr.clone() };
+                self.thunks[thunk_id.0] = Thunk::Evaluating { entry_point };
                 if let Some(result) = self.eval_expr(&expr, scope) {
                     self.thunks[thunk_id.0] = Thunk::Evaluated(result.clone());
                     Some(result)
                 } else {
                     self.error(&expr, format!("Failed to evaluate thunk {}", thunk_id.0));
+                    self.thunks[thunk_id.0] = Thunk::Failed;
                     None
                 }
             }
-            Thunk::Evaluating { expr } => {
-                let expr = expr.clone(); // appease the borrow checker
+            Thunk::ObjectPrimitive { obj, prim } => {
+                let obj = obj.clone();
+                let prim = *prim;
+                let entry_point = Node {
+                    span: obj.span.clone(),
+                    pos: obj.pos.clone(),
+                    data: (),
+                };
+                self.thunks[thunk_id.0] = Thunk::Evaluating { entry_point };
+                if let Some(result) = prim.0(self, obj.clone()) {
+                    self.thunks[thunk_id.0] = Thunk::Evaluated(result.clone());
+                    Some(result)
+                } else {
+                    self.error(
+                        &obj,
+                        format!("Failed to evaluate thunk {}.{:?}", thunk_id.0, prim),
+                    );
+                    self.thunks[thunk_id.0] = Thunk::Failed;
+                    None
+                }
+            }
+            Thunk::Evaluating { entry_point } => {
+                let entry_point = entry_point.clone(); // appease the borrow checker
                 self.error(
-                    &expr,
+                    &entry_point,
                     format!("Evaluating thunk {} caused endless recursion", thunk_id.0),
                 );
                 None
             }
             Thunk::Evaluated(value) => Some(value.clone()),
+            Thunk::Failed => None,
         }
     }
 
@@ -248,8 +320,8 @@ impl Context {
             ast::Expr::Float(x) => Some(Value::Float(x.into_inner())),
             ast::Expr::Bool(x) => Some(Value::Bool(x.clone())),
             ast::Expr::Unary { operator, operand } => match operator.data {
-                ast::UnaryOp::Plus => None,
-                ast::UnaryOp::Minus => None,
+                ast::UnaryOp::Plus => todo!("ast::UnaryOp::Plus"),
+                ast::UnaryOp::Minus => todo!("ast::UnaryOp::Minus"),
                 ast::UnaryOp::Not => {
                     let operand_value = self.eval_expr(operand, scope)?;
                     let b = self.expect_bool(operand, operand_value)?;
@@ -261,10 +333,10 @@ impl Context {
                 operator,
                 right,
             } => match operator.data {
-                ast::BinaryOp::Add => None,
-                ast::BinaryOp::Sub => None,
-                ast::BinaryOp::Mult => None,
-                ast::BinaryOp::Div => None,
+                ast::BinaryOp::Add => todo!("ast::BinaryOp::Add"),
+                ast::BinaryOp::Sub => todo!("ast::BinaryOp::Sub"),
+                ast::BinaryOp::Mult => todo!("ast::BinaryOp::Mult"),
+                ast::BinaryOp::Div => todo!("ast::BinaryOp::Div"),
                 ast::BinaryOp::And => {
                     let left_value = self.eval_expr(left, scope)?;
                     let l = self.expect_bool(left, left_value)?;
@@ -307,9 +379,7 @@ impl Context {
                 self.force_thunk(thunk)
             }
             ast::Expr::Accessor {
-                expr,
-                attribute,
-                ..
+                expr, attribute, ..
             } => {
                 let accessee = self.eval_expr(expr, scope)?;
                 if let Some(obj) = accessee.as_object() {
@@ -323,14 +393,11 @@ impl Context {
                     self.error(expr, "cannot access attribute of non-object");
                     None
                 }
-            },
+            }
             ast::Expr::Call {
-                callee,
-                lparen,
-                arguments,
-                rparen,
-            } => None,
-            ast::Expr::Sequence(_) => None,
+                callee, arguments, ..
+            } => todo!("ast::Expr::Call"),
+            ast::Expr::Sequence(_) => todo!("ast::Expr::Sequence"),
         }
     }
 
@@ -393,5 +460,62 @@ impl Value {
         } else {
             None
         }
+    }
+
+    pub fn try_into_ratio(self) -> Result<Rational, Self> {
+        match self {
+            Value::Int(i) => Ok(Rational::int(i)),
+            Value::Ratio(r) => Ok(r),
+            _ => Err(self),
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+pub struct Primitive(fn(cxt: &mut Context, obj: Node<ObjectId>) -> Option<Value>);
+
+impl Debug for Primitive {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "<primitive@{:p}>",
+            self.0 as *const fn(&mut Context, ObjectId) -> Option<Value>
+        )
+    }
+}
+
+mod builtins {
+    use syntxt_core::rational::Rational;
+
+    use crate::ast::Node;
+
+    use super::{Context, ObjectId, Value};
+
+    pub fn sequence_end(cxt: &mut Context, obj: Node<ObjectId>) -> Option<Value> {
+        let start = if let Some(thunk) = cxt.objects[obj.data.0].attrs.get("start").cloned() {
+            if let Ok(r) = cxt.force_thunk(thunk)?.try_into_ratio() {
+                r
+            } else {
+                cxt.error(
+                    &obj,
+                    format!(
+                        "`start` attribute of object {} is not a rational",
+                        obj.data.0
+                    ),
+                );
+                return None;
+            }
+        } else {
+            cxt.error(
+                &obj,
+                format!("Object {} does not have a `start` attribute", obj.data.0),
+            );
+            return None;
+        };
+
+        // TODO: take actual length
+        let len = Rational::int(1);
+
+        Some(Value::Ratio(start + len))
     }
 }

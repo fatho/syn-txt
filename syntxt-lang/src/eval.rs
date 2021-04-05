@@ -212,14 +212,18 @@ impl Context {
                         attrs.insert("start".into(), start);
                     }
                     let end = self.create_thunk(Thunk::ObjectPrimitive {
-                        obj: Node {
-                            span: node.span.clone(),
-                            pos: node.pos.clone(),
-                            data: obj,
-                        },
+                        obj: node.replace(obj),
                         prim: Primitive(builtins::sequence_end),
                     });
                     attrs.insert("end".into(), end);
+                }
+
+                let len = self.create_thunk(Thunk::ObjectPrimitive {
+                    obj: node.replace(obj),
+                    prim: Primitive(builtins::sequence_len),
+                });
+                if attrs.insert("len".into(), len).is_some() {
+                    self.error(node, "Redefined `len` attribute of sequence.")
                 }
             }
             // Regular object without special behavior
@@ -477,6 +481,14 @@ impl Value {
             _ => Err(self),
         }
     }
+
+    pub fn try_into_sequence(self) -> Result<Sequence, Self> {
+        if let Self::Sequence(v) = self {
+            Ok(v)
+        } else {
+            Err(self)
+        }
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -493,7 +505,7 @@ impl Debug for Primitive {
 }
 
 mod builtins {
-    use syntxt_core::rational::Rational;
+    use syntxt_core::{rational::Rational, sequence::Sequence};
 
     use crate::ast::Node;
 
@@ -520,10 +532,48 @@ mod builtins {
             );
             return None;
         };
-
-        // TODO: take actual length
-        let len = Rational::int(1);
+        let len = if let Some(thunk) = cxt.objects[obj.data.0].attrs.get("len").cloned() {
+            if let Ok(r) = cxt.force_thunk(thunk)?.try_into_ratio() {
+                r
+            } else {
+                cxt.error(
+                    &obj,
+                    format!(
+                        "`len` attribute of object {} is not a rational",
+                        obj.data.0
+                    ),
+                );
+                return None;
+            }
+        } else {
+            cxt.error(
+                &obj,
+                format!("Object {} does not have a `len` attribute", obj.data.0),
+            );
+            return None;
+        };
 
         Some(Value::Ratio(start + len))
+    }
+
+    pub fn sequence_len(cxt: &mut Context, obj: Node<ObjectId>) -> Option<Value> {
+        let notes = if let Some(thunk) = cxt.objects[obj.data.0].attrs.get("notes").cloned() {
+            if let Ok(r) = cxt.force_thunk(thunk)?.try_into_sequence() {
+                r
+            } else {
+                cxt.error(
+                    &obj,
+                    format!(
+                        "`notes` attribute of object {} is not a sequence",
+                        obj.data.0
+                    ),
+                );
+                return None;
+            }
+        } else {
+            Sequence::new()
+        };
+
+        Some(Value::Ratio(notes.duration()))
     }
 }

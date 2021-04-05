@@ -18,4 +18,5 @@
 pub mod nonnan;
 pub mod note;
 pub mod rational;
+pub mod sequence;
 pub mod util;

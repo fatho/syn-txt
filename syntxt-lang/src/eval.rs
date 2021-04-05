@@ -18,7 +18,7 @@
 
 use std::{collections::HashMap, fmt::Debug, ops::Range};
 
-use syntxt_core::rational::Rational;
+use syntxt_core::{rational::Rational, sequence::{SeqItem, Sequence}};
 
 use crate::{
     ast::{self, Node, NodePtr},
@@ -389,7 +389,22 @@ impl Context {
             ast::Expr::Call {
                 callee, arguments, ..
             } => todo!("ast::Expr::Call"),
-            ast::Expr::Sequence(_) => todo!("ast::Expr::Sequence"),
+            ast::Expr::Sequence(seq_expr) => {
+                let mut sequence = Sequence::new();
+                for sym in &seq_expr.data.symbols {
+                    let item = match sym.data {
+                        ast::SeqSym::Note { note, duration } => {
+                            SeqItem::Note { note, duration }
+                        }
+                        ast::SeqSym::Rest { duration } => {
+                            SeqItem::Rest { duration }
+                        }
+                        ast::SeqSym::Group(_) => todo!("ast::SeqSym::Group"),
+                    };
+                    sequence.add(item);
+                }
+                Some(Value::Sequence(sequence))
+            },
         }
     }
 
@@ -434,6 +449,7 @@ pub enum Value {
     Ratio(Rational),
     String(String),
     Bool(bool),
+    Sequence(Sequence),
     Object(ObjectId),
 }
 

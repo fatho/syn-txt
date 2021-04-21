@@ -26,7 +26,7 @@ fn check(input: &str, output: Expect) {
 fn check_expr(input: &str, output: Expect) {
     let mut parser = Parser::new(input);
     let result = parser.parse_expr();
-    let debug = format!("{:#?}", result);
+    let debug = format!("{:#?}\n{:#?}", result, parser.errors);
     output.assert_eq(&debug);
 }
 

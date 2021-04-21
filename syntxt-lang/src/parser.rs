@@ -644,7 +644,7 @@ impl<'a> Parser<'a> {
                 Some(Token::RRBracket) => {
                     break;
                 }
-                Some(other) => match self.parse_expr() {
+                Some(_) => match self.parse_expr() {
                     Ok(expr) => {
                         symbols.push(expr.nest(ast::SeqSym::Expr));
                     }

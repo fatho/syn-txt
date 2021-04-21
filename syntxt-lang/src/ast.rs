@@ -113,27 +113,12 @@ pub enum Expr {
         arguments: Vec<Node<Expr>>,
         rparen: Node<()>,
     },
-    Sequence(NodePtr<Sequence>),
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Sequence {
-    pub llbracket: Node<()>,
-    pub symbols: Vec<Node<SeqSym>>,
-    pub rrbracket: Node<()>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum SeqSym {
-    Note {
-        note: Note,
-        duration: Rational,
+    Note { note: Note, duration: Rational },
+    Sequence {
+        llbracket: Node<()>,
+        symbols: Vec<Node<Expr>>,
+        rrbracket: Node<()>,
     },
-    Rest {
-        duration: Rational,
-    },
-    /// A nested expression evaluating to a sequence again that is spliced in its place
-    Expr(NodePtr<Expr>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
